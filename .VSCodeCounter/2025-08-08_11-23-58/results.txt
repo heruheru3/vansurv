@@ -1,0 +1,42 @@
+Date : 2025-08-08 11:23:58
+Directory : e:\jupy_work\vansurv
+Total : 14 files,  21954 codes, 91 comments, 127 blanks, all 22172 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| JSON     |          1 |     21,194 |          0 |          0 |     21,194 |
+| Python   |         13 |        760 |         91 |        127 |        978 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++--------------------------------------------+------------+------------+------------+------------+------------+
+| path                                       | files      | code       | comment    | blank      | total      |
++--------------------------------------------+------------+------------+------------+------------+------------+
+| .                                          |         14 |     21,954 |         91 |        127 |     22,172 |
+| . (Files)                                  |          6 |     21,533 |         63 |         64 |     21,660 |
+| effects                                    |          4 |        173 |         10 |         19 |        202 |
+| weapons                                    |          4 |        248 |         18 |         44 |        310 |
++--------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++--------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                   | language | code       | comment    | blank      | total      |
++--------------------------------------------+----------+------------+------------+------------+------------+
+| e:\jupy_work\vansurv\__init__.py           | Python   |          0 |          1 |          0 |          1 |
+| e:\jupy_work\vansurv\chat_20250808.json    | JSON     |     21,194 |          0 |          0 |     21,194 |
+| e:\jupy_work\vansurv\constants.py          | Python   |         14 |          2 |          1 |         17 |
+| e:\jupy_work\vansurv\effects\__init__.py   | Python   |          0 |          1 |          0 |          1 |
+| e:\jupy_work\vansurv\effects\attack.py     | Python   |         98 |          6 |          8 |        112 |
+| e:\jupy_work\vansurv\effects\items.py      | Python   |         50 |          3 |          8 |         61 |
+| e:\jupy_work\vansurv\effects\particles.py  | Python   |         25 |          0 |          3 |         28 |
+| e:\jupy_work\vansurv\enemy.py              | Python   |         81 |          5 |          8 |         94 |
+| e:\jupy_work\vansurv\main.py               | Python   |        154 |         39 |         35 |        228 |
+| e:\jupy_work\vansurv\player.py             | Python   |         90 |         16 |         20 |        126 |
+| e:\jupy_work\vansurv\weapons\__init__.py   | Python   |          0 |          1 |          0 |          1 |
+| e:\jupy_work\vansurv\weapons\base.py       | Python   |         16 |          1 |          5 |         22 |
+| e:\jupy_work\vansurv\weapons\melee.py      | Python   |        101 |          7 |         15 |        123 |
+| e:\jupy_work\vansurv\weapons\projectile.py | Python   |        131 |          9 |         24 |        164 |
+| Total                                      |          |     21,954 |         91 |        127 |     22,172 |
++--------------------------------------------+----------+------------+------------+------------+------------+
