@@ -49,12 +49,12 @@ def get_default_subitems():
     return {
         'hp': SubItem('hp', base=0.0, per_level=20.0, is_percent=True),
         'base_damage': SubItem('base_damage', base=0.0, per_level=0.20, is_percent=True),
-        'defense': SubItem('defense', base=0.0, per_level=1.0, is_percent=False),
+        'defense': SubItem('defense', base=0.0, per_level=2.0, is_percent=False),
         'speed': SubItem('speed', base=0.0, per_level=0.2, is_percent=False),
         'effect_range': SubItem('effect_range', base=0.0, per_level=0.25, is_percent=True),
         'effect_time': SubItem('effect_time', base=0.0, per_level=0.25, is_percent=True),
         'extra_projectiles': SubItem('extra_projectiles', base=0.0, per_level=1, is_percent=False),
-        'projectile_speed': SubItem('projectile_speed', base=0.0, per_level=0.15, is_percent=True),
+        'projectile_speed': SubItem('projectile_speed', base=0.0, per_level=0.2, is_percent=True),
     }
 
 

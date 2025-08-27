@@ -287,24 +287,48 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
     except Exception:
         pass
 
-    # --- 所持サブアイテムを画面上にテキストで表示（アイコンは後回し） ---
+    # --- 所持サブアイテムを武器表示と同じスタイルのアイコン並びに統一 ---
     try:
-        sub_start_x = 10
+        sub_start_x = start_x
         sub_start_y = start_y + icon_display_size + 40  # 武器表示の下に余白を取って表示
-        sub_gap_y = 28
-        sub_font = get_font(20)
-        i = 0
-        for key, inst in player.subitems.items():
-            try:
-                name = key.replace('_', ' ').title()
-                lvl = getattr(inst, 'level', 1)
-                text = f"{name}  Lv{lvl}"
-                tx = sub_start_x
-                ty = sub_start_y + i * sub_gap_y
-                screen.blit(sub_font.render(text, True, WHITE), (tx, ty))
-                i += 1
-            except Exception:
-                continue
+        sub_icon_size = icon_display_size  # 武器と同じサイズに統一
+        sub_gap = gap
+        # 小フォントは武器表示と同じ small_font を流用
+        sub_items = list(getattr(player, 'subitems', {}).items())
+        if sub_items:
+            max_per_row = max(1, (SCREEN_WIDTH - sub_start_x - 20) // (sub_icon_size + sub_gap))
+            for idx, (key, inst) in enumerate(sub_items):
+                row = idx // max_per_row
+                col = idx % max_per_row
+                x = sub_start_x + col * (sub_icon_size + sub_gap)
+                y = sub_start_y + row * (sub_icon_size + 36)
+
+                # アイコン表示（武器と同じnearest-neighbor拡大を試みる）
+                icon_surf = None
+                try:
+                    if icons and isinstance(icons, dict):
+                        icon_surf = icons.get(key)
+                except Exception:
+                    icon_surf = None
+
+                if icon_surf:
+                    try:
+                        icon_draw = pygame.transform.scale(icon_surf, (sub_icon_size, sub_icon_size))
+                        screen.blit(icon_draw, (x, y))
+                    except Exception:
+                        pygame.draw.rect(screen, (120,200,140), (x, y, sub_icon_size, sub_icon_size))
+                else:
+                    pygame.draw.rect(screen, (120,200,140), (x, y, sub_icon_size, sub_icon_size))
+
+                # レベル表示は武器と同様に数値のみをアイコンの下にセンタリングして表示
+                try:
+                    lvl = str(getattr(inst, 'level', 1))
+                    lvl_text = small_font.render(lvl, True, WHITE)
+                    tx = x + (sub_icon_size - lvl_text.get_width()) // 2
+                    ty = y + sub_icon_size + 4
+                    screen.blit(lvl_text, (tx, ty))
+                except Exception:
+                    pass
     except Exception:
         pass
 
@@ -565,13 +589,49 @@ def draw_level_choice(screen, player, icons):
             else:
                 pygame.draw.rect(screen, (60,60,60), rect, 2, border_radius=10)
 
+            # タイプバッジを左下に表示（武器 / サブ）
+            try:
+                # 動的幅計算: テキストに合わせて幅を決定し、オプションボックスを超えないように制限
+                if typ == 'weapon':
+                    badge_label = 'WEAPON'
+                    badge_bg = (255,160,60)
+                else:
+                    badge_label = 'SUB'
+                    badge_bg = (80,200,140)
+                text_color = (0,0,0)
+                # small_font は上部で定義済み
+                try:
+                    badge_surf = small_font.render(badge_label, True, text_color)
+                except Exception:
+                    badge_surf = pygame.font.Font(None, 18).render(badge_label, True, text_color)
+                padding_x = 10
+                padding_y = 6
+                bw = badge_surf.get_width() + padding_x
+                bh = badge_surf.get_height() + padding_y
+                # オプションボックス内に収まる最大幅を計算して制限
+                max_bw = max(44, rect.width - 16)
+                if bw > max_bw:
+                    bw = max_bw
+                bh = max(bh, 16)
+                # 左下に配置（左端からはみ出さないようにクランプ）
+                bx = rect.x + 8
+                by = rect.bottom - bh - 8
+                pygame.draw.rect(screen, badge_bg, (bx, by, bw, bh), border_radius=6)
+                # テキストを中央寄せ
+                tx = bx + max(4, (bw - badge_surf.get_width()) // 2)
+                ty = by + max(1, (bh - badge_surf.get_height()) // 2)
+                screen.blit(badge_surf, (tx, ty))
+            except Exception:
+                pass
+
             # アイコン（武器ならアイコン辞書から取得、サブアイテムは汎用アイコン）
             icon_x = rect.x + 12
             icon_y = rect.y + 12
             icon_size = 32
             icon_surf = None
             try:
-                if typ == 'weapon' and icons and isinstance(icons, dict):
+                # 武器・サブアイテムの両方について icons 辞書から探す
+                if icons and isinstance(icons, dict):
                     icon_surf = icons.get(key)
             except Exception:
                 icon_surf = None
@@ -608,11 +668,39 @@ def draw_level_choice(screen, player, icons):
                     pass
                 # 新規バッジ
                 if key in getattr(player, 'available_weapons', {}):
-                    badge = small_font.render('NEW', True, (8,8,8))
-                    bx = rect.x + rect.width - 60
-                    by = rect.y + 10
-                    pygame.draw.rect(screen, (255,200,60), (bx+4, by, 44, 20), border_radius=6)
-                    screen.blit(badge, (bx + 8, by + 2))
+                    # NEW バッジの幅をテキスト幅に合わせて調整（はみ出し防止）
+                    try:
+                        badge_text = 'NEW'
+                        b_surf = small_font.render(badge_text, True, (8,8,8))
+                        padding_x = 10
+                        padding_y = 6
+                        bw = b_surf.get_width() + padding_x
+                        bh = b_surf.get_height() + padding_y
+                        # オプションボックス内に収まる最大幅を計算して制限
+                        max_bw = max(44, rect.width - 24)
+                        if bw > max_bw:
+                            bw = max_bw
+                        # バッジの高さは最低限確保
+                        bh = max(bh, 18)
+                        # 右端に寄せるが、左にはみ出さないようにクランプ
+                        bx = rect.x + rect.width - bw - 12
+                        bx = max(rect.x + 8, bx)
+                        by = rect.y + 10
+                        pygame.draw.rect(screen, (255,200,60), (bx, by, bw, bh), border_radius=6)
+                        # テキストを中央に描画（幅が狭い場合は左寄せの余白を確保）
+                        tx = bx + max(4, (bw - b_surf.get_width()) // 2)
+                        ty = by + max(1, (bh - b_surf.get_height()) // 2)
+                        screen.blit(b_surf, (tx, ty))
+                    except Exception:
+                        # フォールバック: 既存の固定サイズで描画
+                        try:
+                            badge = small_font.render('NEW', True, (8,8,8))
+                            bx = rect.x + rect.width - 60
+                            by = rect.y + 10
+                            pygame.draw.rect(screen, (255,200,60), (bx+4, by, 44, 20), border_radius=6)
+                            screen.blit(badge, (bx + 8, by + 2))
+                        except Exception:
+                            pass
             else:
                 # サブアイテムの説明をテンプレートから取得
                 tmpl = player.subitem_templates.get(key)
@@ -636,7 +724,7 @@ def draw_level_choice(screen, player, icons):
 
 def draw_subitem_choice(screen, player, icons=None):
     """サブアイテム選択 UI を描画する。player.last_subitem_choices を参照する。
-    icons は無視されるが引数を合わせておく。
+    icons はオプションで渡すとサブアイテムアイコンが表示される。
     """
     try:
         if not getattr(player, 'last_subitem_choices', None):
@@ -679,19 +767,60 @@ def draw_subitem_choice(screen, player, icons=None):
             else:
                 pygame.draw.rect(screen, (60,60,60), rect, 2, border_radius=8)
 
+            # タイプバッジを左下に表示
+            try:
+                badge_w, badge_h = 56, 18
+                # 枠の左下に表示
+                badge_x = rect.x + 8
+                badge_y = rect.bottom - badge_h - 8
+                badge_color = (80,200,140)  # sub default
+                badge_label = 'SUB'
+                text_color = (0,0,0)
+                pygame.draw.rect(screen, badge_color, (badge_x, badge_y, badge_w, badge_h), border_radius=6)
+                try:
+                    blt = small.render(badge_label, True, text_color)
+                    bx = badge_x + (badge_w - blt.get_width()) // 2
+                    by = badge_y + (badge_h - blt.get_height()) // 2
+                    screen.blit(blt, (bx, by))
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+            # アイコン表示: icons が渡されていれば利用する
+            try:
+                icon_size = 28
+                icon_x = rect.x + 12
+                icon_y = rect.y + 12
+                icon_surf = None
+                if icons and isinstance(icons, dict):
+                    icon_surf = icons.get(key)
+                if icon_surf:
+                    try:
+                        icon_draw = pygame.transform.scale(icon_surf, (icon_size, icon_size))
+                        screen.blit(icon_draw, (icon_x, icon_y))
+                    except Exception:
+                        pygame.draw.circle(screen, (120,120,120), (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2)
+                        pygame.draw.circle(screen, BLACK, (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2, 2)
+                else:
+                    pygame.draw.circle(screen, (120,200,140), (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2)
+                    pygame.draw.circle(screen, BLACK, (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2, 2)
+            except Exception:
+                pass
+
             name = key.replace('_',' ').title()
-            screen.blit(title_font.render(name, True, WHITE), (rect.x + 12, rect.y + 8))
+            screen.blit(title_font.render(name, True, WHITE), (rect.x + 12 + 36, rect.y + 8))
             # 説明はテンプレートの per_level を使って簡単に表示
             tmpl = player.subitem_templates.get(key)
             if tmpl is not None:
                 desc = f"+{tmpl.per_level}{('%' if tmpl.is_percent else '')} per level"
             else:
                 desc = ''
-            screen.blit(small.render(desc, True, (200,200,200)), (rect.x + 12, rect.y + 40))
+            screen.blit(small.render(desc, True, (200,200,200)), (rect.x + 12 + 36, rect.y + 40))
             # 所持状態表示
             if key in player.subitems:
                 lvl = player.subitems[key].level
-                screen.blit(small.render(f"Lv {lvl}", True, (220,220,220)), (rect.x + 12, rect.y + 64))
+                screen.blit(small.render(f"Lv {lvl}", True, (220,220,220)), (rect.x + 12 + 36, rect.y + 64))
 
     except Exception:
         pass

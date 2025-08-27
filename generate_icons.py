@@ -142,12 +142,69 @@ def axe():
     d.rectangle([17,12,18,13], fill=(120,120,120,255))
     return img
 
+# --- Crystal icons for subitems ---
+
+def crystal(color):
+    """Generate a simple 32x32 crystal/gem with basic shading."""
+    img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    cx, cy = 16, 14
+    # core polygon (diamond)
+    core = [(cx, cy-8), (cx+6, cy), (cx, cy+8), (cx-6, cy)]
+    d.polygon(core, fill=color+(255,))
+    # inner highlight (smaller, lighter)
+    hl = (min(255, color[0]+60), min(255, color[1]+60), min(255, color[2]+60), 200)
+    inner = [(cx, cy-5), (cx+3, cy), (cx, cy+5), (cx-3, cy)]
+    d.polygon(inner, fill=hl)
+    # facets (darker lines)
+    dark = (max(0, color[0]-50), max(0, color[1]-50), max(0, color[2]-50), 200)
+    d.line([core[0], core[1], core[2], core[3], core[0]], fill=dark, width=1)
+    # small sparkle
+    d.rectangle([cx+7, cy-8, cx+8, cy-7], fill=(255,255,255,200))
+    d.rectangle([cx+8, cy-6, cx+9, cy-5], fill=(255,255,255,120))
+    return img
+
+
+def crystal_hp():
+    return crystal((80,200,120))  # green
+
+def crystal_base_damage():
+    return crystal((220,60,60))  # red
+
+def crystal_defense():
+    return crystal((255,160,60))  # orange
+
+def crystal_speed():
+    return crystal((90,200,240))  # light blue
+
+def crystal_effect_range():
+    return crystal((240,220,70))  # yellow
+
+def crystal_effect_time():
+    return crystal((0,180,150))  # teal / 青緑
+
+def crystal_extra_projectiles():
+    return crystal((80,120,220))  # blue
+
+def crystal_projectile_speed():
+    return crystal((150,90,40))  # brown
+
+
 if __name__ == '__main__':
-    save(sword(), 'sword')
-    save(magic_wand(), 'magic_wand')
-    save(stone(), 'stone')
-    save(whip(), 'whip')
-    save(holy_water(), 'holy_water')
-    save(garlic(), 'garlic')
-    save(axe(), 'axe')
+    # save(sword(), 'sword')
+    # save(magic_wand(), 'magic_wand')
+    # save(stone(), 'stone')
+    # save(whip(), 'whip')
+    # save(holy_water(), 'holy_water')
+    # save(garlic(), 'garlic')
+    # save(axe(), 'axe')
+    # save crystals for subitems
+    save(crystal_hp(), 'hp')
+    save(crystal_base_damage(), 'base_damage')
+    save(crystal_defense(), 'defense')
+    save(crystal_speed(), 'speed')
+    save(crystal_effect_range(), 'effect_range')
+    save(crystal_effect_time(), 'effect_time')
+    save(crystal_extra_projectiles(), 'extra_projectiles')
+    save(crystal_projectile_speed(), 'projectile_speed')
     print('Icons generated in', OUT_DIR)

@@ -4,12 +4,14 @@ import math
 from constants import *
 
 class ExperienceGem:
-    def __init__(self, x, y):
+    def __init__(self, x, y, value=1):
         self.x = x
         self.y = y
         self.size = 8
         self.speed = 3
         self.collected = False
+        # ジェムが持つ経験値量（デフォルト1）
+        self.value = int(max(1, value))
 
     def move_to_player(self, player):
         dx = player.x - self.x

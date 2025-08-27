@@ -14,8 +14,12 @@ import resources
 # パーティクル関連の制限（パフォーマンス改善用）
 PARTICLE_LIMIT = 300        # これ以上は古いパーティクルから切る
 PARTICLE_TRIM_TO = 220      # 切るときに残す数
+# 画面上に存在可能な経験値ジェムの上限
+MAX_GEMS_ON_SCREEN = 80
 
-DEBUG_MODE = DEBUG  # ランタイムで切り替え可能（F3でトグル）
+# ランタイムで切り替え可能なデバッグフラグ（F3でトグル）
+DEBUG_MODE = DEBUG
+
 
 def init_game(screen):
     """ゲームの初期状態を設定する関数"""
@@ -56,11 +60,41 @@ def init_game(screen):
     damage_stats = {}
     return player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats
 
+def enforce_experience_gems_limit(gems, max_gems=MAX_GEMS_ON_SCREEN):
+    """上限を超えた場合、古いジェムから順に削除して
+    その value を残った（最新の）ジェムに加算して総EXPを維持する。
+    """
+    try:
+        while len(gems) > max_gems:
+            oldest = gems.pop(0)
+            if not gems:
+                # もし残ったジェムがなければ、古いジェムの価値を新しいまとまりとして
+                # 末尾に再配置する（ほとんど発生しないが保険）
+                gems.append(ExperienceGem(oldest.x, oldest.y, value=oldest.value))
+            else:
+                # 古いジェムの値を最新のジェムに集約
+                gems[-1].value = getattr(gems[-1], 'value', 1) + getattr(oldest, 'value', 1)
+    except Exception:
+        # 失敗してもゲームは続行
+        pass
+
 def main():
     global DEBUG_MODE
     # 初期化
     pygame.init()
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    # ディスプレイ情報取得（フルスクリーン切替に使用）
+    try:
+        display_info = pygame.display.Info()
+    except Exception:
+        display_info = None
+
+    # ウィンドウサイズ（通常モード）
+    windowed_size = (SCREEN_WIDTH, SCREEN_HEIGHT)
+    # フルスクリーンフラグ（ウィンドウフルスクリーンタイプのトグルに使用）
+    is_fullscreen = False
+
+    # 初期はウィンドウモードで開始
+    screen = pygame.display.set_mode(windowed_size)
     pygame.display.set_caption("Van Survivor Clone")
 
     # リソースをプリロード（アイコン・フォント・サウンド等）
@@ -128,13 +162,34 @@ def main():
                         print(f"[INFO] show_hitboxes set to {show_hitboxes}")
                         continue
 
+                    # フルスクリーン切替（F11） -- 元の変更を取り消して一旦無効化
+                    if event.key == pygame.K_F11:
+                        # フルスクリーン系の変更は一旦戻しました。必要なら再度実装してください。
+                        try:
+                            print("[INFO] F11 fullscreen toggle is disabled (reverted).")
+                        except Exception:
+                            pass
+                        continue
+
                     # 武器/サブアイテム選択のキー処理は下側の統合ブロックで処理する
                     # （ここでは何もしない）
 
-
                     if event.key == pygame.K_RETURN and (game_over or game_clear):
-                        # エンターキーでリスタート（screenを渡すように修正）
-                        player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game(screen)
+                        # ゲームクリア後は（規定時間生存）プレイヤー状態を保持して続行する
+                        if game_clear:
+                            print("[INFO] Survived required time - continuing without resetting player/weapons.")
+                            enemies = []
+                            experience_gems = []
+                            items = []
+                            particles = []
+                            spawn_timer = 0
+                            spawn_interval = 60
+                            game_time = 0
+                            last_difficulty_increase = 0
+                            game_clear = False
+                        else:
+                            # 通常のリスタート（全て再初期化）
+                            player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game(screen)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     # マウスで選択可能ならクリック位置を判定
                     if getattr(player, 'awaiting_weapon_choice', False) and event.button == 1:
@@ -217,8 +272,11 @@ def main():
                     if getattr(attack, '_pending', False):
                         continue
                     for enemy in enemies[:]:
-                        distance = math.sqrt((enemy.x - attack.x)**2 + (enemy.y - attack.y)**2)
-                        if distance < attack.size + enemy.size:
+                        # sqrt を避けて二乗距離で比較（高速化）
+                        dx = enemy.x - attack.x
+                        dy = enemy.y - attack.y
+                        r = (getattr(attack, 'size', 0) + getattr(enemy, 'size', 0))
+                        if dx*dx + dy*dy < (r * r):
                             # 持続系攻撃は0.2秒ごとにダメージ再発生
                             persistent_types = {"garlic", "holy_water"}
                             is_persistent = getattr(attack, 'type', '') in persistent_types
@@ -333,6 +391,7 @@ def main():
                                     items.append(GameItem(enemy.x, enemy.y, "bomb"))
                                 else:
                                     experience_gems.append(ExperienceGem(enemy.x, enemy.y))
+                                    enforce_experience_gems_limit(experience_gems)
 
                                 if enemy in enemies:
                                     enemies.remove(enemy)
@@ -402,11 +461,15 @@ def main():
 
                 for enemy in enemies[:]:
                     enemy.move(player)
-                    distance = math.sqrt((player.x - enemy.x)**2 + (player.y - enemy.y)**2)
-                    if distance < player.size + enemy.size:
+                    # プレイヤーとの当たり判定も二乗距離で比較
+                    dx = player.x - enemy.x
+                    dy = player.y - enemy.y
+                    r = (getattr(player, 'size', 0) + getattr(enemy, 'size', 0))
+                    if dx*dx + dy*dy < (r * r):
                         particles.append(HurtFlash(player.x, player.y, size=player.size))
                         for _ in range(12):
                             particles.append(PlayerHurtParticle(player.x, player.y))
+                        # 被弾はミス判定の対象にしない（生存時間クリアで継続させたい）
                         player.hp -= enemy.damage
                         enemies.remove(enemy)
                         if player.hp <= 0:
@@ -414,10 +477,14 @@ def main():
 
                 for gem in experience_gems[:]:
                     gem.move_to_player(player)
-                    distance = math.sqrt((player.x - gem.x)**2 + (player.y - gem.y)**2)
-                    if distance < player.size + gem.size:
+                    # 経験値ジェムの取得判定も二乗距離で比較
+                    dx = player.x - gem.x
+                    dy = player.y - gem.y
+                    r = (getattr(player, 'size', 0) + getattr(gem, 'size', 0))
+                    if dx*dx + dy*dy < (r * r):
                         prev_level = player.level
-                        player.add_exp(1)
+                        # ジェムごとの価値を付与
+                        player.add_exp(getattr(gem, 'value', 1))
                         experience_gems.remove(gem)
                         if player.level > prev_level:
                             particles.append(LevelUpEffect(player.x, player.y))
@@ -426,8 +493,11 @@ def main():
 
                 for item in items[:]:
                     item.move_to_player(player)
-                    distance = math.sqrt((player.x - item.x)**2 + (player.y - item.y)**2)
-                    if distance < player.size + item.size:
+                    # アイテム取得判定も二乗距離比較に変更
+                    dx = player.x - item.x
+                    dy = player.y - item.y
+                    r = (getattr(player, 'size', 0) + getattr(item, 'size', 0))
+                    if dx*dx + dy*dy < (r * r):
                         if item.type == "heal":
                             try:
                                 prev_hp = int(getattr(player, 'hp', 0))
@@ -445,6 +515,8 @@ def main():
                         elif item.type == "bomb":
                             for enemy in enemies[:]:
                                 experience_gems.append(ExperienceGem(enemy.x, enemy.y))
+                                # 各追加ごとに上限をチェックして古いものを削除しつつ価値を集約
+                                enforce_experience_gems_limit(experience_gems)
                             enemies.clear()
                         items.remove(item)
 
@@ -574,13 +646,11 @@ def main():
 
             # デバッグ: ゲーム終了時に damage_stats の中身をログ出力 (表が出ない原因調査用)
             try:
-                if game_over or game_clear:
-                    if DEBUG_MODE:
-                        if not damage_stats:
-                            print("[DEBUG] damage_stats is empty at game end")
-                        else:
-                            # show abbreviated summary
-                            print(f"[DEBUG] damage_stats keys={list(damage_stats.items())[:8]}")
+                if (game_over or game_clear) and DEBUG_MODE:
+                    if not damage_stats:
+                        print("[DEBUG] damage_stats is empty at game end")
+                    else:
+                        print(f"[DEBUG] damage_stats keys={list(damage_stats.items())[:8]}")
             except Exception:
                 pass
             # UI描画を修正（プレイヤーステータス表示のON/OFFを渡す）
@@ -591,7 +661,7 @@ def main():
             if getattr(player, 'awaiting_subitem_choice', False) and getattr(player, 'last_subitem_choices', None):
                 # サブアイテム選択は ui.draw_subitem_choice を使う
                 from ui import draw_subitem_choice
-                draw_subitem_choice(screen, player)
+                draw_subitem_choice(screen, player, ICONS)
             elif getattr(player, 'awaiting_weapon_choice', False) and getattr(player, 'last_level_choices', None):
                 draw_level_choice(screen, player, ICONS)
 
