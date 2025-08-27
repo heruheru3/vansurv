@@ -23,7 +23,11 @@ GRAY = (128, 128, 128)
 # 所持できる武器の最大数（レベルアップで新規武器を取得できる上限）
 MAX_WEAPONS = 4
 
-# 所持できるサブアイテムの最大数（武器とは別管理）
-MAX_SUBITEMS = 4
+# 所持できるサブアイテムの最大数（武器上限と同じにする）
+MAX_SUBITEMS = MAX_WEAPONS
+
+# レベル上限
+MAX_WEAPON_LEVEL = 5
+MAX_SUBITEM_LEVEL = 3
 
 DEBUG = False

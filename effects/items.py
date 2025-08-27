@@ -23,6 +23,18 @@ class ExperienceGem:
             self.y += (dy / distance) * self.speed
 
     def draw(self, screen, camera_x=0, camera_y=0):
+        # ジェムの色を value に応じて変更する
+        try:
+            val = int(max(1, self.value))
+        except Exception:
+            val = 1
+        if val == 1:
+            base_col = CYAN
+        elif 2 <= val <= 5:
+            base_col = GREEN
+        else:
+            base_col = RED
+
         # ジェムを小さなひし形（ダイヤ）にしてグローを付ける
         r = max(4, self.size // 2)
         w = h = r * 6
@@ -32,8 +44,11 @@ class ExperienceGem:
         for i in range(r*3, 0, -1):
             t = i / (r*3)
             alpha = int(10 + (1 - t) * 180)
-            col = (CYAN[0], CYAN[1], CYAN[2], alpha)
-            pygame.draw.ellipse(surf, col, (cx - int(t*r*2.2), cy - int(t*r*2.2), int(t*r*4.4), int(t*r*4.4)))
+            col = (base_col[0], base_col[1], base_col[2], alpha)
+            try:
+                pygame.draw.ellipse(surf, col, (cx - int(t*r*2.2), cy - int(t*r*2.2), int(t*r*4.4), int(t*r*4.4)))
+            except Exception:
+                pass
         # ひし形の頂点（ローカル座標）
         points = [
             (cx, cy - r),
@@ -42,17 +57,27 @@ class ExperienceGem:
             (cx - r, cy)
         ]
         # 本体
-        pygame.draw.polygon(surf, CYAN + (240,), points)
+        try:
+            pygame.draw.polygon(surf, base_col + (240,), points)
+        except Exception:
+            # まれに tuple + (int,) でエラーが出る環境があるため安全策
+            pygame.draw.polygon(surf, (base_col[0], base_col[1], base_col[2], 240), points)
         # ハイライト
-        hl = (min(255, CYAN[0]+80), min(255, CYAN[1]+80), min(255, CYAN[2]+80), 140)
-        pygame.draw.polygon(surf, hl, [
-            (cx, cy - r),
-            (cx + int(r*0.5), cy - int(r*0.2)),
-            (cx, cy + int(r*0.2)),
-            (cx - int(r*0.5), cy - int(r*0.2))
-        ])
+        hl = (min(255, base_col[0]+80), min(255, base_col[1]+80), min(255, base_col[2]+80), 140)
+        try:
+            pygame.draw.polygon(surf, hl, [
+                (cx, cy - r),
+                (cx + int(r*0.5), cy - int(r*0.2)),
+                (cx, cy + int(r*0.2)),
+                (cx - int(r*0.5), cy - int(r*0.2))
+            ])
+        except Exception:
+            pass
         # 線で輪郭
-        pygame.draw.polygon(surf, (0,0,0,100), points, 1)
+        try:
+            pygame.draw.polygon(surf, (0,0,0,100), points, 1)
+        except Exception:
+            pass
         screen.blit(surf, (int(self.x - cx - camera_x), int(self.y - cy - camera_y)))
 
 class GameItem:

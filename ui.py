@@ -275,12 +275,28 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
                 else:
                     pygame.draw.rect(screen, (120,120,120), (x, y, icon_display_size, icon_display_size))
 
-                # レベルは 'Lv.' を付けず数値のみをアイコンの下にセンタリングして表示
-                lvl = str(getattr(weapon, 'level', 1))
-                lvl_text = small_font.render(lvl, True, WHITE)
-                tx = x + (icon_display_size - lvl_text.get_width()) // 2
-                ty = y + icon_display_size + 4
-                screen.blit(lvl_text, (tx, ty))
+                # レベル表示（上限到達なら MAX バッジを表示）
+                try:
+                    level_val = int(getattr(weapon, 'level', 1))
+                except Exception:
+                    level_val = int(getattr(weapon, 'level', 1) if hasattr(weapon, 'level') else 1)
+                if level_val >= MAX_WEAPON_LEVEL:
+                    try:
+                        badge_text = 'MAX'
+                        b_surf = small_font.render(badge_text, True, WHITE)
+                        bw = b_surf.get_width() + 8
+                        bh = b_surf.get_height() + 4
+                        bx = x + (icon_display_size - bw) // 2
+                        by = y + icon_display_size + 4
+                        pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
+                        screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
+                    except Exception:
+                        screen.blit(small_font.render('MAX', True, WHITE), (x, y + icon_display_size + 4))
+                else:
+                    lvl_text = small_font.render(str(level_val), True, WHITE)
+                    tx = x + (icon_display_size - lvl_text.get_width()) // 2
+                    ty = y + icon_display_size + 4
+                    screen.blit(lvl_text, (tx, ty))
             except Exception:
                 # 個別描画エラーは無視して次の武器へ
                 continue
@@ -322,11 +338,24 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
 
                 # レベル表示は武器と同様に数値のみをアイコンの下にセンタリングして表示
                 try:
-                    lvl = str(getattr(inst, 'level', 1))
-                    lvl_text = small_font.render(lvl, True, WHITE)
-                    tx = x + (sub_icon_size - lvl_text.get_width()) // 2
-                    ty = y + sub_icon_size + 4
-                    screen.blit(lvl_text, (tx, ty))
+                    lvl_val = int(getattr(inst, 'level', 1))
+                except Exception:
+                    lvl_val = int(getattr(inst, 'level', 1) if hasattr(inst, 'level') else 1)
+                try:
+                    if lvl_val >= MAX_SUBITEM_LEVEL:
+                        badge_text = 'MAX'
+                        b_surf = small_font.render(badge_text, True, WHITE)
+                        bw = b_surf.get_width() + 8
+                        bh = b_surf.get_height() + 4
+                        bx = x + (sub_icon_size - bw) // 2
+                        by = y + sub_icon_size + 4
+                        pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
+                        screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
+                    else:
+                        lvl_text = small_font.render(str(lvl_val), True, WHITE)
+                        tx = x + (sub_icon_size - lvl_text.get_width()) // 2
+                        ty = y + sub_icon_size + 4
+                        screen.blit(lvl_text, (tx, ty))
                 except Exception:
                     pass
     except Exception:
@@ -662,8 +691,20 @@ def draw_level_choice(screen, player, icons):
                 try:
                     w = player.weapons.get(key)
                     if w is not None:
-                        level_s = small_font.render(f"Lv.{w.level}", True, (220,220,220))
-                        screen.blit(level_s, (rect.x + 16 + 32, rect.y + 72))
+                        lvl_val = int(getattr(w, 'level', 1))
+                        if lvl_val >= MAX_WEAPON_LEVEL:
+                            # MAX バッジ
+                            badge_text = 'MAX'
+                            b_surf = small_font.render(badge_text, True, WHITE)
+                            bw = b_surf.get_width() + 8
+                            bh = b_surf.get_height() + 4
+                            bx = rect.x + 16 + 32
+                            by = rect.y + 72
+                            pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
+                            screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
+                        else:
+                            level_s = small_font.render(f"Lv.{lvl_val}", True, (220,220,220))
+                            screen.blit(level_s, (rect.x + 16 + 32, rect.y + 72))
                 except Exception:
                     pass
                 # 新規バッジ
@@ -713,11 +754,20 @@ def draw_level_choice(screen, player, icons):
                 # 所持中ならレベル表示
                 if key in player.subitems:
                     try:
-                        lvl = player.subitems[key].level
-                        screen.blit(small_font.render(f"Lv {lvl}", True, (220,220,220)), (rect.x + 16 + 32, rect.y + 72))
+                        lvl = int(player.subitems[key].level)
+                        if lvl >= MAX_SUBITEM_LEVEL:
+                            badge_text = 'MAX'
+                            b_surf = small_font.render(badge_text, True, WHITE)
+                            bw = b_surf.get_width() + 8
+                            bh = b_surf.get_height() + 4
+                            bx = rect.x + 16 + 32
+                            by = rect.y + 72
+                            pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
+                            screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
+                        else:
+                            screen.blit(small_font.render(f"Lv {lvl}", True, (220,220,220)), (rect.x + 16 + 32, rect.y + 72))
                     except Exception:
                         pass
-
     except Exception:
         # レンダリング中の例外は無視して描画を中断
         pass
@@ -821,6 +871,17 @@ def draw_subitem_choice(screen, player, icons=None):
             if key in player.subitems:
                 lvl = player.subitems[key].level
                 screen.blit(small.render(f"Lv {lvl}", True, (220,220,220)), (rect.x + 12 + 36, rect.y + 64))
-
+                try:
+                    if lvl >= MAX_SUBITEM_LEVEL:
+                        badge_text = 'MAX'
+                        b_surf = small.render(badge_text, True, WHITE)
+                        bw = b_surf.get_width() + 8
+                        bh = b_surf.get_height() + 4
+                        bx = rect.x + 12 + 36
+                        by = rect.y + 64
+                        pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
+                        screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
+                except Exception:
+                    pass
     except Exception:
         pass

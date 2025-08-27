@@ -12,7 +12,7 @@ class HolyWater(Weapon):
         # 範囲攻撃のためやや低めに設定
         self.damage = 8
         self.duration = 1000
-        self.radius = 100  # 初期範囲を50から80に増加
+        self.radius = 50  # 初期範囲を50に設定
         self.num_attacks = 1  # 初期の攻撃個数
 
     def attack(self, player):
@@ -155,36 +155,55 @@ class Axe(Weapon):
             return []
 
         self.update_cooldown()
-        # ランダムな角度で発射
-        angle = math.radians(random.uniform(0, 360))
-        vx = math.cos(angle) * self.throw_speed
-        vy = math.sin(angle) * self.throw_speed
-
-        # apply projectile speed multiplier if available
+        # サブアイテム補正を取得
         try:
-            mult = player.get_projectile_speed()
+            proj_speed_mult = player.get_projectile_speed()
         except Exception:
-            mult = 1.0
-        vx *= mult
-        vy *= mult
-        eff_speed = self.throw_speed * mult
-
+            proj_speed_mult = 1.0
         try:
             base_mult = player.get_base_damage_bonus()
         except Exception:
             base_mult = 1.0
+        try:
+            range_mult = player.get_effect_range_multiplier()
+        except Exception:
+            range_mult = 1.0
+        try:
+            time_mult = player.get_effect_time_multiplier()
+        except Exception:
+            time_mult = 1.0
+        try:
+            extra = player.get_extra_projectiles()
+        except Exception:
+            extra = 0
 
-        return [Attack(x=player.x,
-                      y=player.y,
-                      size_x=self.size,
-                      size_y=self.size,
-                      type_="axe",
-                      duration=3000,
-                      speed=eff_speed,
-                      velocity_x=vx,
-                      velocity_y=vy,
-                      rotation_speed=self.rotation_speed,
-                      damage=self.damage * base_mult)]
+        effective_size = max(1, int(self.size * range_mult))
+        effective_duration = max(100, int(3000 * time_mult))
+        effective_damage = self.damage * base_mult
+        effective_num = max(1, int(1 + extra))
+        
+        attacks = []
+        for i in range(effective_num):
+            # ランダムな角度で発射（複数投擲時は若干の分散を持たせる）
+            angle = math.radians(random.uniform(0, 360))
+            # 基本速度にプロジェクタイル速度補正を反映
+            vx = math.cos(angle) * (self.throw_speed * proj_speed_mult)
+            vy = math.sin(angle) * (self.throw_speed * proj_speed_mult)
+            eff_speed = self.throw_speed * proj_speed_mult
+
+            attacks.append(Attack(x=player.x,
+                                  y=player.y,
+                                  size_x=effective_size,
+                                  size_y=effective_size,
+                                  type_="axe",
+                                  duration=effective_duration,
+                                  speed=eff_speed,
+                                  velocity_x=vx,
+                                  velocity_y=vy,
+                                  rotation_speed=self.rotation_speed,
+                                  damage=effective_damage))
+        
+        return attacks
 
     def level_up(self):
         """レベルアップ時の強化"""

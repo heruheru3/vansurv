@@ -666,15 +666,51 @@ class Player:
             # If player can still acquire new weapons, include available ones
             if len(self.weapons) < MAX_WEAPONS and getattr(self, 'available_weapons', None):
                 for k in list(self.available_weapons.keys()):
+                    # 新規取得候補として available_weapons を出す。既に所持しているがレベル上限に達している武器は除外
+                    if k in self.weapons:
+                        try:
+                            if getattr(self.weapons[k], 'level', 1) >= MAX_WEAPON_LEVEL:
+                                continue
+                        except Exception:
+                            pass
                     pool.append(f"weapon:{k}")
             # Include existing weapons as possible upgrade targets
             for k in list(self.weapons.keys()):
+                # 所持武器がレベル上限に達している場合は候補から外す
+                try:
+                    if getattr(self.weapons[k], 'level', 1) >= MAX_WEAPON_LEVEL:
+                        continue
+                except Exception:
+                    pass
                 pool.append(f"weapon:{k}")
             # Include subitem templates (new possible subitems)
             for k in list(getattr(self, 'subitem_templates', {}).keys()):
-                pool.append(f"sub:{k}")
+                # 新規取得として追加するか判定:
+                # - 既に所持している場合は、レベル上限をチェックして候補にするか決定
+                # - 所持していない場合は、所持数が上限に達していれば新規候補としては追加しない
+                if k in self.subitems:
+                    try:
+                        if getattr(self.subitems[k], 'level', 0) >= MAX_SUBITEM_LEVEL:
+                            continue
+                    except Exception:
+                        pass
+                    pool.append(f"sub:{k}")
+                else:
+                    try:
+                        if len(self.subitems) >= MAX_SUBITEMS:
+                            # 既にサブアイテム所持数が上限なら新規は追加しない
+                            continue
+                    except Exception:
+                        pass
+                    pool.append(f"sub:{k}")
             # Also include existing owned subitems as upgrade targets
             for k in list(self.subitems.keys()):
+                # 所持サブアイテムがレベル上限に達している場合は候補から除外
+                try:
+                    if getattr(self.subitems[k], 'level', 0) >= MAX_SUBITEM_LEVEL:
+                        continue
+                except Exception:
+                    pass
                 pool.append(f"sub:{k}")
 
             # Deduplicate while preserving order
