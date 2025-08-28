@@ -67,6 +67,9 @@ class Attack:
             origin_y = self.follow_player.y
             if self.type == "garlic":
                 # パルスエフェクトの更新
+                # 中心をプレイヤー位置に追従させる
+                self.x = origin_x
+                self.y = origin_y
                 self.pulse_timer += 1
                 pulse_period = 60  # パルスの周期（フレーム数）
                 pulse_ratio = abs(math.sin(self.pulse_timer * math.pi / pulse_period))
