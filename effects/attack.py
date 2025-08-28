@@ -63,8 +63,8 @@ class Attack:
 
         if self.follow_player:
             # follow_player の共通処理（位置追従）
-            self.x = self.follow_player.x
-            self.y = self.follow_player.y
+            origin_x = self.follow_player.x
+            origin_y = self.follow_player.y
             if self.type == "garlic":
                 # パルスエフェクトの更新
                 self.pulse_timer += 1
@@ -79,7 +79,7 @@ class Attack:
                 t = min(max(elapsed / max(1, self.duration), 0.0), 1.0)
                 extend = math.sin(math.pi * t) ** 2
 
-                # 長さ・角度を direction から決定
+                # 長さ・角度を direction から決定（常にプレイヤー基点から計算）
                 length = getattr(self, 'length', max(self.size_x, self.size_y))
                 dir_name = getattr(self, 'direction', 'right')
                 angle_lookup = {
@@ -95,17 +95,20 @@ class Attack:
                 points = []
                 for i in range(segments + 1):
                     frac = i / segments
-                    px = self.x + math.cos(angle) * (length * extend * frac)
-                    py = self.y + math.sin(angle) * (length * extend * frac)
+                    px = origin_x + math.cos(angle) * (length * extend * frac)
+                    py = origin_y + math.sin(angle) * (length * extend * frac)
                     points.append((px, py))
                 self.whip_points = points
+                # 当たり判定用の中心座標はムチの全長の中央に固定（描画の伸縮に依らない）
+                self.x = origin_x + math.cos(angle) * (length * 0.5)
+                self.y = origin_y + math.sin(angle) * (length * 0.5)
             elif self.type == "book":
                 # 回転する本: orbit_angle を進め、プレイヤー周囲に配置
                 try:
                     self.orbit_angle = getattr(self, 'orbit_angle', 0.0) + getattr(self, 'rotation_speed', 0.08)
                     r = getattr(self, 'orbit_radius', 40)
-                    self.x = self.follow_player.x + math.cos(self.orbit_angle) * r
-                    self.y = self.follow_player.y + math.sin(self.orbit_angle) * r
+                    self.x = origin_x + math.cos(self.orbit_angle) * r
+                    self.y = origin_y + math.sin(self.orbit_angle) * r
                 except Exception:
                     pass
         elif self.type == "axe":

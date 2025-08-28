@@ -89,18 +89,27 @@ class Whip(Weapon):
             input_direction = None
 
         # レベル1の場合、マウス方向（あれば）を優先、なければキーボード移動または最後の方向を使用
-        if self.level == 1:
-            if input_direction:
-                self.last_direction = input_direction
-                self.directions = [input_direction]
-            elif moving_left:
-                self.last_direction = 'left'
-                self.directions = ['left']
-            elif moving_right:
-                self.last_direction = 'right'
-                self.directions = ['right']
-            else:
-                self.directions = [self.last_direction]
+        # 発射方向を決定: 入力（マウス/キー）を優先、なければ last_direction を使用
+        primary_dir = None
+        if input_direction in ('left', 'right'):
+            primary_dir = input_direction
+            self.last_direction = primary_dir
+        elif moving_left:
+            primary_dir = 'left'
+            self.last_direction = 'left'
+        elif moving_right:
+            primary_dir = 'right'
+            self.last_direction = 'right'
+        else:
+            primary_dir = self.last_direction or 'right'
+
+        # レベルに応じて単発/両方向を切り替え
+        if self.level <= 2:
+            use_dirs = [primary_dir]
+        else:
+            # レベル3以上は前方と後方（左右反転）の両方。後方は遅延発生させる
+            opposite = 'left' if primary_dir == 'right' else 'right'
+            use_dirs = [primary_dir, opposite]
 
         # サブアイテムのレンジ/時間/ダメージ補正を反映した値を計算
         effective_range = max(1, int(self.range * range_mult))
@@ -108,7 +117,7 @@ class Whip(Weapon):
         effective_damage = self.damage + base_bonus
 
         # 攻撃を生成
-        for direction in self.directions:
+        for i, direction in enumerate(use_dirs):
             if direction == 'up':
                 x = player.x
                 y = player.y - effective_range/2
@@ -148,21 +157,23 @@ class Whip(Weapon):
             atk.length = effective_range  # ムチの長さ
             atk.width = self.width   # 描画幅（細め）
             atk.direction = direction
-        
+            # レベル3以上で2つ目（後方）のムチは少し遅延して発生させる
+            if self.level >= 3 and i == 1:
+                try:
+                    delay_ms = max(40, int(self.duration * 0.4))  # 適度な遅延
+                    atk.spawn_delay = delay_ms
+                    atk._pending = True
+                except Exception:
+                    pass
+
         return attacks
 
     def level_up(self):
         """レベルに応じて攻撃方向を設定"""
-        if self.level == 1:
-            # レベル1は現在の方向を維持
-            pass
-        elif self.level == 2:
-            self.directions = ['left', 'right']  # 左右両方
-        elif self.level == 3:
-            self.directions = ['left', 'right', 'up']  # 左右上
-        elif self.level == 4:
-            self.directions = ['left', 'right', 'up', 'down']  # 全方向
-        
+        # 基底の level_up を呼んで level を増やす
+        super().level_up()
+        # 方向は attack() 側で動的に決定する（レベルにより単発/両方向を切替）
+
         # レベルアップ時の強化
         self.range *= 1.1  # 範囲10%増加
         self.width = int(self.width * 1.1)  # 攻撃の太さも10%増加
