@@ -226,8 +226,8 @@ class Stone(Weapon):
         super().__init__()
         self.cooldown = 1500
         # 貫通・バウンドするため中程度
-        self.damage = 10
-        self.speed = 10
+        self.damage = 15
+        self.speed = 15
         self.bounces = 2
         self.duration = 5000
         self.size = 25  # サイズ属性を追加

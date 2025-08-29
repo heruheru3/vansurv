@@ -18,7 +18,14 @@ class ExperienceGem:
         dy = player.y - self.y
         distance = math.sqrt(dx**2 + dy**2)
         
-        if distance < 100 and distance != 0:
+        # 引き寄せ開始距離をサブアイテムで拡張可能にする
+        try:
+            extra = float(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0.0
+        except Exception:
+            extra = 0.0
+        attract_threshold = 100.0 + extra
+
+        if distance < attract_threshold and distance != 0:
             self.x += (dx / distance) * self.speed
             self.y += (dy / distance) * self.speed
 
@@ -94,7 +101,14 @@ class GameItem:
         dy = player.y - self.y
         distance = math.sqrt(dx**2 + dy**2)
         
-        if distance < 100 and distance != 0:
+        # アイテムの引き寄せも同様にサブアイテムで拡張
+        try:
+            extra = float(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0.0
+        except Exception:
+            extra = 0.0
+        attract_threshold = 100.0 + extra
+
+        if distance < attract_threshold and distance != 0:
             self.x += (dx / distance) * self.speed
             self.y += (dy / distance) * self.speed
 

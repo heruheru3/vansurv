@@ -4,6 +4,7 @@ import os
 # キャッシュ
 _icon_cache = {}
 _font_cache = {}
+_jp_font_path = None
 _sound_cache = {}
 
 DEFAULT_ICON_NAMES = ['sword','magic_wand','stone','whip','holy_water','garlic',
@@ -49,8 +50,32 @@ def get_font(size):
     key = f"font_{size}"
     if key in _font_cache:
         return _font_cache[key]
+    global _jp_font_path
+    if _jp_font_path is None:
+        try:
+            proj_font = os.path.join(os.path.dirname(__file__), 'assets', 'fonts', 'NotoSansJP-VariableFont_wght.ttf')
+            if os.path.exists(proj_font):
+                _jp_font_path = proj_font
+            else:
+                # try common system fonts
+                candidates = ["Meiryo", "Yu Gothic", "MS Gothic", "NotoSansCJKjp-Regular", "Noto Sans CJK JP", "IPAPGothic", "TakaoPGothic"]
+                found = None
+                for name in candidates:
+                    try:
+                        p = pygame.font.match_font(name)
+                        if p:
+                            found = p
+                            break
+                    except Exception:
+                        continue
+                _jp_font_path = found
+        except Exception:
+            _jp_font_path = None
     try:
-        f = pygame.font.Font(None, size)
+        if _jp_font_path:
+            f = pygame.font.Font(_jp_font_path, size)
+        else:
+            f = pygame.font.Font(None, size)
     except Exception:
         try:
             f = pygame.font.SysFont(None, size)
@@ -101,7 +126,7 @@ def preload_all(icon_size=32, icon_names=None, font_sizes=None, sound_names=None
 
     # fonts
     if font_sizes is None:
-        font_sizes = [18, 22, 28, 30, 34, 36, 40, 72]
+        font_sizes = [14,18, 22, 28, 30, 34, 36, 40, 72]
     for s in font_sizes:
         get_font(s)
 

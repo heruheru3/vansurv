@@ -514,7 +514,14 @@ def main():
                     # 経験値ジェムの取得判定も二乗距離で比較
                     dx = player.x - gem.x
                     dy = player.y - gem.y
-                    r = (getattr(player, 'size', 0) + getattr(gem, 'size', 0))
+                    # プレイヤーの基準取得半径は player.size + gem.size
+                    base_r = (getattr(player, 'size', 0) + getattr(gem, 'size', 0))
+                    # サブアイテムから追加されるピクセル半径を取得
+                    try:
+                        extra = float(getattr(player, 'get_gem_pickup_range', lambda: 0.0)())
+                    except Exception:
+                        extra = 0.0
+                    r = base_r + extra
                     if dx*dx + dy*dy < (r * r):
                         prev_level = player.level
                         # ジェムごとの価値を付与

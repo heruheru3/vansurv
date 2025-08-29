@@ -2,6 +2,7 @@ import pygame
 import math
 import random
 from constants import *
+from resources import get_font
 
 class DeathParticle:
     def __init__(self, x, y, color):
@@ -93,9 +94,12 @@ class LevelUpEffect:
         if self.font is None:
             try:
                 # 少し小さめに調整
-                self.font = pygame.font.Font(None, 36)
+                self.font = get_font(22)
             except Exception:
-                self.font = pygame.font.SysFont(None, 36)
+                try:
+                    self.font = get_font(36)
+                except Exception:
+                    self.font = pygame.font.SysFont(None, 36)
 
         # フェードイン・アウトのアルファ
         elapsed = self.duration - self.timer
@@ -164,7 +168,10 @@ class DamageNumber:
         self.fade_out = 6
         if DamageNumber.font is None:
             # ダメージ表示はやや大きめに調整
-            DamageNumber.font = pygame.font.Font(None, 26)
+            try:
+                DamageNumber.font = get_font(18)
+            except Exception:
+                DamageNumber.font = pygame.font.SysFont(None, 18)
 
     def update(self):
         # 上に移動しつつタイマーを減らす

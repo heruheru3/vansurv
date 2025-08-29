@@ -814,6 +814,18 @@ class Player:
         except Exception:
             return 1.0
 
+    def get_gem_pickup_range(self):
+        """ジェムを自動取得するための追加半径（ピクセル）。
+        サブアイテム 'gem_pickup_range' が存在する場合はその value() を返す。
+        返り値は float（ピクセル）で、0 の場合はデフォルトの引き寄せ距離を使用する。
+        """
+        try:
+            if 'gem_pickup_range' in self.subitems:
+                return float(self.subitems.get('gem_pickup_range').value())
+            return 0.0
+        except Exception:
+            return 0.0
+
     def upgrade_subitems(self, count=1):
         try:
             return random_upgrade(self.subitems, count=count)
