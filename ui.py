@@ -772,6 +772,61 @@ def draw_level_choice(screen, player, icons):
         # レンダリング中の例外は無視して描画を中断
         pass
 
+def get_end_button_rects():
+    """GAME OVER / CLEAR 時に表示するボタンの矩形を返す。描画は行わない。
+    戻り値: {'restart': Rect, 'continue': Rect or None}
+    """
+    try:
+        button_w = 220
+        button_h = 48
+        gap = 24
+        total_w = button_w * 2 + gap
+        cx = SCREEN_WIDTH // 2
+        by = SCREEN_HEIGHT // 2 + 80
+        left_x = cx - total_w // 2
+        restart_rect = pygame.Rect(left_x, by, button_w, button_h)
+        continue_rect = pygame.Rect(left_x + button_w + gap, by, button_w, button_h)
+        return {'restart': restart_rect, 'continue': continue_rect}
+    except Exception:
+        return {'restart': None, 'continue': None}
+
+
+def draw_end_buttons(screen, is_game_over, is_game_clear):
+    """エンド画面用のボタンを描画し、矩形を返す。主に main.py 側でクリック判定に使う。
+    """
+    rects = get_end_button_rects()
+    restart_rect = rects.get('restart')
+    continue_rect = rects.get('continue')
+    try:
+        font = get_font(24)
+        # GAME OVER / GAME CLEAR の場合は Continue と Restart を表示
+        if is_game_over or is_game_clear:
+            # Continue（緑）
+            try:
+                pygame.draw.rect(screen, (40, 160, 40), continue_rect, border_radius=8)
+            except Exception:
+                pass
+            # Restart（灰）
+            try:
+                pygame.draw.rect(screen, (40, 40, 40), restart_rect, border_radius=8)
+            except Exception:
+                pass
+
+            try:
+                txt = font.render('Restart', True, WHITE)
+                screen.blit(txt, (restart_rect.centerx - txt.get_width()//2, restart_rect.centery - txt.get_height()//2))
+            except Exception:
+                pass
+            try:
+                txt = font.render('Continue', True, WHITE)
+                screen.blit(txt, (continue_rect.centerx - txt.get_width()//2, continue_rect.centery - txt.get_height()//2))
+            except Exception:
+                pass
+        # （どちらの終了状態でも上で Continue / Restart を描画しているため、ここでは追加の分岐は不要）
+    except Exception:
+        pass
+    return rects
+
 def draw_subitem_choice(screen, player, icons=None):
     """サブアイテム選択 UI を描画する。player.last_subitem_choices を参照する。
     icons はオプションで渡すとサブアイテムアイコンが表示される。

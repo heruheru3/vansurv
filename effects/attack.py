@@ -237,6 +237,10 @@ class Attack:
         sx = int(self.x - camera_x)
         sy = int(self.y - camera_y)
 
+        # spawn_delay によってまだ発生していない攻撃は描画しない
+        if getattr(self, '_pending', False) and getattr(self, 'spawn_delay', 0) > 0:
+            return
+
         if self.type == "whip":
             # ムチは follow_player と whip_points を使ってシュッと伸び縮みする直線で描画
             pts = getattr(self, 'whip_points', None)

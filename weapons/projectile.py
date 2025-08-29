@@ -46,18 +46,26 @@ class HolyWater(Weapon):
         effective_count = max(1, int(self.num_attacks + extra))
         
         # レベルに応じた攻撃数で生成
-        for _ in range(effective_count):
+        # 複数発生する場合は短い遅延を挟んで順次発生させる
+        delay_step = 120  # ms の単位で短い遅延
+        for i in range(effective_count):
             x = player.x + random.randint(-150, 150)  # 散布範囲を広げる
             y = player.y + random.randint(-150, 150)
-            attacks.append(
-                Attack(x=x, 
-                      y=y, 
-                      size_x=effective_radius * 2,  # 直径を指定
-                      size_y=effective_radius * 2, 
-                      type_="holy_water", 
-                      duration=effective_duration,
-                      damage=effective_damage)
-            )
+            atk = Attack(x=x,
+                         y=y,
+                         size_x=effective_radius * 2,  # 直径を指定
+                         size_y=effective_radius * 2,
+                         type_="holy_water",
+                         duration=effective_duration,
+                         damage=effective_damage)
+            # 複数個の場合は順次スポーンさせるため spawn_delay を設定
+            try:
+                if effective_count > 1:
+                    atk.spawn_delay = int(i * delay_step)
+                    atk._pending = True
+            except Exception:
+                pass
+            attacks.append(atk)
         
         return attacks
 
@@ -502,7 +510,9 @@ class Thunder(Weapon):
         else:
             targets = []
 
-        for t in targets:
+        # 複数のターゲットに対して順次発生させるため遅延を設定
+        delay_step = 120
+        for i, t in enumerate(targets):
             # 上空から落ちるエフェクト: 目標位置を敵の頭上に設定
             try:
                 target_x = t.x
@@ -530,15 +540,28 @@ class Thunder(Weapon):
                 pass
             # 落下開始位置は頭上よりさらに上に設定して上空から落ちてくる表現にする
             atk.strike_from_y = head_y - self.height_offset
+            try:
+                if effective_num > 1:
+                    atk.spawn_delay = int(i * delay_step)
+                    atk._pending = True
+            except Exception:
+                pass
             attacks.append(atk)
 
         # 敵がいない場合はプレイヤー周辺のランダム地点に落とす
         if not targets:
-            for _ in range(effective_num):
+            delay_step = 120
+            for i in range(effective_num):
                 rx = player.x + random.randint(-200, 200)
                 ry = player.y + random.randint(-200, 200)
                 atk = Attack(x=rx, y=ry, size_x=effective_area, size_y=effective_area, type_="thunder", duration=self.duration, damage=effective_damage)
                 atk.strike_from_y = ry - self.height_offset
+                try:
+                    if effective_num > 1:
+                        atk.spawn_delay = int(i * delay_step)
+                        atk._pending = True
+                except Exception:
+                    pass
                 attacks.append(atk)
 
         return attacks

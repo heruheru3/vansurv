@@ -8,14 +8,14 @@ from player import Player
 from enemy import Enemy
 from effects.items import ExperienceGem, GameItem
 from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber
-from ui import draw_ui, draw_minimap, draw_background, draw_level_choice
+from ui import draw_ui, draw_minimap, draw_background, draw_level_choice, draw_end_buttons, get_end_button_rects
 import resources
 
 # パーティクル関連の制限（パフォーマンス改善用）
 PARTICLE_LIMIT = 300        # これ以上は古いパーティクルから切る
 PARTICLE_TRIM_TO = 220      # 切るときに残す数
 # 画面上に存在可能な経験値ジェムの上限
-MAX_GEMS_ON_SCREEN = 80
+MAX_GEMS_ON_SCREEN = 150
 
 # ランタイムで切り替え可能なデバッグフラグ（F3でトグル）
 DEBUG_MODE = DEBUG
@@ -249,6 +249,40 @@ def main():
                                     break
                             if hit:
                                 continue
+
+                    # エンド画面のボタン処理（GAME OVER / CLEAR）
+                    if (game_over or game_clear) and event.button == 1:
+                        mx, my = event.pos
+                        try:
+                            rects = get_end_button_rects()
+                            # Continue はゲームオーバー時のみ有効
+                            if game_over and rects.get('continue') and rects['continue'].collidepoint(mx, my):
+                                try:
+                                    player.hp = player.get_max_hp()
+                                except Exception:
+                                    player.hp = getattr(player, 'max_hp', 100)
+                                game_over = False
+                                for _ in range(8):
+                                    particles.append(DeathParticle(player.x, player.y, CYAN))
+                                continue
+                            # GAME CLEAR の Continue: 残り時間を規定値に戻して続行
+                            if game_clear and rects.get('continue') and rects['continue'].collidepoint(mx, my):
+                                try:
+                                    # reset game_time to 0 on continue from game clear
+                                    game_time = 0
+                                except Exception:
+                                    game_time = 0
+                                game_clear = False
+                                # 画面エフェクト
+                                for _ in range(8):
+                                    particles.append(DeathParticle(player.x, player.y, CYAN))
+                                continue
+                            # Restart
+                            if rects.get('restart') and rects['restart'].collidepoint(mx, my):
+                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game(screen)
+                                continue
+                        except Exception:
+                            pass
 
             # ループ冒頭でプレイヤー位置からターゲットカメラを算出（まだスムーズは適用しない）
             target_cam_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, int(player.x - SCREEN_WIDTH // 2)))
@@ -501,17 +535,23 @@ def main():
                         if item.type == "heal":
                             try:
                                 prev_hp = int(getattr(player, 'hp', 0))
-                                # ここもハードコードの100ではなくプレイヤーの最大HPを使用
-                                new_hp = min(player.get_max_hp(), prev_hp + 30)
+                                # 最大HPの30%を回復（最低1）
+                                heal_amount = max(1, int(player.get_max_hp() * 0.3))
+                                new_hp = min(player.get_max_hp(), prev_hp + heal_amount)
                                 healed = new_hp - prev_hp
                                 if healed > 0:
                                     player.hp = new_hp
                                     particles.append(DamageNumber(player.x, player.y - getattr(player, 'size', 32) - 6, f"+{int(healed)}", color=GREEN))
                             except Exception:
                                 try:
-                                    player.hp = min(player.get_max_hp(), player.hp + 30)
+                                    try:
+                                        max_hp = player.get_max_hp()
+                                    except Exception:
+                                        max_hp = 100
+                                    heal_amount = max(1, int(max_hp * 0.3))
+                                    player.hp = min(max_hp, getattr(player, 'hp', 0) + heal_amount)
                                 except Exception:
-                                    player.hp = min(100, player.hp + 30)
+                                    player.hp = min(100, getattr(player, 'hp', 0) + 30)
                         elif item.type == "bomb":
                             for enemy in enemies[:]:
                                 experience_gems.append(ExperienceGem(enemy.x, enemy.y))
@@ -655,6 +695,10 @@ def main():
                 pass
             # UI描画を修正（プレイヤーステータス表示のON/OFFを渡す）
             draw_ui(screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status)
+            # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
+            if game_over or game_clear:
+                from ui import draw_end_buttons
+                draw_end_buttons(screen, game_over, game_clear)
             
             # レベルアップ候補がある場合はポップアップを ui.draw_level_choice に任せる
             # サブアイテム選択 UI を優先して表示
