@@ -81,7 +81,7 @@ class HolyWater(Weapon):
 class MagicWand(Weapon):
     def __init__(self):
         super().__init__()
-        self.cooldown = 1000
+        self.cooldown = 800
         # 追尾弾は単発でそこそこのダメージ
         self.damage = 12
         self.speed = 5
@@ -482,7 +482,7 @@ class Thunder(Weapon):
         self.num_strikes = 1
         self.duration = 500
         self.height_offset = 120
-        self.area_size = 60
+        self.area_size = 80
 
     def attack(self, player, enemies=None, camera_x=0, camera_y=0):
         if not self.can_attack():
@@ -503,6 +503,10 @@ class Thunder(Weapon):
             base_bonus = player.get_base_damage_bonus()
         except Exception:
             base_bonus = 0
+        try:
+            time_mult = player.get_effect_time_multiplier()
+        except Exception:
+            time_mult = 1.0
 
         effective_area = max(8, int(self.area_size * range_mult))
         effective_num = max(1, int(self.num_strikes + extra))
@@ -543,7 +547,7 @@ class Thunder(Weapon):
                          size_x=effective_area,
                          size_y=effective_area,
                          type_="thunder",
-                         duration=self.duration,
+                         duration=self.duration * time_mult,
                          damage=effective_damage)
             # 目標の参照と頭上オフセットを保持（敵が移動しても追従させるため）
             try:

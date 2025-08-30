@@ -90,19 +90,19 @@ class Enemy:
             self.base_speed = 1.875
             self.speed = self.base_speed
             self.color = (255, 50, 50)    # 普通の赤
-            self.damage = 6
+            self.damage = 5
         elif self.enemy_type == 4:
             self.hp = 40
             self.base_speed = 2.0
             self.speed = self.base_speed
             self.color = (200, 0, 0)      # 濃い赤
-            self.damage = 8
+            self.damage = 6
         else:  # type 5
             self.hp = 50
             self.base_speed = 2.25
             self.speed = self.base_speed
             self.color = (150, 0, 0)      # 最も濃い赤
-            self.damage = 10
+            self.damage = 8
 
     def move(self, player):
         angle = math.atan2(player.y - self.y, player.x - self.x)
