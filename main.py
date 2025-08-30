@@ -503,7 +503,6 @@ def main():
                         particles.append(HurtFlash(player.x, player.y, size=player.size))
                         for _ in range(12):
                             particles.append(PlayerHurtParticle(player.x, player.y))
-                        # 被弾はミス判定の対象にしない（生存時間クリアで継続させたい）
                         player.hp -= enemy.damage
                         enemies.remove(enemy)
                         if player.hp <= 0:
