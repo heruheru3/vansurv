@@ -45,6 +45,7 @@ def get_default_subitems():
       - effect_time: 武器の効果時間に対する倍率（is_percent=True）
       - extra_projectiles: 武器の発射数に追加される量（小数で蓄積し、実際の追加は int() で扱う）
       - projectile_speed: 発射物（弾）の速度に対する倍率（is_percent=True）
+      - gem_pickup_range: ジェムの取得範囲に対する倍率（is_percent=True）
     """
     return {
         'hp': SubItem('hp', base=0.0, per_level=20.0, is_percent=True),
