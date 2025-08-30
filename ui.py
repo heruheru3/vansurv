@@ -17,7 +17,7 @@ def get_font(size):
         if _jp_font_path is None:
             try:
                 # Check project bundled font
-                proj_font = os.path.join(os.path.dirname(__file__), 'assets', 'fonts', 'NotoSansJP-VariableFont_wght.ttf')
+                proj_font = os.path.join(os.path.dirname(__file__), 'assets', 'fonts', 'NotoSansCJKjp-DemiLight.ttf')
                 if os.path.exists(proj_font):
                     _jp_font_path = proj_font
                 else:

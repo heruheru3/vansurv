@@ -250,16 +250,29 @@ class Stone(Weapon):
             base_mult = player.get_base_damage_bonus()
         except Exception:
             base_mult = 1.0
-        
+
+        try:
+            range_mult = player.get_effect_range_multiplier()
+        except Exception:
+            range_mult = 1.0
+        try:
+            time_mult = player.get_effect_time_multiplier()
+        except Exception:
+            time_mult = 1.0
+        try:
+            extra = player.get_extra_projectiles()
+        except Exception:
+            extra = 0
+
         return [Attack(
             x=player.x, 
             y=player.y, 
-            size_x=self.size,  # self.sizeを使用
-            size_y=self.size,  # self.sizeを使用
+            size_x=self.size * range_mult,  # self.sizeを使用
+            size_y=self.size * range_mult,  # self.sizeを使用
             type_="stone",
             speed=spd,
-            duration=self.duration,
-            bounces=self.bounces,
+            duration=self.duration * time_mult,
+            bounces=self.bounces + extra,
             velocity_x=math.cos(angle) * spd,
             velocity_y=math.sin(angle) * spd,
             damage=self.damage * base_mult
