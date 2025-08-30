@@ -2,6 +2,7 @@
 import pygame
 import math
 from constants import *
+from resources import load_icons
 
 class ExperienceGem:
     def __init__(self, x, y, value=1):
@@ -115,10 +116,11 @@ class GameItem:
     def draw(self, screen, camera_x=0, camera_y=0):
         # アイテム表示（heal/bomb）の陰影付け
         if self.type == "heal":
-            # 十字をやや立体的に描画
             r = self.size
-            surf = pygame.Surface((r*4, r*4), pygame.SRCALPHA)
             cx, cy = r*2, r*2
+
+            # 十字をやや立体的に描画
+            surf = pygame.Surface((r*4, r*4), pygame.SRCALPHA)
             # 背景小円
             pygame.draw.circle(surf, (0, 100, 0, 60), (cx, cy), r+6)
             # 十字本体（影）

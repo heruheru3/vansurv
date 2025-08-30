@@ -197,7 +197,7 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
     pygame.draw.rect(screen, (40, 40, 40), (bar_x, exp_y, meter_w, meter_h), border_radius=6)
     exp_to = max(1, getattr(player, 'exp_to_next_level', 1))
     exp_ratio = max(0.0, min(1.0, getattr(player, 'exp', 0) / exp_to))
-    pygame.draw.rect(screen, CYAN, (bar_x, exp_y, int(meter_w * exp_ratio), meter_h), border_radius=6)
+    pygame.draw.rect(screen, (40, 200, 250), (bar_x, exp_y, int(meter_w * exp_ratio), meter_h), border_radius=6)
     exp_text = font.render(f"LV{getattr(player,'level',1)} EXP {getattr(player,'exp',0)}/{exp_to}", True, WHITE)
     exp_rect = exp_text.get_rect(midleft=(bar_x + 8, exp_y + meter_h // 2))
     screen.blit(exp_text, exp_rect.topleft)
