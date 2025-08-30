@@ -73,6 +73,28 @@ class HurtFlash:
         pygame.draw.circle(s, (255, 0, 0, alpha), (surf_size // 2, surf_size // 2), r)
         screen.blit(s, (int(self.x - camera_x - surf_size // 2), int(self.y - camera_y - surf_size // 2)))
 
+class AvoidanceParticle:
+    def __init__(self, x=0, y=0, size=20, duration=18):
+        # プレイヤー位置とサイズを保持して、プレイヤー上部に青い半透明フラッシュを描く
+        self.x = x
+        self.y = y
+        self.size = max(8, int(size))
+        self.duration = duration
+        self.timer = duration
+
+    def update(self):
+        self.timer -= 1
+        return self.timer > 0
+
+    def draw(self, screen, camera_x=0, camera_y=0):
+        # プレイヤー位置に半透明の赤い円を描画（カメラオフセットを適用）
+        alpha = int(150 * (self.timer / max(1, self.duration)))
+        r = int(self.size * (1.0 + 0.25 * (self.timer / max(1, self.duration))))
+        surf_size = r * 2 + 4
+        s = pygame.Surface((surf_size, surf_size), pygame.SRCALPHA)
+        # 円を描画してからスクリーンにブリット
+        pygame.draw.circle(s, (0, 0, 255, alpha), (surf_size // 2, surf_size // 2), r)
+        screen.blit(s, (int(self.x - camera_x - surf_size // 2), int(self.y - camera_y - surf_size // 2)))
 
 class LevelUpEffect:
     def __init__(self, x, y):

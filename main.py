@@ -7,7 +7,7 @@ from constants import *
 from player import Player
 from enemy import Enemy
 from effects.items import ExperienceGem, GameItem
-from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber
+from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber, AvoidanceParticle
 from ui import draw_ui, draw_minimap, draw_background, draw_level_choice, draw_end_buttons, get_end_button_rects
 import resources
 
@@ -500,17 +500,20 @@ def main():
                     dy = player.y - enemy.y
                     r = (getattr(player, 'size', 0) + getattr(enemy, 'size', 0))
                     if dx*dx + dy*dy < (r * r):
-                        particles.append(HurtFlash(player.x, player.y, size=player.size))
-                        for _ in range(12):
-                            particles.append(PlayerHurtParticle(player.x, player.y))
-                        # サブアイテムの効果でダメージを軽減
-                        try:
-                            player.hp -= max(1, int(enemy.damage - player.get_defense()))
-                        except Exception:
-                            player.hp -= enemy.damage
-                        enemies.remove(enemy)
-                        if player.hp <= 0:
-                            game_over = True
+                        if random.random() < player.get_avoidance():
+                            # サブアイテムスピードアップ効果で攻撃を回避
+                            particles.append(AvoidanceParticle(player.x, player.y))
+                        else:
+                            particles.append(HurtFlash(player.x, player.y, size=player.size))
+
+                            # サブアイテムアーマーの効果でダメージを軽減
+                            try:
+                                player.hp -= max(1, int(enemy.damage - player.get_defense()))
+                            except Exception:
+                                player.hp -= enemy.damage
+                            enemies.remove(enemy)
+                            if player.hp <= 0:
+                                game_over = True
 
                 for gem in experience_gems[:]:
                     gem.move_to_player(player)

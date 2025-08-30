@@ -775,10 +775,18 @@ class Player:
     def get_speed(self):
         try:
             if 'speed' in self.subitems:
-                return float(self.base_speed + self.subitems.get('speed').value())
+                return float(self.base_speed * (1 + self.subitems.get('speed').value()))
             return float(self.base_speed)
         except Exception:
             return float(self.base_speed)
+
+    def get_avoidance(self):
+        try:
+            if 'speed' in self.subitems:
+                return float(self.subitems.get('speed').value())
+            return 0.0
+        except Exception:
+            return 0.0
 
     def get_effect_range_multiplier(self):
         try:
