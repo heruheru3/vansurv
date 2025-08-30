@@ -10,7 +10,9 @@ _sound_cache = {}
 DEFAULT_ICON_NAMES = ['sword','magic_wand','stone','whip','holy_water','garlic',
                       'axe','thunder','knife','rotating_book',
                       # subitem crystals
-                      'hp','base_damage','defense','speed','effect_range','effect_time','extra_projectiles','projectile_speed','gem_pickup_range']
+                      'hp','base_damage','defense','speed','effect_range','effect_time','extra_projectiles','projectile_speed','gem_pickup_range',
+                      # field items
+                      'bomb','healing_item']
 
 def load_icons(size=32, icon_names=None, icons_dir=None):
     """指定フォルダからアイコンPNGを読み込み、指定サイズにリサイズして辞書で返す。

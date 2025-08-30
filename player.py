@@ -16,10 +16,12 @@ class Player:
         self.speed = 3
         # 基本速度（サブアイテムで増加する）
         self.base_speed = 3
-        self.size = 32
+        self.size = 24
         # 基本最大HP と現在HP（サブアイテムで最大HPが増える）
         self.max_hp = 100
         self.hp = self.max_hp
+        self.defense = 1
+        self.avoidance = 0.1
         self.exp = 0
         self.level = 1
         self.exp_to_next_level = 3
@@ -767,10 +769,10 @@ class Player:
     def get_defense(self):
         try:
             if 'defense' in self.subitems:
-                return self.subitems.get('defense').value()
-            return 0
+                return self.defense + self.subitems.get('defense').value()
+            return self.defense
         except Exception:
-            return 0
+            return 1
 
     def get_speed(self):
         try:
@@ -778,15 +780,15 @@ class Player:
                 return float(self.base_speed * (1 + self.subitems.get('speed').value()))
             return float(self.base_speed)
         except Exception:
-            return float(self.base_speed)
+            return 3
 
     def get_avoidance(self):
         try:
             if 'speed' in self.subitems:
-                return float(self.subitems.get('speed').value())
-            return 0.0
+                return self.avoidance + float(self.subitems.get('speed').value())
+            return float(self.avoidance)
         except Exception:
-            return 0.0
+            return 0.1
 
     def get_effect_range_multiplier(self):
         try:

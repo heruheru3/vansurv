@@ -17,7 +17,8 @@ def get_font(size):
         if _jp_font_path is None:
             try:
                 # Check project bundled font
-                proj_font = os.path.join(os.path.dirname(__file__), 'assets', 'fonts', 'NotoSansCJKjp-DemiLight.ttf')
+                proj_font = os.path.join(os.path.dirname(__file__), 'assets', 'fonts', 'NotoSansCJKjp-Medium.ttf')
+                print(proj_font)
                 if os.path.exists(proj_font):
                     _jp_font_path = proj_font
                 else:
@@ -41,10 +42,10 @@ def get_font(size):
             else:
                 f = pygame.font.Font(None, size)
             # Try to make the font render heavier (semibold-like) when possible
-            try:
-                f.set_bold(True)
-            except Exception:
-                pass
+            # try:
+            #     f.set_bold(True)
+            # except Exception:
+            #     pass
         except Exception:
             try:
                 f = pygame.font.SysFont(None, size)
@@ -670,7 +671,7 @@ def draw_level_choice(screen, player, icons):
 
         # 半透明の暗いオーバーレイ
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 180))
+        overlay.fill((0, 0, 0, 140))
         screen.blit(overlay, (0, 0))
 
         choices = player.last_level_choices
@@ -696,6 +697,7 @@ def draw_level_choice(screen, player, icons):
 
         # タイトル
         title_font = get_font(24)
+        middle_font = get_font(18)
         small_font = get_font(14)
         title_bg = title_font.render('Choose Your Reward', True, WHITE)
         screen.blit(title_bg, (panel_rect.x + 24, panel_rect.y + 10))
@@ -831,7 +833,7 @@ def draw_level_choice(screen, player, icons):
                             pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
                             screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
                         else:
-                            level_s = small_font.render(f"Lv.{lvl_val}", True, (220,220,220))
+                            level_s = middle_font.render(f"Lv.{lvl_val + 1}", True, (50,220,220))
                             screen.blit(level_s, (rect.x + 220, rect.y + 15))
                 except Exception:
                     pass
@@ -884,7 +886,7 @@ def draw_level_choice(screen, player, icons):
                             pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
                             screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
                         else:
-                            screen.blit(small_font.render(f"Lv {lvl}", True, (220,220,220)), (rect.x + 220, rect.y + 15))
+                            screen.blit(middle_font.render(f"Lv {lvl + 1}", True, (50,220,220)), (rect.x + 220, rect.y + 15))
                     except Exception:
                         pass
     except Exception:
