@@ -503,7 +503,11 @@ def main():
                         particles.append(HurtFlash(player.x, player.y, size=player.size))
                         for _ in range(12):
                             particles.append(PlayerHurtParticle(player.x, player.y))
-                        player.hp -= enemy.damage
+                        # サブアイテムの効果でダメージを軽減
+                        try:
+                            player.hp -= max(1, int(enemy.damage - player.get_defense()))
+                        except Exception:
+                            player.hp -= enemy.damage
                         enemies.remove(enemy)
                         if player.hp <= 0:
                             game_over = True
