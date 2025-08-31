@@ -3,6 +3,7 @@ import sys
 import math
 import random
 import os
+import asyncio
 from constants import *
 from player import Player
 from enemy import Enemy
@@ -78,7 +79,7 @@ def enforce_experience_gems_limit(gems, max_gems=MAX_GEMS_ON_SCREEN):
         # 失敗してもゲームは続行
         pass
 
-def main():
+async def main():
     global DEBUG_MODE
     # 初期化
     pygame.init()
@@ -724,6 +725,7 @@ def main():
 
             pygame.display.flip()
             clock.tick(FPS)
+            await asyncio.sleep(0)
 
         except Exception as e:
             # 例外が発生したら詳細をログ出力してループを抜ける
@@ -736,5 +738,5 @@ def main():
     pygame.quit()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
     sys.exit(0)
