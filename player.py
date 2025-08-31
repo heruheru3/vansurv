@@ -2,6 +2,7 @@
 import pygame
 import math
 import random
+import os
 from constants import *  # 相対インポートを絶対インポートに変更
 from weapons.melee import Whip, Garlic
 from weapons.projectile import HolyWater, MagicWand, Axe, Stone, RotatingBook, Knife, Thunder
@@ -92,7 +93,9 @@ class Player:
         # プレイヤー用チップセットの読み込み（幅64px、16pxごとに4フレーム）
         # ファイル名はプロジェクトルートの "player_chip.png" を想定します。存在しない場合はフォールバック描画を使用します。
         try:
-            sheet = pygame.image.load("assets/character/player_chip.png").convert_alpha()
+            player_character_chip_path = os.path.join(os.path.dirname(__file__), 'assets', 'character', 'player_chip.png')
+            sheet = pygame.image.load(player_character_chip_path).convert_alpha()
+            print(sheet)
             sheet_w = sheet.get_width()
             sheet_h = sheet.get_height()
             tile_w = 16
