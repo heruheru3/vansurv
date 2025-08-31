@@ -5,6 +5,8 @@ __pycache__/
 *.pyo
 *.pyd
 
+output/
+
 # pipでインストールされるパッケージ
 venv/
 env/
