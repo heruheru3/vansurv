@@ -92,7 +92,7 @@ class Player:
         # プレイヤー用チップセットの読み込み（幅64px、16pxごとに4フレーム）
         # ファイル名はプロジェクトルートの "player_chip.png" を想定します。存在しない場合はフォールバック描画を使用します。
         try:
-            sheet = pygame.image.load("player_chip.png").convert_alpha()
+            sheet = pygame.image.load("assets/character/player_chip.png").convert_alpha()
             sheet_w = sheet.get_width()
             sheet_h = sheet.get_height()
             tile_w = 16
