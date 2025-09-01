@@ -69,20 +69,56 @@ def init_game(screen):
         pass
     return player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats
 
-def enforce_experience_gems_limit(gems, max_gems=MAX_GEMS_ON_SCREEN):
-    """上限を超えた場合、古いジェムから順に削除して
-    その value を残った（最新の）ジェムに加算して総EXPを維持する。
+def enforce_experience_gems_limit(gems, max_gems=MAX_GEMS_ON_SCREEN, player_x=None, player_y=None):
+    """上限を超えた場合、プレイヤーから遠いジェムから順に削除して
+    その value を残った（近い）ジェムに加算して総EXPを維持する。
+    player_x, player_yが指定されていない場合は従来通り古い順で削除。
     """
     try:
         while len(gems) > max_gems:
-            oldest = gems.pop(0)
-            if not gems:
-                # もし残ったジェムがなければ、古いジェムの価値を新しいまとまりとして
-                # 末尾に再配置する（ほとんど発生しないが保険）
-                gems.append(ExperienceGem(oldest.x, oldest.y, value=oldest.value))
+            if player_x is not None and player_y is not None:
+                # プレイヤーから最も遠いジェムを見つける
+                farthest_gem = None
+                max_distance = -1
+                farthest_index = 0
+                
+                for i, gem in enumerate(gems):
+                    distance = ((gem.x - player_x) ** 2 + (gem.y - player_y) ** 2) ** 0.5
+                    if distance > max_distance:
+                        max_distance = distance
+                        farthest_gem = gem
+                        farthest_index = i
+                
+                # 最も遠いジェムを削除
+                removed_gem = gems.pop(farthest_index)
             else:
-                # 古いジェムの値を最新のジェムに集約
-                gems[-1].value = getattr(gems[-1], 'value', 1) + getattr(oldest, 'value', 1)
+                # プレイヤー位置が不明な場合は従来通り古い順
+                removed_gem = gems.pop(0)
+            
+            if not gems:
+                # もし残ったジェムがなければ、削除したジェムの価値を新しいまとまりとして
+                # 末尾に再配置する（ほとんど発生しないが保険）
+                gems.append(ExperienceGem(removed_gem.x, removed_gem.y, value=removed_gem.value))
+            else:
+                # プレイヤーから最も近いジェムに価値を集約
+                if player_x is not None and player_y is not None:
+                    closest_gem = None
+                    min_distance = float('inf')
+                    
+                    for gem in gems:
+                        distance = ((gem.x - player_x) ** 2 + (gem.y - player_y) ** 2) ** 0.5
+                        if distance < min_distance:
+                            min_distance = distance
+                            closest_gem = gem
+                    
+                    if closest_gem:
+                        closest_gem.value = getattr(closest_gem, 'value', 1) + getattr(removed_gem, 'value', 1)
+                    else:
+                        # 最寄りが見つからない場合は最新のジェムに集約
+                        gems[-1].value = getattr(gems[-1], 'value', 1) + getattr(removed_gem, 'value', 1)
+                else:
+                    # プレイヤー位置が不明な場合は従来通り最新のジェムに集約
+                    gems[-1].value = getattr(gems[-1], 'value', 1) + getattr(removed_gem, 'value', 1)
     except Exception:
         # 失敗してもゲームは続行
         pass
@@ -499,7 +535,7 @@ def main():
                                     items.append(GameItem(enemy.x, enemy.y, "bomb"))
                                 else:
                                     experience_gems.append(ExperienceGem(enemy.x, enemy.y))
-                                    enforce_experience_gems_limit(experience_gems)
+                                    enforce_experience_gems_limit(experience_gems, player_x=player.x, player_y=player.y)
 
                                 if enemy in enemies:
                                     enemies.remove(enemy)
@@ -665,8 +701,8 @@ def main():
                         elif item.type == "bomb":
                             for enemy in enemies[:]:
                                 experience_gems.append(ExperienceGem(enemy.x, enemy.y))
-                                # 各追加ごとに上限をチェックして古いものを削除しつつ価値を集約
-                                enforce_experience_gems_limit(experience_gems)
+                                # 各追加ごとに上限をチェックしてプレイヤーから遠いものを削除しつつ価値を集約
+                                enforce_experience_gems_limit(experience_gems, player_x=player.x, player_y=player.y)
                             enemies.clear()
                         items.remove(item)
 
