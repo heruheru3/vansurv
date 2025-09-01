@@ -85,14 +85,20 @@ def main():
     ICONS = preload_res.get('icons', {})
 
     clock = pygame.time.Clock()
+    # FPSカウンター用
+    fps_values = []
+    fps_update_timer = 0.0
+    
     # 画面右下に小さなプレイヤーステータスを表示するかどうかのフラグ（F4でトグル）
     show_status = True
     # デバッグ表示フラグ（F5でトグル：攻撃範囲+障害物）
     show_debug_visuals = False
     try:
         debug_font = pygame.font.SysFont(None, 14)
+        fps_font = pygame.font.SysFont(None, 20)  # FPS表示用フォント
     except Exception:
         debug_font = None
+        fps_font = None
 
     # カメラ初期値とスムージング係数（0.0: 固定、1.0: 即時追従）
     camera_x = 0.0
@@ -1073,9 +1079,36 @@ def main():
 
             pygame.display.flip()
             
+            # FPS表示（実画面の左下に直接描画）
+            if SHOW_FPS and fps_font and len(fps_values) > 0:
+                # 過去のFPS値の平均を計算
+                avg_fps = sum(fps_values[-30:]) / len(fps_values[-30:])  # 直近30フレーム
+                fps_text = fps_font.render(f"FPS: {avg_fps:.1f}", True, (255, 255, 255))
+                fps_rect = fps_text.get_rect()
+                fps_rect.bottomleft = (10, screen.get_height() - 10)
+                
+                # 背景を暗くして読みやすくする
+                bg_rect = fps_rect.inflate(8, 4)
+                pygame.draw.rect(screen, (0, 0, 0, 128), bg_rect)
+                screen.blit(fps_text, fps_rect)
+                
+                pygame.display.update(bg_rect)
+            
             # パフォーマンス最適化：大きなスケーリング時はFPSを調整
             target_fps = FULLSCREEN_FPS if scale_factor > FULLSCREEN_FPS_THRESHOLD else NORMAL_FPS
             clock.tick(target_fps)
+            
+            # FPS計算と表示の更新（0.5秒ごと）
+            if SHOW_FPS:
+                current_fps = clock.get_fps()
+                if current_fps > 0:
+                    fps_values.append(current_fps)
+                    # FPS値リストのサイズを制限（最大60個、約2秒分）
+                    if len(fps_values) > 60:
+                        fps_values = fps_values[-60:]
+                fps_update_timer += clock.get_time() / 1000.0
+                if fps_update_timer >= 0.5:
+                    fps_update_timer = 0.0
 
         except Exception as e:
             # 例外が発生したら詳細をログ出力してループを抜ける

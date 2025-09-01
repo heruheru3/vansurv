@@ -33,7 +33,9 @@ MAX_SUBITEMS = MAX_WEAPONS
 MAX_WEAPON_LEVEL = 5
 MAX_SUBITEM_LEVEL = 3
 
+# デバッグ・表示設定
 DEBUG = False
+SHOW_FPS = True  # FPS表示のON/OFF
 
 # マップ・ステージ設定
 USE_STAGE_MAP = False  # True: レトロマップチップ使用, False: 市松模様背景（テスト用）
@@ -48,16 +50,16 @@ BOMB_ITEM_DROP_RATE = 0.002   # 0.2%の確率でボムアイテム（0.01 + 0.00
 MAGNET_ITEM_DROP_RATE = 0.001  # 0.1%の確率でマグネットアイテム
 
 # パーティクル関連の制限（パフォーマンス改善用）
-PARTICLE_LIMIT = 300        # これ以上は古いパーティクルから切る
+PARTICLE_LIMIT = 200        # これ以上は古いパーティクルから切る
 
 # パフォーマンス最適化設定
 FULLSCREEN_FPS_THRESHOLD = 2.5  # この倍率以上でFPS調整
-FULLSCREEN_FPS = 45  # フルスクリーン時の目標FPS（大画面時）
+FULLSCREEN_FPS = 60  # フルスクリーン時の目標FPS（大画面時）
 NORMAL_FPS = 60  # 通常時のFPS
-PARTICLE_TRIM_TO = 220      # 切るときに残す数
+PARTICLE_TRIM_TO = 150      # 切るときに残す数
 
 # 画面上に存在可能な経験値ジェムの上限
-MAX_GEMS_ON_SCREEN = 200
+MAX_GEMS_ON_SCREEN = 150
 
 # HP自然回復設定
 NATURAL_HEAL_INTERVAL_MS = 2000  # 自然回復の間隔（ミリ秒）
