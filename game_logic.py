@@ -91,8 +91,12 @@ def handle_enemy_death(enemy, enemies, experience_gems, items, particles, damage
     return False
 
 
-def handle_bomb_item_effect(enemies, experience_gems, particles, player_x, player_y):
+def handle_bomb_item_effect(enemies, experience_gems, particles, player_x, player_y, player=None):
     """ボムアイテム使用時の処理"""
+    # 画面揺れエフェクトを発生させる
+    if player and hasattr(player, 'activate_screen_shake'):
+        player.activate_screen_shake()
+    
     # 全敵を経験値ジェムに変換
     for enemy in enemies[:]:
         experience_gems.append(ExperienceGem(enemy.x, enemy.y))
@@ -168,9 +172,9 @@ def collect_items(player, items, enemies, experience_gems, particles):
                 player.heal(HEAL_ITEM_AMOUNT, "item")
                         
             elif item.type == "bomb":
-                # ボム効果
+                # ボム効果（画面揺れも含む）
                 handle_bomb_item_effect(enemies, experience_gems, particles, 
-                                      player.x, player.y)
+                                      player.x, player.y, player)
             
             elif item.type == "magnet":
                 # マグネット効果を有効化

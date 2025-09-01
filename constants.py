@@ -62,5 +62,9 @@ HEAL_ITEM_AMOUNT = 0.20          # 回復アイテムの回復量（割合：0.2
 MAGNET_EFFECT_DURATION_MS = 3000 # マグネット効果の持続時間（ミリ秒）
 MAGNET_FORCE_MULTIPLIER = 3.0    # マグネット効果時のジェム引き寄せ倍率
 
+# 画面揺れエフェクト設定
+SCREEN_SHAKE_DURATION_MS = 500   # 画面揺れの持続時間（ミリ秒）
+SCREEN_SHAKE_INTENSITY = 10      # 画面揺れの強度（ピクセル）
+
 # レベルアップ時の自動回復量
 LEVELUP_HEAL_AMOUNT = 20         # レベルアップ時の回復量

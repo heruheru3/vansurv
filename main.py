@@ -329,6 +329,9 @@ def main():
                 # マグネット効果の更新
                 player.update_magnet_effect()
 
+                # 画面揺れエフェクトの更新
+                player.update_screen_shake()
+
                 # 攻撃と敵の当たり判定
                 for attack in player.active_attacks[:]:
                     # spawn_delay によってまだ発生していない攻撃は無視する
@@ -597,6 +600,8 @@ def main():
                             # 体力回復（割合回復）
                             player.heal(HEAL_ITEM_AMOUNT, "item")
                         elif item.type == "bomb":
+                            # 画面揺れエフェクトを発生させる
+                            player.activate_screen_shake()
                             for enemy in enemies[:]:
                                 experience_gems.append(ExperienceGem(enemy.x, enemy.y))
                                 # 各追加ごとに上限をチェックしてプレイヤーから遠いものを削除しつつ価値を集約
@@ -631,9 +636,13 @@ def main():
             # 補間（スムージング）
             camera_x += (desired_x - camera_x) * CAMERA_LERP
             camera_y += (desired_y - camera_y) * CAMERA_LERP
-            # 描画で使用する整数カメラ座標
-            int_cam_x = int(camera_x)
-            int_cam_y = int(camera_y)
+            
+            # 画面揺れオフセットを適用
+            shake_offset_x, shake_offset_y = player.get_screen_shake_offset()
+            
+            # 描画で使用する整数カメラ座標（画面揺れを加味）
+            int_cam_x = int(camera_x) + shake_offset_x
+            int_cam_y = int(camera_y) + shake_offset_y
 
             # ワールド用サーフェスに描画してからスクリーンにブリットする
             world_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)

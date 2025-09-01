@@ -56,6 +56,11 @@ class Player:
         self.magnet_active = False
         self.magnet_end_time = 0
 
+        # 画面揺れエフェクト
+        self.screen_shake_active = False
+        self.screen_shake_end_time = 0
+        self.screen_shake_intensity = 0
+
         # 見た目（オーブ + スプライト）
         orb_size = max(32, self.size * 3)
         self.orb_base = pygame.Surface((orb_size, orb_size), pygame.SRCALPHA)
@@ -704,3 +709,35 @@ class Player:
     def is_magnet_active(self):
         """マグネット効果が有効かどうかを返す"""
         return self.magnet_active
+
+    def activate_screen_shake(self, intensity=None):
+        """画面揺れエフェクトを有効化"""
+        current_time = pygame.time.get_ticks()
+        self.screen_shake_active = True
+        self.screen_shake_end_time = current_time + SCREEN_SHAKE_DURATION_MS
+        self.screen_shake_intensity = intensity if intensity is not None else SCREEN_SHAKE_INTENSITY
+
+    def update_screen_shake(self):
+        """画面揺れエフェクトの状態を更新"""
+        if self.screen_shake_active:
+            current_time = pygame.time.get_ticks()
+            if current_time >= self.screen_shake_end_time:
+                self.screen_shake_active = False
+                self.screen_shake_intensity = 0
+
+    def get_screen_shake_offset(self):
+        """現在の画面揺れオフセットを取得"""
+        if not self.screen_shake_active:
+            return (0, 0)
+        
+        import random
+        # 時間経過で強度を減衰
+        current_time = pygame.time.get_ticks()
+        remaining_time = max(0, self.screen_shake_end_time - current_time)
+        time_ratio = remaining_time / SCREEN_SHAKE_DURATION_MS
+        current_intensity = self.screen_shake_intensity * time_ratio
+        
+        # ランダムなオフセット
+        offset_x = random.uniform(-current_intensity, current_intensity)
+        offset_y = random.uniform(-current_intensity, current_intensity)
+        return (int(offset_x), int(offset_y))
