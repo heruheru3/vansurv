@@ -368,6 +368,12 @@ def main():
                 # 自動攻撃の更新
                 player.update_attacks(enemies, camera_x=int(camera_x), camera_y=int(camera_y))
 
+                # 自然回復（HPサブアイテム所持時のみ、5秒で1回復）
+                try:
+                    player.update_regen()
+                except Exception:
+                    pass
+
                 # 攻撃と敵の当たり判定
                 for attack in player.active_attacks[:]:
                     # spawn_delay によってまだ発生していない攻撃は無視する
