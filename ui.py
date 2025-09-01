@@ -699,12 +699,22 @@ def draw_level_choice(screen, player, icons):
                     pygame.draw.rect(screen, (120, 120, 120), (icon_x, icon_y, icon_size, icon_size))
 
             # テキスト
-            name = key.replace('_', ' ').title()
-            screen.blit(title_font.render(name, True, WHITE), (rect.x + 16 + 32, rect.y + 8))
+            # 新しい形式の名前と説明を取得
+            display_name = key.replace('_', ' ').title()  # デフォルト名
+            long_desc = ''
             try:
-                long_desc = (desc_data['weapons' if typ == 'weapon' else 'subitems']).get(key, '')
+                category_data = desc_data['weapons' if typ == 'weapon' else 'subitems']
+                item_data = category_data.get(key, {})
+                if isinstance(item_data, dict):
+                    display_name = item_data.get('name', display_name)
+                    long_desc = item_data.get('description', '')
+                elif isinstance(item_data, str):
+                    # 旧形式との互換性
+                    long_desc = item_data
             except Exception:
-                long_desc = ''
+                pass
+            
+            screen.blit(title_font.render(display_name, True, WHITE), (rect.x + 16 + 32, rect.y + 8))
             desc_x, desc_y, desc_w = rect.x + 16 + 32, rect.y + 44, rect.width - (16 + 32 + 24)
             if long_desc:
                 for li, surf in enumerate(render_wrapped_jp(long_desc, small_font, (200, 200, 200), desc_w, max_lines=4)):
@@ -918,14 +928,24 @@ def draw_subitem_choice(screen, player, icons=None):
                 pass
 
             # テキスト
-            screen.blit(title_font.render(key.replace('_', ' ').title(), True, WHITE), (rect.x + 12 + 36, rect.y + 8))
+            # 新しい形式の名前と説明を取得
+            display_name = key.replace('_', ' ').title()  # デフォルト名
+            long_desc = ''
             try:
                 data_path = os.path.join(os.path.dirname(__file__), 'data', 'descriptions.json')
                 with open(data_path, 'r', encoding='utf-8') as f:
                     sub_desc_data = json.load(f).get('subitems', {})
+                item_data = sub_desc_data.get(key, {})
+                if isinstance(item_data, dict):
+                    display_name = item_data.get('name', display_name)
+                    long_desc = item_data.get('description', '')
+                elif isinstance(item_data, str):
+                    # 旧形式との互換性
+                    long_desc = item_data
             except Exception:
-                sub_desc_data = {}
-            long_desc = sub_desc_data.get(key, None)
+                pass
+            
+            screen.blit(title_font.render(display_name, True, WHITE), (rect.x + 12 + 36, rect.y + 8))
             if long_desc:
                 desc_x, desc_y, desc_w = rect.x + 12 + 36, rect.y + 40, rect.width - (12 + 36 + 20)
                 lines = render_wrapped_jp(long_desc, small, (200, 200, 200), desc_w, max_lines=3)
