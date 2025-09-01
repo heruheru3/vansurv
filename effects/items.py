@@ -96,6 +96,13 @@ class GameItem:
         self.speed = 2
         self.type = item_type
         self.collected = False
+        
+        # アイテム画像を読み込む
+        try:
+            icons = load_icons(size=48, icon_names=[item_type])  # サイズを48に倍増
+            self.image = icons.get(item_type)
+        except Exception:
+            self.image = None
 
     def move_to_player(self, player):
         dx = player.x - self.x
@@ -114,31 +121,61 @@ class GameItem:
             self.y += (dy / distance) * self.speed
 
     def draw(self, screen, camera_x=0, camera_y=0):
-        # アイテム表示（heal/bomb）の陰影付け
-        if self.type == "heal":
-            r = self.size
-            cx, cy = r*2, r*2
+        # 画像が読み込まれている場合は画像を使用
+        if self.image:
+            # 画像のサイズに基づいて描画位置を調整
+            img_w, img_h = self.image.get_size()
+            draw_x = int(self.x - img_w // 2 - camera_x)
+            draw_y = int(self.y - img_h // 2 - camera_y)
+            
+            # 画像の中心座標
+            center_x = int(self.x - camera_x)
+            center_y = int(self.y - camera_y)
+            
+            # ピンクの円の半径（画像サイズの約70%）
+            circle_radius = int(max(img_w, img_h) * 0.35)
+            
+            # グロー効果（複数の円を重ねて描画）
+            glow_color = (255, 20, 147, 30)  # DeepPink with low alpha
+            for i in range(5):
+                glow_radius = circle_radius + (i + 1) * 3
+                glow_alpha = max(10, 40 - i * 8)
+                glow_surf = pygame.Surface((glow_radius * 2 + 10, glow_radius * 2 + 10), pygame.SRCALPHA)
+                pygame.draw.circle(glow_surf, (255, 20, 147, glow_alpha), 
+                                 (glow_radius + 5, glow_radius + 5), glow_radius)
+                screen.blit(glow_surf, (center_x - glow_radius - 5, center_y - glow_radius - 5))
+            
+            # メインのピンクの円（背景）
+            pygame.draw.circle(screen, (255, 20, 147, 180), (center_x, center_y), circle_radius)
+            
+            # 元の画像を上に描画
+            screen.blit(self.image, (draw_x, draw_y))
+        else:
+            # フォールバック: 従来の図形描画
+            if self.type == "heal":
+                r = self.size
+                cx, cy = r*2, r*2
 
-            # 十字をやや立体的に描画
-            surf = pygame.Surface((r*4, r*4), pygame.SRCALPHA)
-            # 背景小円
-            pygame.draw.circle(surf, (0, 100, 0, 60), (cx, cy), r+6)
-            # 十字本体（影）
-            pygame.draw.line(surf, (0, 120, 0), (cx - 8, cy + 1), (cx + 8, cy + 1), 6)
-            pygame.draw.line(surf, (0, 120, 0), (cx + 1, cy - 8), (cx + 1, cy + 8), 6)
-            # 十字ハイライト
-            pygame.draw.line(surf, GREEN, (cx - 8, cy - 1), (cx + 8, cy - 1), 4)
-            pygame.draw.line(surf, GREEN, (cx - 1, cy - 8), (cx - 1, cy + 8), 4)
-            screen.blit(surf, (int(self.x - cx - camera_x), int(self.y - cy - camera_y)))
-        elif self.type == "bomb":
-            r = self.size
-            surf = pygame.Surface((r*4, r*4), pygame.SRCALPHA)
-            cx, cy = r*2, r*2
-            base = RED
-            darker = tuple(max(0, int(c * 0.5)) for c in base)
-            highlight = tuple(min(255, int(c * 1.4)) for c in base)
-            pygame.draw.circle(surf, darker + (230,), (cx, cy), r+6)
-            pygame.draw.circle(surf, base + (240,), (int(cx - r*0.4), int(cy - r*0.4)), r)
-            pygame.draw.circle(surf, highlight + (160,), (int(cx - r*0.8), int(cy - r*0.8)), int(r*0.4))
-            pygame.draw.line(surf, YELLOW, (cx + r, cy - r), (cx + r + 6, cy - r - 6), 3)
-            screen.blit(surf, (int(self.x - cx - camera_x), int(self.y - cy - camera_y)))
+                # 十字をやや立体的に描画
+                surf = pygame.Surface((r*4, r*4), pygame.SRCALPHA)
+                # 背景小円
+                pygame.draw.circle(surf, (0, 100, 0, 60), (cx, cy), r+6)
+                # 十字本体（影）
+                pygame.draw.line(surf, (0, 120, 0), (cx - 8, cy + 1), (cx + 8, cy + 1), 6)
+                pygame.draw.line(surf, (0, 120, 0), (cx + 1, cy - 8), (cx + 1, cy + 8), 6)
+                # 十字ハイライト
+                pygame.draw.line(surf, GREEN, (cx - 8, cy - 1), (cx + 8, cy - 1), 4)
+                pygame.draw.line(surf, GREEN, (cx - 1, cy - 8), (cx - 1, cy + 8), 4)
+                screen.blit(surf, (int(self.x - cx - camera_x), int(self.y - cy - camera_y)))
+            elif self.type == "bomb":
+                r = self.size
+                surf = pygame.Surface((r*4, r*4), pygame.SRCALPHA)
+                cx, cy = r*2, r*2
+                base = RED
+                darker = tuple(max(0, int(c * 0.5)) for c in base)
+                highlight = tuple(min(255, int(c * 1.4)) for c in base)
+                pygame.draw.circle(surf, darker + (230,), (cx, cy), r+6)
+                pygame.draw.circle(surf, base + (240,), (int(cx - r*0.4), int(cy - r*0.4)), r)
+                pygame.draw.circle(surf, highlight + (160,), (int(cx - r*0.8), int(cy - r*0.8)), int(r*0.4))
+                pygame.draw.line(surf, YELLOW, (cx + r, cy - r), (cx + r + 6, cy - r - 6), 3)
+                screen.blit(surf, (int(self.x - cx - camera_x), int(self.y - cy - camera_y)))
