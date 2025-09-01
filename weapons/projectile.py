@@ -134,7 +134,7 @@ class MagicWand(Weapon):
     def level_up(self):
         """レベルアップ時の強化"""
         if self.level % 2 == 0:  # 現在のレベルが偶数（次は奇数に）
-            self.speed += 2
+            self.speed += 3
             print(f"Speed increased to {self.speed}")
         else:  # 現在のレベルが奇数（次は偶数に）
             self.num_projectiles += 1
@@ -143,7 +143,7 @@ class MagicWand(Weapon):
         # 基本強化（レベルを上げる前に効果を適用）
         self.damage *= 1.1  # ダメージ10%増加
         self.num_projectiles += 1
-        self.cooldown = max(self.cooldown * 0.95, 500)  # クールダウン短縮（最小500ms）
+        self.cooldown = max(self.cooldown * 0.85, 500)  # クールダウン短縮（最小500ms）
         
         # 最後にレベルを上げる
         super().level_up()
