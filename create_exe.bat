@@ -3,7 +3,6 @@ pyinstaller --noconfirm --onefile --windowed ^
 --add-data "E:\jupy_work\vansurv\__init__.py;." ^
 --add-data "E:\jupy_work\vansurv\constants.py;." ^
 --add-data "E:\jupy_work\vansurv\enemy.py;." ^
---add-data "E:\jupy_work\vansurv\generate_icons.py;." ^
 --add-data "E:\jupy_work\vansurv\player.py;." ^
 --add-data "E:\jupy_work\vansurv\resources.py;." ^
 --add-data "E:\jupy_work\vansurv\subitems.py;." ^
