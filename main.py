@@ -197,39 +197,90 @@ def main():
                             pass
                         continue
 
-                    # 武器/サブアイテム選択のキー処理は下側の統合ブロックで処理する
-                    # （ここで処理: 1押下=1移動に変更）
+                    # 武器/サブアイテム選択のキー処理
                     try:
                         if getattr(player, 'awaiting_weapon_choice', False) and getattr(player, 'last_level_choices', None):
                             n = len(player.last_level_choices)
                             if n > 0:
-                                if event.key in (pygame.K_LEFT, pygame.K_a):
-                                    player.set_input_method("keyboard")
-                                    player.selected_weapon_choice_index = (player.selected_weapon_choice_index - 1) % n
-                                    try:
-                                        particles.append(DeathParticle(player.x, player.y, CYAN))
-                                    except Exception:
-                                        pass
-                                    continue
-                                elif event.key in (pygame.K_RIGHT, pygame.K_d):
-                                    player.set_input_method("keyboard")
-                                    player.selected_weapon_choice_index = (player.selected_weapon_choice_index + 1) % n
-                                    try:
-                                        particles.append(DeathParticle(player.x, player.y, CYAN))
-                                    except Exception:
-                                        pass
-                                    continue
-                                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                                    player.set_input_method("keyboard")
-                                    idx = max(0, min(player.selected_weapon_choice_index, n - 1))
-                                    choice = player.last_level_choices[idx]
-                                    player.apply_level_choice(choice)
-                                    try:
-                                        for _ in range(8):
+                                # 初期武器選択（グリッド形式）の場合
+                                if getattr(player, 'is_initial_weapon_selection', False):
+                                    grid_size = 3
+                                    current_index = getattr(player, 'selected_weapon_choice_index', 0)
+                                    current_row = current_index // grid_size
+                                    current_col = current_index % grid_size
+                                    
+                                    new_index = current_index
+                                    
+                                    if event.key in (pygame.K_LEFT, pygame.K_a):
+                                        new_col = (current_col - 1) % grid_size
+                                        new_index = current_row * grid_size + new_col
+                                    elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                        new_col = (current_col + 1) % grid_size
+                                        new_index = current_row * grid_size + new_col
+                                    elif event.key in (pygame.K_UP, pygame.K_w):
+                                        new_row = (current_row - 1) % grid_size
+                                        new_index = new_row * grid_size + current_col
+                                    elif event.key in (pygame.K_DOWN, pygame.K_s):
+                                        new_row = (current_row + 1) % grid_size
+                                        new_index = new_row * grid_size + current_col
+                                    elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5,
+                                                       pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9):
+                                        # 数字キーで直接選択
+                                        digit = event.key - pygame.K_1  # 0-8
+                                        if digit < n:
+                                            new_index = digit
+                                    elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                        # 選択確定
+                                        player.set_input_method("keyboard")
+                                        idx = max(0, min(current_index, n - 1))
+                                        choice = player.last_level_choices[idx]
+                                        player.apply_level_choice(choice)
+                                        player.is_initial_weapon_selection = False
+                                        try:
+                                            for _ in range(8):
+                                                particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        continue
+                                    
+                                    # インデックス更新
+                                    if new_index != current_index and new_index < n:
+                                        player.set_input_method("keyboard")
+                                        player.selected_weapon_choice_index = new_index
+                                        try:
                                             particles.append(DeathParticle(player.x, player.y, CYAN))
-                                    except Exception:
-                                        pass
+                                        except Exception:
+                                            pass
                                     continue
+                                else:
+                                    # 通常のレベルアップ選択（横並び3択）
+                                    if event.key in (pygame.K_LEFT, pygame.K_a):
+                                        player.set_input_method("keyboard")
+                                        player.selected_weapon_choice_index = (player.selected_weapon_choice_index - 1) % n
+                                        try:
+                                            particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        continue
+                                    elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                        player.set_input_method("keyboard")
+                                        player.selected_weapon_choice_index = (player.selected_weapon_choice_index + 1) % n
+                                        try:
+                                            particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        continue
+                                    elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                        player.set_input_method("keyboard")
+                                        idx = max(0, min(player.selected_weapon_choice_index, n - 1))
+                                        choice = player.last_level_choices[idx]
+                                        player.apply_level_choice(choice)
+                                        try:
+                                            for _ in range(8):
+                                                particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        continue
                         elif getattr(player, 'awaiting_subitem_choice', False) and getattr(player, 'last_subitem_choices', None):
                             n = len(player.last_subitem_choices)
                             if n > 0:
@@ -300,33 +351,72 @@ def main():
                     if getattr(player, 'awaiting_weapon_choice', False) and event.button == 1:
                         player.set_input_method("mouse")
                         mx, my = convert_mouse_pos(*event.pos)
-                        # レイアウトを再現して当たり判定
+                        
                         choices = getattr(player, 'last_level_choices', [])
                         if choices:
-                            # 中央パネルに3分割で表示するレイアウト
-                            cw = min(880, SCREEN_WIDTH - 160)
-                            ch = 180
-                            cx = SCREEN_WIDTH // 2
-                            cy = SCREEN_HEIGHT // 2
-                            panel_rect = pygame.Rect(cx - cw//2, cy - ch//2, cw, ch)
-                            option_w = (cw - 40) // len(choices)
-                            option_h = ch - 60
-                            hit = False
-                            for i, choice in enumerate(choices):
-                                ox = panel_rect.x + 20 + i * option_w
-                                oy = panel_rect.y + 40
-                                rect = pygame.Rect(ox, oy, option_w - 8, option_h)
-                                if rect.collidepoint(mx, my):
-                                    player.apply_level_choice(choice)
-                                    try:
-                                        for _ in range(8):
-                                            particles.append(DeathParticle(player.x, player.y, CYAN))
-                                    except Exception:
-                                        pass
-                                    hit = True
-                                    break
-                            if hit:
-                                continue
+                            # 初期武器選択（グリッド形式）の場合
+                            if getattr(player, 'is_initial_weapon_selection', False):
+                                # グリッドパネルの当たり判定（レベルアップと同じレイアウト）
+                                grid_size = 3
+                                cw = min(880, SCREEN_WIDTH - 160)
+                                option_w = (cw - 40) // grid_size
+                                option_h = 142
+                                cell_margin = 8
+                                panel_w = cw
+                                panel_h = grid_size * (option_h + cell_margin) + 100
+                                
+                                cx = SCREEN_WIDTH // 2
+                                cy = SCREEN_HEIGHT // 2
+                                # パネルが画面からはみ出ないように調整
+                                panel_y = max(20, cy - panel_h // 2)
+                                if panel_y + panel_h > SCREEN_HEIGHT - 20:
+                                    panel_y = SCREEN_HEIGHT - panel_h - 20
+                                panel_rect = pygame.Rect(cx - panel_w // 2, panel_y, panel_w, panel_h)
+                                accent_h = 54
+                                
+                                for i, weapon_key in enumerate(choices[:9]):
+                                    row = i // grid_size
+                                    col = i % grid_size
+                                    
+                                    rect_x = panel_rect.x + 20 + col * option_w
+                                    rect_y = panel_rect.y + accent_h + 12 + row * (option_h + cell_margin)
+                                    rect = pygame.Rect(rect_x, rect_y, option_w - 8, option_h)
+                                    
+                                    if rect.collidepoint(mx, my):
+                                        choice = choices[i]
+                                        player.apply_level_choice(choice)
+                                        player.is_initial_weapon_selection = False
+                                        try:
+                                            for _ in range(8):
+                                                particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        break
+                            else:
+                                # 通常のレベルアップ選択（横並び3択）
+                                cw = min(880, SCREEN_WIDTH - 160)
+                                ch = 180
+                                cx = SCREEN_WIDTH // 2
+                                cy = SCREEN_HEIGHT // 2
+                                panel_rect = pygame.Rect(cx - cw//2, cy - ch//2, cw, ch)
+                                option_w = (cw - 40) // len(choices)
+                                option_h = ch - 60
+                                hit = False
+                                for i, choice in enumerate(choices):
+                                    ox = panel_rect.x + 20 + i * option_w
+                                    oy = panel_rect.y + 40
+                                    rect = pygame.Rect(ox, oy, option_w - 8, option_h)
+                                    if rect.collidepoint(mx, my):
+                                        player.apply_level_choice(choice)
+                                        try:
+                                            for _ in range(8):
+                                                particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        hit = True
+                                        break
+                                if hit:
+                                    continue
                     # サブアイテム選択のマウスクリック判定
                     if getattr(player, 'awaiting_subitem_choice', False) and event.button == 1:
                         player.set_input_method("mouse")

@@ -601,9 +601,181 @@ def draw_background(screen, camera_x=0, camera_y=0):
                 pygame.draw.rect(screen, dark, rect)
     # ビネットなどの余計な効果はここでは付けない（シンプルに）
 
+def draw_initial_weapon_grid(screen, player, icons):
+    """初期武器選択用の3x3グリッドUIを描画する"""
+    try:
+        choices = getattr(player, 'last_level_choices', None)
+        if not choices:
+            return
+
+        # 説明データの読み込み
+        try:
+            data_path = os.path.join(os.path.dirname(__file__), 'data', 'descriptions.json')
+            with open(data_path, 'r', encoding='utf-8') as f:
+                desc_data = json.load(f)
+        except Exception:
+            desc_data = {'weapons': {}, 'subitems': {}}
+
+        # 背景オーバーレイ
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        screen.blit(overlay, (0, 0))
+
+        # グリッド設定（レベルアップと同じ幅を3x3に分割）
+        grid_size = 3
+        cw = min(880, SCREEN_WIDTH - 160)  # レベルアップと同じパネル幅
+        option_w = (cw - 40) // grid_size  # 3分割
+        cell_margin = 8
+        option_h = 142  # レベルアップと同じ高さ
+        panel_w = cw
+        panel_h = grid_size * (option_h + cell_margin) + 100  # 縦方向のスペース確保（タイトル+余白）
+
+        cx = SCREEN_WIDTH // 2
+        cy = SCREEN_HEIGHT // 2
+        # パネルが画面からはみ出ないように調整
+        panel_y = max(20, cy - panel_h // 2)  # 上端から最低20pxの余白を確保
+        if panel_y + panel_h > SCREEN_HEIGHT - 20:  # 下端からも20pxの余白を確保
+            panel_y = SCREEN_HEIGHT - panel_h - 20
+        panel_rect = pygame.Rect(cx - panel_w // 2, panel_y, panel_w, panel_h)
+
+        # パネル背景
+        panel_surf = pygame.Surface((panel_rect.width, panel_rect.height), pygame.SRCALPHA)
+        panel_surf.fill((18, 18, 20, 230))
+        accent_h = 54
+        pygame.draw.rect(panel_surf, (36, 200, 185, 230), (0, 0, panel_rect.width, accent_h), border_radius=12)
+        pygame.draw.rect(panel_surf, (10, 10, 10), (0, 0, panel_rect.width, panel_rect.height), 3, border_radius=12)
+        pygame.draw.line(panel_surf, (255, 255, 255, 28), (12, accent_h - 8), (panel_rect.width - 12, accent_h - 8), 2)
+        screen.blit(panel_surf, panel_rect.topleft)
+
+        # タイトル
+        title_font = get_font(24)
+        screen.blit(title_font.render('最初の武器を選ぼう！', True, WHITE), (panel_rect.x + 24, panel_rect.y + 10))
+
+        # グリッドセル描画（レベルアップと同じレイアウト）
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        selected_index = getattr(player, 'selected_weapon_choice_index', 0)
+        
+        title_font = get_font(24)
+        small_font = get_font(14)
+        option_h = 142  # レベルアップと同じ高さ
+
+        for i, weapon_key in enumerate(choices[:9]):  # 最大9個まで
+            if weapon_key.startswith('weapon:'):
+                key = weapon_key.split(':', 1)[1]
+            else:
+                key = weapon_key
+
+            row = i // grid_size
+            col = i % grid_size
+            
+            # レベルアップと同じ配置計算
+            rect_x = panel_rect.x + 20 + col * option_w
+            rect_y = panel_rect.y + accent_h + 12 + row * (option_h + cell_margin)
+            rect = pygame.Rect(rect_x, rect_y, option_w - 8, option_h)
+
+            # セル背景（レベルアップと同じスタイル）
+            pygame.draw.rect(screen, (28, 28, 30), rect, border_radius=10)
+
+            # 選択状態の表示
+            is_selected = (i == selected_index)
+            is_mouse_hover = rect.collidepoint((mouse_x, mouse_y))
+            show_keyboard_cursor = getattr(player, 'should_show_keyboard_cursor', lambda: True)()
+            
+            if (is_selected and show_keyboard_cursor) or is_mouse_hover:
+                hl = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+                if is_selected and show_keyboard_cursor:
+                    hl.fill((50, 230, 200, 48))
+                    pygame.draw.rect(screen, (36, 200, 185), rect, 4, border_radius=10)
+                else:
+                    hl.fill((50, 230, 200, 28))
+                    pygame.draw.rect(screen, (36, 200, 185), rect, 3, border_radius=10)
+                screen.blit(hl, rect.topleft)
+            else:
+                pygame.draw.rect(screen, (60, 60, 60), rect, 2, border_radius=10)
+
+            # バッジ（レベルアップと同じスタイル）
+            try:
+                badge_surf = small_font.render('WEAPON', True, (0, 0, 0))
+                bw = badge_surf.get_width() + 10
+                bh = badge_surf.get_height() + 6
+                bx = rect.x + 8
+                by = rect.bottom - bh - 8
+                pygame.draw.rect(screen, (255, 160, 60), (bx, by, bw, bh), border_radius=6)
+                screen.blit(badge_surf, (bx + (bw - badge_surf.get_width()) // 2, by + (bh - badge_surf.get_height()) // 2))
+            except Exception:
+                pass
+
+            # アイコン描画（レベルアップと同じ位置とサイズ）
+            icon_x, icon_y, icon_size = rect.x + 12, rect.y + 12, 32
+            icon_surf = None
+            try:
+                if icons and isinstance(icons, dict):
+                    icon_surf = icons.get(key)
+            except Exception:
+                icon_surf = None
+
+            if icon_surf:
+                try:
+                    screen.blit(pygame.transform.scale(icon_surf, (icon_size, icon_size)), (icon_x, icon_y))
+                except Exception:
+                    pygame.draw.rect(screen, (120, 120, 120), (icon_x, icon_y, icon_size, icon_size))
+            else:
+                pygame.draw.rect(screen, (120, 120, 120), (icon_x, icon_y, icon_size, icon_size))
+
+            # テキスト（レベルアップと同じレイアウト）
+            try:
+                weapon_data = desc_data.get('weapons', {}).get(key, {})
+                display_name = weapon_data.get('name', key.replace('_', ' ').title())
+                long_desc = weapon_data.get('description', 'New weapon')
+
+                # 武器名（レベルアップと同じ位置）
+                screen.blit(title_font.render(display_name, True, WHITE), (rect.x + 16 + 32, rect.y + 8))
+                
+                # 説明文（レベルアップと同じレイアウト）
+                desc_x, desc_y, desc_w = rect.x + 16 + 32, rect.y + 44, rect.width - (16 + 32 + 24)
+                if long_desc:
+                    for li, surf in enumerate(render_wrapped_jp(long_desc, small_font, (200, 200, 200), desc_w, max_lines=4)):
+                        screen.blit(surf, (desc_x, desc_y + li * (small_font.get_height() - 3)))
+
+            except Exception:
+                # フォールバック：キー名のみ表示
+                fallback_name = key.replace('_', ' ').title()
+                screen.blit(title_font.render(fallback_name, True, WHITE), (rect.x + 16 + 32, rect.y + 8))
+
+            # 右上のNEWバッジ（レベルアップと同じスタイル）
+            try:
+                if key in getattr(player, 'available_weapons', {}):
+                    new_surf = small_font.render('NEW', True, (8, 8, 8))
+                    new_w, new_h = new_surf.get_width() + 10, new_surf.get_height() + 6
+                    new_x = max(rect.x + 8, rect.x + rect.width - new_w - 12)
+                    new_y = rect.y + 10
+                    pygame.draw.rect(screen, (255, 200, 60), (new_x, new_y, new_w, new_h), border_radius=6)
+                    screen.blit(new_surf, (new_x + (new_w - new_surf.get_width()) // 2, new_y + (new_h - new_surf.get_height()) // 2))
+            except Exception:
+                pass
+
+        # 操作説明
+        try:
+            help_font = get_font(14)
+            help_text = "Use arrow keys or 1-9 keys to select, ENTER to confirm"
+            help_surf = help_font.render(help_text, True, (180, 180, 180))
+            help_x = panel_rect.x + (panel_rect.width - help_surf.get_width()) // 2
+            help_y = panel_rect.y + panel_rect.height - 30
+            screen.blit(help_surf, (help_x, help_y))
+        except Exception:
+            pass
+
+    except Exception:
+        pass
+
 def draw_level_choice(screen, player, icons):
     """レベルアップ（または開始時）の3択オーバーレイを描画する。"""
     try:
+        # 初期武器選択の場合はグリッドUIを使用
+        if getattr(player, 'is_initial_weapon_selection', False):
+            draw_initial_weapon_grid(screen, player, icons)
+            return
+
         choices = getattr(player, 'last_level_choices', None)
         if not choices:
             return

@@ -68,27 +68,27 @@ def init_game_state(screen):
     from player import Player
     
     player = Player(screen)
-    # 初期開始時は必ず「武器のみ」の3択ダイアログを表示する
-    #（サブアイテム混在ではなく起動直後は武器だけを選ばせる）
+    # 初期武器選択：すべての武器を3x3グリッドで表示
     player.awaiting_subitem_choice = False
     player.last_subitem_choices = []
+    
     try:
-        pool = list(getattr(player, 'available_weapons', {}).keys())
-        if pool:
-            num = min(3, len(pool))
-            sampled = random.sample(pool, num)
-            player.last_level_choices = [f"weapon:{k}" for k in sampled]
+        # すべての利用可能な武器を取得（最大9個）
+        all_weapons = list(getattr(player, 'available_weapons', {}).keys())
+        if all_weapons:
+            # 武器を9個に制限（3x3グリッド用）
+            selected_weapons = all_weapons[:9]
+            player.last_level_choices = [f"weapon:{k}" for k in selected_weapons]
             player.awaiting_weapon_choice = True
-            try:
-                player.selected_weapon_choice_index = 0
-            except Exception:
-                pass
+            player.is_initial_weapon_selection = True  # 初期武器選択フラグ
+            player.selected_weapon_choice_index = 0
         else:
             # 万が一 available_weapons が空なら従来の混合候補生成を試みる
             try:
                 player.upgrade_weapons()
                 if getattr(player, 'last_level_choices', None):
                     player.awaiting_weapon_choice = True
+                    player.is_initial_weapon_selection = False
             except Exception:
                 pass
     except Exception:
