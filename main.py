@@ -15,7 +15,7 @@ import resources
 PARTICLE_LIMIT = 300        # これ以上は古いパーティクルから切る
 PARTICLE_TRIM_TO = 220      # 切るときに残す数
 # 画面上に存在可能な経験値ジェムの上限
-MAX_GEMS_ON_SCREEN = 250
+MAX_GEMS_ON_SCREEN = 200
 
 # ランタイムで切り替え可能なデバッグフラグ（F3でトグル）
 DEBUG_MODE = DEBUG

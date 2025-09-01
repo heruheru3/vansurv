@@ -48,21 +48,30 @@ def load_icons(size=32, icon_names=None, icons_dir=None):
 
 # --- フォント管理 ---
 def get_font(size):
-    """キャッシュ済みの pygame Font を返す。存在しなければ生成してキャッシュする。"""
+    """キャッシュ済みの pygame Font を返す。存在しなければ生成してキャッシュする。
+    日本語表示を優先し、まずプロジェクト同梱の NotoSansCJKjp-Medium.ttf を使用する。
+    見つからない場合のみ、OS の日本語フォントへフォールバック。
+    """
     key = f"font_{size}"
     if key in _font_cache:
         return _font_cache[key]
+
     global _jp_font_path
     if _jp_font_path is None:
         try:
-            proj_font = os.path.join(os.path.dirname(__file__), 'assets', 'fonts', 'NotoSansCJKjp-DemiLight.ttf')
-            if os.path.exists(proj_font):
-                _jp_font_path = proj_font
+            fonts_dir = os.path.join(os.path.dirname(__file__), 'assets', 'fonts')
+            medium_path = os.path.join(fonts_dir, 'NotoSansCJKjp-Medium.ttf')
+            if os.path.exists(medium_path):
+                _jp_font_path = medium_path
             else:
-                # try common system fonts
-                candidates = ["Meiryo", "Yu Gothic", "MS Gothic", "NotoSansCJKjp-Regular", "Noto Sans CJK JP", "IPAPGothic", "TakaoPGothic"]
+                # try common system fonts (Windows / Linux)
+                sys_candidates = [
+                    "Meiryo", "Yu Gothic", "MS Gothic",
+                    "NotoSansCJKjp-Regular", "Noto Sans CJK JP",
+                    "IPAPGothic", "TakaoPGothic"
+                ]
                 found = None
-                for name in candidates:
+                for name in sys_candidates:
                     try:
                         p = pygame.font.match_font(name)
                         if p:
@@ -73,6 +82,9 @@ def get_font(size):
                 _jp_font_path = found
         except Exception:
             _jp_font_path = None
+
+    # フォント生成
+    f = None
     try:
         if _jp_font_path:
             f = pygame.font.Font(_jp_font_path, size)
@@ -83,6 +95,7 @@ def get_font(size):
             f = pygame.font.SysFont(None, size)
         except Exception:
             f = None
+
     _font_cache[key] = f
     return f
 

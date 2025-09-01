@@ -9,7 +9,7 @@ class ExperienceGem:
         self.x = x
         self.y = y
         self.size = 8
-        self.speed = 3
+        self.speed = 6
         self.collected = False
         # ジェムが持つ経験値量（デフォルト1）
         self.value = int(max(1, value))

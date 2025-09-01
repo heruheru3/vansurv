@@ -2,61 +2,10 @@ import pygame
 from constants import *
 import json
 import os
+from resources import get_font
 
-# 軽量キャッシュ: サーフェスとフォントを使い回す
-_font_cache = {}
+# 軽量キャッシュ: サーフェスを使い回す（フォントは resources.get_font に一本化）
 _surf_cache = {}
-_jp_font_path = None
-
-def get_font(size):
-    key = f"font_{size}"
-    f = _font_cache.get(key)
-    if f is None:
-        # Try bundled project font first, then fall back to common system Japanese fonts.
-        global _jp_font_path
-        if _jp_font_path is None:
-            try:
-                # Check project bundled font
-                proj_font = os.path.join(os.path.dirname(__file__), 'assets', 'fonts', 'NotoSansCJKjp-Medium.ttf')
-                print(proj_font)
-                if os.path.exists(proj_font):
-                    _jp_font_path = proj_font
-                else:
-                    # common Japanese fonts on Windows / Linux
-                    candidates = ["Meiryo", "Yu Gothic", "MS Gothic", "NotoSansCJKjp-Regular", "Noto Sans CJK JP", "IPAPGothic", "TakaoPGothic"]
-                    found = None
-                    for name in candidates:
-                        try:
-                            p = pygame.font.match_font(name)
-                            if p:
-                                found = p
-                                break
-                        except Exception:
-                            continue
-                    _jp_font_path = found
-            except Exception:
-                _jp_font_path = None
-        try:
-            if _jp_font_path:
-                f = pygame.font.Font(_jp_font_path, size)
-            else:
-                f = pygame.font.Font(None, size)
-            # Try to make the font render heavier (semibold-like) when possible
-            # try:
-            #     f.set_bold(True)
-            # except Exception:
-            #     pass
-        except Exception:
-            try:
-                f = pygame.font.SysFont(None, size)
-                try:
-                    f.set_bold(True)
-                except Exception:
-                    pass
-            except Exception:
-                f = pygame.font.SysFont(None, size)
-        _font_cache[key] = f
-    return f
 
 
 def render_wrapped_jp(text, font, color, max_width, max_lines=None):
@@ -819,28 +768,90 @@ def draw_level_choice(screen, player, icons):
                 screen.blit(dsurf, (desc_x, desc_y))
 
             if typ == 'weapon':
+                # トップ右に統一表示: 未取得→NEW、取得済み→Lv または MAX
                 try:
                     w = player.weapons.get(key)
-                    if w is not None:
+                except Exception:
+                    w = None
+                if w is not None:
+                    try:
                         lvl_val = int(getattr(w, 'level', 1))
-                        if lvl_val >= MAX_WEAPON_LEVEL:
-                            badge_text = 'MAX'
-                            b_surf = small_font.render(badge_text, True, WHITE)
+                    except Exception:
+                        lvl_val = 1
+                    if lvl_val >= MAX_WEAPON_LEVEL:
+                        # MAX バッジ（赤）
+                        try:
+                            b_surf = small_font.render('MAX', True, WHITE)
                             bw = b_surf.get_width() + 8
                             bh = b_surf.get_height() + 4
-                            bx = rect.x + 220
-                            by = rect.y + 15
+                            bx = rect.x + rect.width - bw - 12
+                            by = rect.y + 10
                             pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
                             screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
-                        else:
+                        except Exception:
+                            pass
+                    else:
+                        # 次レベルを表示（シアン）
+                        try:
                             level_s = middle_font.render(f"Lv.{lvl_val + 1}", True, (50,220,220))
-                            screen.blit(level_s, (rect.x + 220, rect.y + 15))
-                except Exception:
-                    pass
-                if key in getattr(player, 'available_weapons', {}):
+                            tx = rect.x + rect.width - level_s.get_width() - 12
+                            ty = rect.y + 12
+                            screen.blit(level_s, (tx, ty))
+                        except Exception:
+                            pass
+                else:
+                    # 未取得 → NEW バッジ（黄）
                     try:
-                        badge_text = 'NEW'
-                        b_surf = small_font.render(badge_text, True, (8,8,8))
+                        if key in getattr(player, 'available_weapons', {}):
+                            b_surf = small_font.render('NEW', True, (8,8,8))
+                            padding_x = 10
+                            padding_y = 6
+                            bw = b_surf.get_width() + padding_x
+                            bh = b_surf.get_height() + padding_y
+                            max_bw = max(44, rect.width - 24)
+                            if bw > max_bw:
+                                bw = max_bw
+                            bh = max(bh, 18)
+                            bx = rect.x + rect.width - bw - 12
+                            bx = max(rect.x + 8, bx)
+                            by = rect.y + 10
+                            pygame.draw.rect(screen, (255,200,60), (bx, by, bw, bh), border_radius=6)
+                            tx = bx + max(4, (bw - b_surf.get_width()) // 2)
+                            ty = by + max(1, (bh - b_surf.get_height()) // 2)
+                            screen.blit(b_surf, (tx, ty))
+                    except Exception:
+                        pass
+            else:
+                # サブアイテムも同様にトップ右に統一表示
+                owned = key in getattr(player, 'subitems', {})
+                if owned:
+                    try:
+                        lvl = int(getattr(player.subitems.get(key), 'level', 1))
+                    except Exception:
+                        lvl = 1
+                    if lvl >= MAX_SUBITEM_LEVEL:
+                        try:
+                            b_surf = small_font.render('MAX', True, WHITE)
+                            bw = b_surf.get_width() + 8
+                            bh = b_surf.get_height() + 4
+                            bx = rect.x + rect.width - bw - 12
+                            by = rect.y + 10
+                            pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
+                            screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            level_s = middle_font.render(f"Lv {lvl + 1}", True, (50,220,220))
+                            tx = rect.x + rect.width - level_s.get_width() - 12
+                            ty = rect.y + 12
+                            screen.blit(level_s, (tx, ty))
+                        except Exception:
+                            pass
+                else:
+                    # 未取得 → NEW バッジ
+                    try:
+                        b_surf = small_font.render('NEW', True, (8,8,8))
                         padding_x = 10
                         padding_y = 6
                         bw = b_surf.get_width() + padding_x
@@ -856,37 +867,6 @@ def draw_level_choice(screen, player, icons):
                         tx = bx + max(4, (bw - b_surf.get_width()) // 2)
                         ty = by + max(1, (bh - b_surf.get_height()) // 2)
                         screen.blit(b_surf, (tx, ty))
-                    except Exception:
-                        try:
-                            badge = small_font.render('NEW', True, (8,8,8))
-                            bx = rect.x + rect.width - 60
-                            by = rect.y + 10
-                            pygame.draw.rect(screen, (255,200,60), (bx+4, by, 44, 20), border_radius=6)
-                            screen.blit(badge, (bx + 8, by + 2))
-                        except Exception:
-                            pass
-            else:
-                tmpl = player.subitem_templates.get(key)
-                # if tmpl is not None:
-                #     desc = f"+{tmpl.per_level}{('%' if getattr(tmpl, 'is_percent', False) else '')} per level"
-                # else:
-                #     desc = 'Subitem'
-                # dsurf = small_font.render(desc, True, (200,200,200))
-                # screen.blit(dsurf, (rect.x + 16 + 32, rect.y + 44))
-                if key in player.subitems:
-                    try:
-                        lvl = int(player.subitems[key].level)
-                        if lvl >= MAX_SUBITEM_LEVEL:
-                            badge_text = 'MAX'
-                            b_surf = small_font.render(badge_text, True, WHITE)
-                            bw = b_surf.get_width() + 8
-                            bh = b_surf.get_height() + 4
-                            bx = rect.x + 220
-                            by = rect.y + 15
-                            pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
-                            screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
-                        else:
-                            screen.blit(middle_font.render(f"Lv {lvl + 1}", True, (50,220,220)), (rect.x + 220, rect.y + 15))
                     except Exception:
                         pass
     except Exception:
