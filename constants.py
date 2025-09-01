@@ -38,3 +38,10 @@ INVINCIBLE_MS = 200
 # アイテムドロップ確率設定
 HEAL_ITEM_DROP_RATE = 0.005    # 0.5%の確率で回復アイテム
 BOMB_ITEM_DROP_RATE = 0.002   # 0.2%の確率でボムアイテム（0.01 + 0.002）
+
+# パーティクル関連の制限（パフォーマンス改善用）
+PARTICLE_LIMIT = 300        # これ以上は古いパーティクルから切る
+PARTICLE_TRIM_TO = 220      # 切るときに残す数
+
+# 画面上に存在可能な経験値ジェムの上限
+MAX_GEMS_ON_SCREEN = 200

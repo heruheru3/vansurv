@@ -10,118 +10,14 @@ from effects.items import ExperienceGem, GameItem
 from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber, AvoidanceParticle
 from ui import draw_ui, draw_minimap, draw_background, draw_level_choice, draw_end_buttons, get_end_button_rects
 import resources
-
-# パーティクル関連の制限（パフォーマンス改善用）
-PARTICLE_LIMIT = 300        # これ以上は古いパーティクルから切る
-PARTICLE_TRIM_TO = 220      # 切るときに残す数
-# 画面上に存在可能な経験値ジェムの上限
-MAX_GEMS_ON_SCREEN = 200
+from game_utils import init_game_state, limit_particles, enforce_experience_gems_limit
+from game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item_effect, 
+                       update_difficulty, handle_player_level_up, collect_experience_gems, collect_items)
+from collision import check_player_enemy_collision, check_attack_enemy_collision
 
 # ランタイムで切り替え可能なデバッグフラグ（F3でトグル）
 DEBUG_MODE = DEBUG
 
-
-def init_game(screen):
-    """ゲームの初期状態を設定する関数"""
-    player = Player(screen)
-    # 初期開始時は必ず「武器のみ」の3択ダイアログを表示する
-    #（サブアイテム混在ではなく起動直後は武器だけを選ばせる）
-    player.awaiting_subitem_choice = False
-    player.last_subitem_choices = []
-    try:
-        pool = list(getattr(player, 'available_weapons', {}).keys())
-        if pool:
-            num = min(3, len(pool))
-            sampled = random.sample(pool, num)
-            player.last_level_choices = [f"weapon:{k}" for k in sampled]
-            player.awaiting_weapon_choice = True
-            try:
-                player.selected_weapon_choice_index = 0
-            except Exception:
-                pass
-        else:
-            # 万が一 available_weapons が空なら従来の混合候補生成を試みる
-            try:
-                player.upgrade_weapons()
-                if getattr(player, 'last_level_choices', None):
-                    player.awaiting_weapon_choice = True
-            except Exception:
-                pass
-    except Exception:
-        # 失敗してもゲーム開始は続行
-        pass
-    enemies = []
-    experience_gems = []
-    items = []
-    game_over = False
-    game_clear = False
-    spawn_timer = 0
-    spawn_interval = 60
-    game_time = 0
-    last_difficulty_increase = 0
-    particles = []  # パーティクルリストを追加
-    # ダメージ記録: { weapon_type: total_damage }
-    damage_stats = {}
-    # 無敵タイマー初期化（ミリ秒タイムスタンプ）
-    try:
-        player.last_hit_time = -999999
-    except Exception:
-        pass
-    return player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats
-
-def enforce_experience_gems_limit(gems, max_gems=MAX_GEMS_ON_SCREEN, player_x=None, player_y=None):
-    """上限を超えた場合、プレイヤーから遠いジェムから順に削除して
-    その value を残った（近い）ジェムに加算して総EXPを維持する。
-    player_x, player_yが指定されていない場合は従来通り古い順で削除。
-    """
-    try:
-        while len(gems) > max_gems:
-            if player_x is not None and player_y is not None:
-                # プレイヤーから最も遠いジェムを見つける
-                farthest_gem = None
-                max_distance = -1
-                farthest_index = 0
-                
-                for i, gem in enumerate(gems):
-                    distance = ((gem.x - player_x) ** 2 + (gem.y - player_y) ** 2) ** 0.5
-                    if distance > max_distance:
-                        max_distance = distance
-                        farthest_gem = gem
-                        farthest_index = i
-                
-                # 最も遠いジェムを削除
-                removed_gem = gems.pop(farthest_index)
-            else:
-                # プレイヤー位置が不明な場合は従来通り古い順
-                removed_gem = gems.pop(0)
-            
-            if not gems:
-                # もし残ったジェムがなければ、削除したジェムの価値を新しいまとまりとして
-                # 末尾に再配置する（ほとんど発生しないが保険）
-                gems.append(ExperienceGem(removed_gem.x, removed_gem.y, value=removed_gem.value))
-            else:
-                # プレイヤーから最も近いジェムに価値を集約
-                if player_x is not None and player_y is not None:
-                    closest_gem = None
-                    min_distance = float('inf')
-                    
-                    for gem in gems:
-                        distance = ((gem.x - player_x) ** 2 + (gem.y - player_y) ** 2) ** 0.5
-                        if distance < min_distance:
-                            min_distance = distance
-                            closest_gem = gem
-                    
-                    if closest_gem:
-                        closest_gem.value = getattr(closest_gem, 'value', 1) + getattr(removed_gem, 'value', 1)
-                    else:
-                        # 最寄りが見つからない場合は最新のジェムに集約
-                        gems[-1].value = getattr(gems[-1], 'value', 1) + getattr(removed_gem, 'value', 1)
-                else:
-                    # プレイヤー位置が不明な場合は従来通り最新のジェムに集約
-                    gems[-1].value = getattr(gems[-1], 'value', 1) + getattr(removed_gem, 'value', 1)
-    except Exception:
-        # 失敗してもゲームは続行
-        pass
 
 def main():
     global DEBUG_MODE
@@ -162,7 +58,7 @@ def main():
     CAMERA_LERP = 0.18
 
     # ゲーム状態の初期化
-    player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game(screen)
+    player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
 
     # デバッグ: 初期状態の選択フラグ確認
     try:
@@ -291,7 +187,7 @@ def main():
                             game_clear = False
                         else:
                             # 通常のリスタート（全て再初期化）
-                            player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game(screen)
+                            player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     # マウスで選択可能ならクリック位置を判定
                     if getattr(player, 'awaiting_weapon_choice', False) and event.button == 1:
@@ -381,7 +277,7 @@ def main():
                                 continue
                             # Restart
                             if rects.get('restart') and rects['restart'].collidepoint(mx, my):
-                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game(screen)
+                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
                                 continue
                         except Exception:
                             pass
