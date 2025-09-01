@@ -380,7 +380,7 @@ class Knife(Weapon):
         self.num_knives = 1
         self.spacing = 15
 
-    def attack(self, player, camera_x=0, camera_y=0):
+    def attack(self, player, camera_x=0, camera_y=0, get_virtual_mouse_pos=None):
         if not self.can_attack():
             return []
         self.update_cooldown()
@@ -388,7 +388,12 @@ class Knife(Weapon):
         # 角度はマウス位置優先、なければ移動方向
         angle = None
         try:
-            mx, my = pygame.mouse.get_pos()
+            if get_virtual_mouse_pos:
+                # 仮想マウス座標を使用
+                mx, my = get_virtual_mouse_pos()
+            else:
+                # 従来の方法（後方互換性のため）
+                mx, my = pygame.mouse.get_pos()
             world_mx = mx + camera_x
             world_my = my + camera_y
             dx = world_mx - player.x

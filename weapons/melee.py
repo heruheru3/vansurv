@@ -20,7 +20,7 @@ class Whip(Weapon):
         self.last_attack_time = 0
         self.is_attacking = False
 
-    def attack(self, player, camera_x=0, camera_y=0):
+    def attack(self, player, camera_x=0, camera_y=0, get_virtual_mouse_pos=None):
         current_time = pygame.time.get_ticks()
         
         if not self.can_attack():
@@ -73,7 +73,12 @@ class Whip(Weapon):
                         input_direction = 'up' if dy < 0 else 'down'
             # 左クリックのマウス移動も考慮
             if input_direction is None and pygame.mouse.get_pressed()[0]:
-                mx, my = pygame.mouse.get_pos()
+                if get_virtual_mouse_pos:
+                    # 仮想マウス座標を使用
+                    mx, my = get_virtual_mouse_pos()
+                else:
+                    # 従来の方法（後方互換性のため）
+                    mx, my = pygame.mouse.get_pos()
                 # マウスは画面座標なのでワールド座標に変換
                 world_mx = mx + camera_x
                 world_my = my + camera_y

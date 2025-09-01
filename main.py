@@ -31,12 +31,21 @@ def main():
 
     # ウィンドウサイズ（通常モード）
     windowed_size = (SCREEN_WIDTH, SCREEN_HEIGHT)
+    current_size = windowed_size
     # フルスクリーンフラグ（ウィンドウフルスクリーンタイプのトグルに使用）
     is_fullscreen = False
 
-    # 初期はウィンドウモードで開始
-    screen = pygame.display.set_mode(windowed_size)
+    # 初期はリサイズ可能なウィンドウモードで開始
+    screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
     pygame.display.set_caption("Van Survivor Clone")
+    
+    # 仮想画面（ゲームロジックは常にこのサイズで動作）
+    virtual_screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    
+    # スケーリング係数（描画用）
+    scale_factor = 1.0
+    offset_x = 0
+    offset_y = 0
 
     # リソースをプリロード（アイコン・フォント・サウンド等）
     preload_res = resources.preload_all(icon_size=16)
@@ -59,6 +68,10 @@ def main():
 
     # ゲーム状態の初期化
     player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+
+    # カメラをプレイヤーの初期位置に設定
+    camera_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, player.x - SCREEN_WIDTH // 2))
+    camera_y = max(0, min(WORLD_HEIGHT - SCREEN_HEIGHT, player.y - SCREEN_HEIGHT // 2))
 
     # HP回復エフェクト用のコールバックを設定
     def heal_effect_callback(x, y, heal_amount, is_auto=False):
@@ -83,6 +96,38 @@ def main():
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                elif event.type == pygame.VIDEORESIZE:
+                    # ウィンドウリサイズ処理（アスペクト比16:9を維持）
+                    new_width, new_height = event.w, event.h
+                    
+                    # 最小サイズを元のサイズの半分に制限
+                    min_width = SCREEN_WIDTH // 2
+                    min_height = SCREEN_HEIGHT // 2
+                    new_width = max(new_width, min_width)
+                    new_height = max(new_height, min_height)
+                    
+                    # アスペクト比を維持するためのスケール計算
+                    target_aspect = SCREEN_WIDTH / SCREEN_HEIGHT  # 16:9 = 1.777...
+                    current_aspect = new_width / new_height
+                    
+                    if current_aspect > target_aspect:
+                        # ウィンドウが横に広すぎる場合、高さを基準にする
+                        scale_factor = new_height / SCREEN_HEIGHT
+                        scaled_width = int(SCREEN_WIDTH * scale_factor)
+                        scaled_height = new_height
+                        offset_x = (new_width - scaled_width) // 2
+                        offset_y = 0
+                    else:
+                        # ウィンドウが縦に長すぎる場合、幅を基準にする
+                        scale_factor = new_width / SCREEN_WIDTH
+                        scaled_width = new_width
+                        scaled_height = int(SCREEN_HEIGHT * scale_factor)
+                        offset_x = 0
+                        offset_y = (new_height - scaled_height) // 2
+                    
+                    current_size = (new_width, new_height)
+                    screen = pygame.display.set_mode(current_size, pygame.RESIZABLE)
+                    
                 elif event.type == pygame.KEYDOWN:
                     # デバッグログのオン/オフ切り替え（F3）
                     if event.key == pygame.K_F3:
@@ -209,10 +254,20 @@ def main():
                                 particles.append(HealEffect(x, y, heal_amount))
                             player.heal_effect_callback = heal_effect_callback
                 elif event.type == pygame.MOUSEBUTTONDOWN:
+                    # マウス座標を仮想画面座標に変換
+                    def convert_mouse_pos(mouse_x, mouse_y):
+                        # オフセットを引いてからスケールで割る
+                        virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                        virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                        # 仮想画面の範囲内にクランプ
+                        virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
+                        virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
+                        return int(virtual_x), int(virtual_y)
+                    
                     # マウスで選択可能ならクリック位置を判定
                     if getattr(player, 'awaiting_weapon_choice', False) and event.button == 1:
                         player.set_input_method("mouse")
-                        mx, my = event.pos
+                        mx, my = convert_mouse_pos(*event.pos)
                         # レイアウトを再現して当たり判定
                         choices = getattr(player, 'last_level_choices', [])
                         if choices:
@@ -243,7 +298,7 @@ def main():
                     # サブアイテム選択のマウスクリック判定
                     if getattr(player, 'awaiting_subitem_choice', False) and event.button == 1:
                         player.set_input_method("mouse")
-                        mx, my = event.pos
+                        mx, my = convert_mouse_pos(*event.pos)
                         choices = getattr(player, 'last_subitem_choices', [])
                         if choices:
                             cw = min(700, SCREEN_WIDTH - 200)
@@ -272,7 +327,7 @@ def main():
 
                     # エンド画面のボタン処理（GAME OVER / CLEAR）
                     if (game_over or game_clear) and event.button == 1:
-                        mx, my = event.pos
+                        mx, my = convert_mouse_pos(*event.pos)
                         try:
                             rects = get_end_button_rects()
                             # Continue はゲームオーバー時のみ有効
@@ -323,20 +378,40 @@ def main():
 
             # UI表示中のマウス移動検出（入力メソッド切り替え用）
             if awaiting_weapon_active or awaiting_subitem_active:
-                mouse_pos = pygame.mouse.get_pos()
+                # 仮想マウス座標を取得してマウス移動検出に使用
+                def get_virtual_mouse_pos_for_detection():
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                    virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                    virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
+                    virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
+                    return int(virtual_x), int(virtual_y)
+                
+                virtual_mouse_pos = get_virtual_mouse_pos_for_detection()
                 # マウスの位置が変化した場合は入力メソッドをマウスに切り替え
-                if hasattr(player, '_last_mouse_pos'):
-                    if player._last_mouse_pos != mouse_pos:
+                if hasattr(player, '_last_virtual_mouse_pos'):
+                    if player._last_virtual_mouse_pos != virtual_mouse_pos:
                         player.set_input_method("mouse")
-                player._last_mouse_pos = mouse_pos
+                player._last_virtual_mouse_pos = virtual_mouse_pos
 
             # ゲームの更新処理。武器/サブアイテム選択UIが開いている間はゲームを一時停止する
             if not game_over and not game_clear and not (awaiting_weapon_active or awaiting_subitem_active):
-                # プレイヤーの移動（現在のカメラ位置を渡してマウス座標をワールド座標に変換）
-                player.move(int(camera_x), int(camera_y))
+                # マウス座標変換関数を定義
+                def get_virtual_mouse_pos():
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    # オフセットを引いてからスケールで割る
+                    virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                    virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                    # 仮想画面の範囲内にクランプ
+                    virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
+                    virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
+                    return int(virtual_x), int(virtual_y)
+                
+                # プレイヤーの移動（現在のカメラ位置と仮想マウス座標を渡す）
+                player.move(int(camera_x), int(camera_y), get_virtual_mouse_pos)
 
-                # 自動攻撃の更新
-                player.update_attacks(enemies, camera_x=int(camera_x), camera_y=int(camera_y))
+                # 自動攻撃の更新（仮想マウス座標も渡す）
+                player.update_attacks(enemies, camera_x=int(camera_x), camera_y=int(camera_y), get_virtual_mouse_pos=get_virtual_mouse_pos)
 
                 # 自然回復（HPサブアイテム所持時のみ、2秒で1回復）
                 try:
@@ -649,6 +724,7 @@ def main():
             particles = new_particles
 
             # カメラ目標を現在のプレイヤー位置から再計算（プレイヤー移動後）
+            # 仮想画面サイズ（常に1280x720）を基準にカメラ計算
             desired_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, player.x - SCREEN_WIDTH // 2))
             desired_y = max(0, min(WORLD_HEIGHT - SCREEN_HEIGHT, player.y - SCREEN_HEIGHT // 2))
             # 補間（スムージング）
@@ -662,7 +738,10 @@ def main():
             int_cam_x = int(camera_x) + shake_offset_x
             int_cam_y = int(camera_y) + shake_offset_y
 
-            # ワールド用サーフェスに描画してからスクリーンにブリットする
+            # 仮想画面をクリア
+            virtual_screen.fill((0, 0, 0))
+
+            # ワールド用サーフェスに描画してから仮想画面にブリットする
             world_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
 
             # 背景をワールド全体のタイルで描画（オフセット適用）
@@ -741,20 +820,20 @@ def main():
                 except Exception:
                     pass
 
-            # ワールドをスクリーンにブリット
-            screen.blit(world_surf, (0, 0))
+            # ワールドを仮想画面にブリット
+            virtual_screen.blit(world_surf, (0, 0))
 
-            # オーバーレイ系パーティクルを画面に直接描画（全画面フラッシュ等）
+            # オーバーレイ系パーティクルを仮想画面に直接描画（全画面フラッシュ等）
             for particle in overlay_particles:
                 # overlay パーティクルはワールド座標を保持しているためカメラオフセットを渡す
                 try:
-                    particle.draw(screen, int_cam_x, int_cam_y)
+                    particle.draw(virtual_screen, int_cam_x, int_cam_y)
                 except TypeError:
-                    particle.draw(screen)
+                    particle.draw(virtual_screen)
 
             # 右上にミニマップを描画
             try:
-                draw_minimap(screen, player, enemies, experience_gems, items, int_cam_x, int_cam_y)
+                draw_minimap(virtual_screen, player, enemies, experience_gems, items, int_cam_x, int_cam_y)
             except Exception:
                 pass
 
@@ -767,21 +846,33 @@ def main():
                         print(f"[DEBUG] damage_stats keys={list(damage_stats.items())[:8]}")
             except Exception:
                 pass
-            # UI描画を修正（プレイヤーステータス表示のON/OFFを渡す）
-            draw_ui(screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status)
+            # UI描画を仮想画面に（スケーリングパラメーターは不要）
+            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status)
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
             if game_over or game_clear:
                 from ui import draw_end_buttons
-                draw_end_buttons(screen, game_over, game_clear)
+                draw_end_buttons(virtual_screen, game_over, game_clear)
             
             # レベルアップ候補がある場合はポップアップを ui.draw_level_choice に任せる
             # サブアイテム選択 UI を優先して表示
             if getattr(player, 'awaiting_subitem_choice', False) and getattr(player, 'last_subitem_choices', None):
                 # サブアイテム選択は ui.draw_subitem_choice を使う
                 from ui import draw_subitem_choice
-                draw_subitem_choice(screen, player, ICONS)
+                draw_subitem_choice(virtual_screen, player, ICONS)
             elif getattr(player, 'awaiting_weapon_choice', False) and getattr(player, 'last_level_choices', None):
-                draw_level_choice(screen, player, ICONS)
+                draw_level_choice(virtual_screen, player, ICONS)
+
+            # 仮想画面を実際の画面にスケールして転送
+            screen.fill((0, 0, 0))  # レターボックス部分を黒で塗りつぶし
+            
+            if scale_factor != 1.0:
+                # スケールして描画
+                scaled_size = (int(SCREEN_WIDTH * scale_factor), int(SCREEN_HEIGHT * scale_factor))
+                scaled_surface = pygame.transform.scale(virtual_screen, scaled_size)
+                screen.blit(scaled_surface, (offset_x, offset_y))
+            else:
+                # 等倍で描画
+                screen.blit(virtual_screen, (offset_x, offset_y))
 
             pygame.display.flip()
             clock.tick(FPS)

@@ -130,7 +130,7 @@ class Player:
         except Exception:
             pass
 
-    def move(self, camera_x=0, camera_y=0):
+    def move(self, camera_x=0, camera_y=0, get_virtual_mouse_pos=None):
         dx = 0.0
         dy = 0.0
         keys = pygame.key.get_pressed()
@@ -144,7 +144,12 @@ class Player:
             dy += 1.0
 
         if pygame.mouse.get_pressed()[0]:
-            mouse_x, mouse_y = pygame.mouse.get_pos()
+            if get_virtual_mouse_pos:
+                # 仮想マウス座標を使用
+                mouse_x, mouse_y = get_virtual_mouse_pos()
+            else:
+                # 従来の方法（後方互換性のため）
+                mouse_x, mouse_y = pygame.mouse.get_pos()
             world_mouse_x = mouse_x + camera_x
             world_mouse_y = mouse_y + camera_y
             mouse_dx = world_mouse_x - self.x
@@ -180,7 +185,7 @@ class Player:
         self.prev_x = float(self.x)
         self.prev_y = float(self.y)
 
-    def update_attacks(self, enemies, camera_x=None, camera_y=None):
+    def update_attacks(self, enemies, camera_x=None, camera_y=None, get_virtual_mouse_pos=None):
         self.active_attacks = [a for a in self.active_attacks if not a.is_expired()]
         import inspect
         for weapon_name, weapon in self.weapons.items():
@@ -196,12 +201,18 @@ class Player:
             try:
                 if 'enemies' in params:
                     try:
-                        new_attacks = atk_fn(self, enemies, camera_x=camera_x, camera_y=camera_y)
+                        new_attacks = atk_fn(self, enemies, camera_x=camera_x, camera_y=camera_y, get_virtual_mouse_pos=get_virtual_mouse_pos)
                     except TypeError:
-                        new_attacks = atk_fn(self, enemies)
+                        try:
+                            new_attacks = atk_fn(self, enemies, camera_x=camera_x, camera_y=camera_y)
+                        except TypeError:
+                            new_attacks = atk_fn(self, enemies)
                 else:
                     if 'camera_x' in params or 'camera_y' in params:
-                        new_attacks = atk_fn(self, camera_x=camera_x, camera_y=camera_y)
+                        try:
+                            new_attacks = atk_fn(self, camera_x=camera_x, camera_y=camera_y, get_virtual_mouse_pos=get_virtual_mouse_pos)
+                        except TypeError:
+                            new_attacks = atk_fn(self, camera_x=camera_x, camera_y=camera_y)
                     else:
                         new_attacks = atk_fn(self)
             except Exception:
