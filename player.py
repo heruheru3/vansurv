@@ -61,6 +61,10 @@ class Player:
         self.screen_shake_end_time = 0
         self.screen_shake_intensity = 0
 
+        # UI制御
+        self.last_input_method = "keyboard"  # "keyboard" or "mouse"
+        self.show_keyboard_cursor = True
+
         # 見た目（オーブ + スプライト）
         orb_size = max(32, self.size * 3)
         self.orb_base = pygame.Surface((orb_size, orb_size), pygame.SRCALPHA)
@@ -741,3 +745,13 @@ class Player:
         offset_x = random.uniform(-current_intensity, current_intensity)
         offset_y = random.uniform(-current_intensity, current_intensity)
         return (int(offset_x), int(offset_y))
+
+    def set_input_method(self, method):
+        """入力メソッドを設定（キーボードカーソル表示制御用）"""
+        if method in ["keyboard", "mouse"]:
+            self.last_input_method = method
+            self.show_keyboard_cursor = (method == "keyboard")
+
+    def should_show_keyboard_cursor(self):
+        """キーボードカーソルを表示すべきかどうか"""
+        return self.show_keyboard_cursor

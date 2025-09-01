@@ -656,11 +656,21 @@ def draw_level_choice(screen, player, icons):
 
             # 強調
             is_selected = (i == getattr(player, 'selected_weapon_choice_index', -1))
-            if is_selected or rect.collidepoint((mouse_x, mouse_y)):
+            is_mouse_hover = rect.collidepoint((mouse_x, mouse_y))
+            show_keyboard_cursor = getattr(player, 'should_show_keyboard_cursor', lambda: True)()
+            
+            # キーボード使用時のみ選択カーソルを表示、マウス使用時はホバーのみ
+            if (is_selected and show_keyboard_cursor) or is_mouse_hover:
                 hl = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-                hl.fill((50, 230, 200, 48) if is_selected else (50, 230, 200, 28))
+                if is_selected and show_keyboard_cursor:
+                    # キーボード選択時：より強い強調
+                    hl.fill((50, 230, 200, 48))
+                    pygame.draw.rect(screen, (36, 200, 185), rect, 4, border_radius=10)
+                else:
+                    # マウスホバー時：弱い強調
+                    hl.fill((50, 230, 200, 28))
+                    pygame.draw.rect(screen, (36, 200, 185), rect, 3, border_radius=10)
                 screen.blit(hl, rect.topleft)
-                pygame.draw.rect(screen, (36, 200, 185), rect, 4 if is_selected else 3, border_radius=10)
             else:
                 pygame.draw.rect(screen, (60, 60, 60), rect, 2, border_radius=10)
 
@@ -890,11 +900,21 @@ def draw_subitem_choice(screen, player, icons=None):
             pygame.draw.rect(screen, (30, 30, 34), rect, border_radius=8)
 
             is_selected = (i == getattr(player, 'selected_subitem_choice_index', -1))
-            if is_selected or rect.collidepoint((mx, my)):
+            is_mouse_hover = rect.collidepoint((mx, my))
+            show_keyboard_cursor = getattr(player, 'should_show_keyboard_cursor', lambda: True)()
+            
+            # キーボード使用時のみ選択カーソルを表示、マウス使用時はホバーのみ
+            if (is_selected and show_keyboard_cursor) or is_mouse_hover:
                 hl = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-                hl.fill((80, 200, 120, 48) if is_selected else (80, 200, 120, 28))
+                if is_selected and show_keyboard_cursor:
+                    # キーボード選択時：より強い強調
+                    hl.fill((80, 200, 120, 48))
+                    pygame.draw.rect(screen, (80, 200, 120), rect, 4, border_radius=8)
+                else:
+                    # マウスホバー時：弱い強調
+                    hl.fill((80, 200, 120, 28))
+                    pygame.draw.rect(screen, (80, 200, 120), rect, 3, border_radius=8)
                 screen.blit(hl, rect.topleft)
-                pygame.draw.rect(screen, (80, 200, 120), rect, 4 if is_selected else 3, border_radius=8)
             else:
                 pygame.draw.rect(screen, (60, 60, 60), rect, 2, border_radius=8)
 

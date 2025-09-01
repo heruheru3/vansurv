@@ -127,6 +127,7 @@ def main():
                             n = len(player.last_level_choices)
                             if n > 0:
                                 if event.key in (pygame.K_LEFT, pygame.K_a):
+                                    player.set_input_method("keyboard")
                                     player.selected_weapon_choice_index = (player.selected_weapon_choice_index - 1) % n
                                     try:
                                         particles.append(DeathParticle(player.x, player.y, CYAN))
@@ -134,6 +135,7 @@ def main():
                                         pass
                                     continue
                                 elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                    player.set_input_method("keyboard")
                                     player.selected_weapon_choice_index = (player.selected_weapon_choice_index + 1) % n
                                     try:
                                         particles.append(DeathParticle(player.x, player.y, CYAN))
@@ -141,6 +143,7 @@ def main():
                                         pass
                                     continue
                                 elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                    player.set_input_method("keyboard")
                                     idx = max(0, min(player.selected_weapon_choice_index, n - 1))
                                     choice = player.last_level_choices[idx]
                                     player.apply_level_choice(choice)
@@ -154,6 +157,7 @@ def main():
                             n = len(player.last_subitem_choices)
                             if n > 0:
                                 if event.key in (pygame.K_LEFT, pygame.K_a):
+                                    player.set_input_method("keyboard")
                                     player.selected_subitem_choice_index = (player.selected_subitem_choice_index - 1) % n
                                     try:
                                         particles.append(DeathParticle(player.x, player.y, CYAN))
@@ -161,6 +165,7 @@ def main():
                                         pass
                                     continue
                                 elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                    player.set_input_method("keyboard")
                                     player.selected_subitem_choice_index = (player.selected_subitem_choice_index + 1) % n
                                     try:
                                         particles.append(DeathParticle(player.x, player.y, CYAN))
@@ -168,6 +173,7 @@ def main():
                                         pass
                                     continue
                                 elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                    player.set_input_method("keyboard")
                                     idx = max(0, min(player.selected_subitem_choice_index, n - 1))
                                     key = player.last_subitem_choices[idx]
                                     player.apply_subitem_choice(key)
@@ -205,6 +211,7 @@ def main():
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     # マウスで選択可能ならクリック位置を判定
                     if getattr(player, 'awaiting_weapon_choice', False) and event.button == 1:
+                        player.set_input_method("mouse")
                         mx, my = event.pos
                         # レイアウトを再現して当たり判定
                         choices = getattr(player, 'last_level_choices', [])
@@ -235,6 +242,7 @@ def main():
                                 continue
                     # サブアイテム選択のマウスクリック判定
                     if getattr(player, 'awaiting_subitem_choice', False) and event.button == 1:
+                        player.set_input_method("mouse")
                         mx, my = event.pos
                         choices = getattr(player, 'last_subitem_choices', [])
                         if choices:
@@ -308,11 +316,21 @@ def main():
             target_cam_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, int(player.x - SCREEN_WIDTH // 2)))
             target_cam_y = max(0, min(WORLD_HEIGHT - SCREEN_HEIGHT, int(player.y - SCREEN_HEIGHT // 2)))
 
-            # ゲームの更新処理。武器/サブアイテム選択UIが開いている間はゲームを一時停止する
             # UI が表示されてゲームを停止すべきかを判定する。
             # フラグだけでなく、実際に候補リストが存在するかもチェックする（フラグが残留していると攻撃できなくなる不具合対策）。
             awaiting_weapon_active = bool(getattr(player, 'awaiting_weapon_choice', False) and getattr(player, 'last_level_choices', None))
             awaiting_subitem_active = bool(getattr(player, 'awaiting_subitem_choice', False) and getattr(player, 'last_subitem_choices', None))
+
+            # UI表示中のマウス移動検出（入力メソッド切り替え用）
+            if awaiting_weapon_active or awaiting_subitem_active:
+                mouse_pos = pygame.mouse.get_pos()
+                # マウスの位置が変化した場合は入力メソッドをマウスに切り替え
+                if hasattr(player, '_last_mouse_pos'):
+                    if player._last_mouse_pos != mouse_pos:
+                        player.set_input_method("mouse")
+                player._last_mouse_pos = mouse_pos
+
+            # ゲームの更新処理。武器/サブアイテム選択UIが開いている間はゲームを一時停止する
             if not game_over and not game_clear and not (awaiting_weapon_active or awaiting_subitem_active):
                 # プレイヤーの移動（現在のカメラ位置を渡してマウス座標をワールド座標に変換）
                 player.move(int(camera_x), int(camera_y))
