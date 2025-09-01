@@ -529,9 +529,9 @@ def main():
                                     particles.append(DeathParticle(enemy.x, enemy.y, enemy.color))
 
                                 rand = random.random()
-                                if rand < 0.01:
+                                if rand < HEAL_ITEM_DROP_RATE:
                                     items.append(GameItem(enemy.x, enemy.y, "heal"))
-                                elif rand < 0.012:
+                                elif rand < BOMB_ITEM_DROP_RATE:
                                     items.append(GameItem(enemy.x, enemy.y, "bomb"))
                                 else:
                                     experience_gems.append(ExperienceGem(enemy.x, enemy.y))

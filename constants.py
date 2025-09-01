@@ -34,3 +34,7 @@ DEBUG = False
 
 # プレイヤーが被弾後に一時的に無敵となる時間（ミリ秒）
 INVINCIBLE_MS = 200
+
+# アイテムドロップ確率設定
+HEAL_ITEM_DROP_RATE = 0.005    # 0.5%の確率で回復アイテム
+BOMB_ITEM_DROP_RATE = 0.002   # 0.2%の確率でボムアイテム（0.01 + 0.002）
