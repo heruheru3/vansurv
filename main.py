@@ -4,11 +4,38 @@ import math
 import random
 import os
 from constants import *
+
+def draw_test_checkerboard(surface, camera_x, camera_y):
+    """テスト用の市松模様背景を描画"""
+    # 描画範囲を計算
+    start_tile_x = int(camera_x // TEST_TILE_SIZE)
+    end_tile_x = int((camera_x + SCREEN_WIDTH) // TEST_TILE_SIZE) + 1
+    start_tile_y = int(camera_y // TEST_TILE_SIZE)
+    end_tile_y = int((camera_y + SCREEN_HEIGHT) // TEST_TILE_SIZE) + 1
+    
+    for tile_y in range(start_tile_y, end_tile_y):
+        for tile_x in range(start_tile_x, end_tile_x):
+            # 市松模様の色を決定
+            if (tile_x + tile_y) % 2 == 0:
+                color = DARK_GRAY
+            else:
+                color = MOREDARK_GRAY
+
+            # タイルの位置を計算
+            screen_x = tile_x * TEST_TILE_SIZE - camera_x
+            screen_y = tile_y * TEST_TILE_SIZE - camera_y
+            
+            # タイルを描画
+            pygame.draw.rect(surface, color, 
+                           (screen_x, screen_y, TEST_TILE_SIZE, TEST_TILE_SIZE))
+
 from player import Player
 from enemy import Enemy
 from effects.items import ExperienceGem, GameItem
 from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber, AvoidanceParticle, HealEffect, AutoHealEffect
-from ui import draw_ui, draw_minimap, draw_background, draw_level_choice, draw_end_buttons, get_end_button_rects
+from ui import draw_ui, draw_minimap, draw_level_choice, draw_end_buttons, get_end_button_rects
+from stage import draw_stage_background
+import stage
 import resources
 from game_utils import init_game_state, limit_particles, enforce_experience_gems_limit
 from game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item_effect, 
@@ -23,6 +50,11 @@ def main():
     global DEBUG_MODE
     # 初期化
     pygame.init()
+    
+    # ステージを最初に初期化（プレイヤーの安全な開始位置決定のため、マップが有効な場合のみ）
+    if USE_STAGE_MAP:
+        stage.init_stage()
+    
     # ディスプレイ情報取得（フルスクリーン切替に使用）
     try:
         display_info = pygame.display.Info()
@@ -54,8 +86,8 @@ def main():
     clock = pygame.time.Clock()
     # 画面右下に小さなプレイヤーステータスを表示するかどうかのフラグ（F4でトグル）
     show_status = True
-    # 攻撃範囲の可視化フラグ（F5でトグル）
-    show_hitboxes = False
+    # デバッグ表示フラグ（F5でトグル：攻撃範囲+障害物）
+    show_debug_visuals = False
     try:
         debug_font = pygame.font.SysFont(None, 14)
     except Exception:
@@ -150,10 +182,10 @@ def main():
                         print(f"[INFO] show_status set to {show_status}")
                         continue
 
-                    # 攻撃範囲表示のトグル（F5）
+                    # デバッグ表示のトグル（F5：攻撃範囲+障害物）
                     if event.key == pygame.K_F5:
-                        show_hitboxes = not show_hitboxes
-                        print(f"[INFO] show_hitboxes set to {show_hitboxes}")
+                        show_debug_visuals = not show_debug_visuals
+                        print(f"[INFO] show_debug_visuals set to {show_debug_visuals}")
                         continue
 
                     # フルスクリーン切替（F11） -- 元の変更を取り消して一旦無効化
@@ -744,8 +776,13 @@ def main():
             # ワールド用サーフェスに描画してから仮想画面にブリットする
             world_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
 
-            # 背景をワールド全体のタイルで描画（オフセット適用）
-            draw_background(world_surf, int_cam_x, int_cam_y)
+            # 背景描画（設定により切り替え）
+            if USE_STAGE_MAP:
+                # レトロマップチップ背景
+                draw_stage_background(world_surf, int_cam_x, int_cam_y)
+            else:
+                # テスト用市松模様背景
+                draw_test_checkerboard(world_surf, int_cam_x, int_cam_y)
             
             # 敵の描画（プレイヤーより背後に表示）
             for enemy in enemies:
@@ -777,10 +814,37 @@ def main():
             # プレイヤー本体は武器エフェクトより手前に表示する
             player.draw(world_surf, int_cam_x, int_cam_y)
 
-            # デバッグ: 攻撃範囲の可視化（world_surf に描画）
-            if show_hitboxes:
+            # デバッグ表示: 攻撃範囲と障害物の可視化（world_surf に描画）
+            if show_debug_visuals:
                 try:
-                    # 攻撃エフェクトの範囲を例示
+                    # 障害物を赤い半透明で表示
+                    stage_map = stage.get_stage_map()
+                    
+                    # 画面内の障害物のみチェック（パフォーマンス向上）
+                    start_tile_x = max(0, int(int_cam_x // stage.TILE_SIZE))
+                    end_tile_x = min(stage.WORLD_WIDTH // stage.TILE_SIZE, 
+                                   int((int_cam_x + SCREEN_WIDTH) // stage.TILE_SIZE) + 1)
+                    start_tile_y = max(0, int(int_cam_y // stage.TILE_SIZE))
+                    end_tile_y = min(stage.WORLD_HEIGHT // stage.TILE_SIZE, 
+                                   int((int_cam_y + SCREEN_HEIGHT) // stage.TILE_SIZE) + 1)
+                    
+                    obstacle_surface = pygame.Surface((stage.TILE_SIZE, stage.TILE_SIZE))
+                    obstacle_surface.set_alpha(120)  # 少し濃い半透明
+                    obstacle_surface.fill((255, 100, 100))  # 赤っぽいピンク
+                    pygame.draw.rect(obstacle_surface, (255, 0, 0), 
+                                   (0, 0, stage.TILE_SIZE, stage.TILE_SIZE), 2)  # 赤い境界線
+                    
+                    for tile_y in range(start_tile_y, end_tile_y):
+                        for tile_x in range(start_tile_x, end_tile_x):
+                            world_x = tile_x * stage.TILE_SIZE
+                            world_y = tile_y * stage.TILE_SIZE
+                            if stage_map.is_obstacle_at_world_pos(world_x + stage.TILE_SIZE//2, 
+                                                                world_y + stage.TILE_SIZE//2):
+                                screen_x = world_x - int_cam_x
+                                screen_y = world_y - int_cam_y
+                                world_surf.blit(obstacle_surface, (screen_x, screen_y))
+                    
+                    # 攻撃エフェクトの範囲を例示（黄色い円）
                     for atk in player.active_attacks:
                         try:
                             ax = int(atk.x - int_cam_x)

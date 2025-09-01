@@ -11,12 +11,16 @@ from subitems import get_default_subitems, random_upgrade
 class Player:
     def __init__(self, screen):
         self.screen = screen
-        # 位置・移動
+        # 位置・移動（初期位置は後で安全な場所に調整）
         self.x = WORLD_WIDTH // 2
         self.y = WORLD_HEIGHT // 2
         self.speed = 3
         self.base_speed = 3
         self.size = 24
+        
+        # 安全な開始位置を見つける
+        self._adjust_spawn_position()
+        
         # 基本ステータス
         self.max_hp = 100
         self.hp = self.max_hp
@@ -166,8 +170,62 @@ class Player:
         if length > 0:
             nx = dx / length
             ny = dy / length
-            self.x += nx * sp
-            self.y += ny * sp
+            
+            # 新しい位置を計算
+            new_x = self.x + nx * sp
+            new_y = self.y + ny * sp
+            
+            # 障害物との衝突判定（マップが有効な場合のみ）
+            if USE_STAGE_MAP:
+                try:
+                    from stage import get_stage_map
+                    stage_map = get_stage_map()
+                    
+                    # プレイヤーの四隅をチェック
+                    corners = [
+                        (new_x - self.size//2, new_y - self.size//2),  # 左上
+                        (new_x + self.size//2, new_y - self.size//2),  # 右上
+                        (new_x - self.size//2, new_y + self.size//2),  # 左下
+                        (new_x + self.size//2, new_y + self.size//2),  # 右下
+                    ]
+                    
+                    # X軸方向の移動をチェック
+                    x_blocked = False
+                    test_x = self.x + nx * sp
+                    for corner_x, corner_y in [(test_x - self.size//2, self.y - self.size//2), 
+                                               (test_x + self.size//2, self.y - self.size//2),
+                                               (test_x - self.size//2, self.y + self.size//2),
+                                               (test_x + self.size//2, self.y + self.size//2)]:
+                        if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                            x_blocked = True
+                            break
+                    
+                    # Y軸方向の移動をチェック
+                    y_blocked = False
+                    test_y = self.y + ny * sp
+                    for corner_x, corner_y in [(self.x - self.size//2, test_y - self.size//2),
+                                               (self.x + self.size//2, test_y - self.size//2),
+                                               (self.x - self.size//2, test_y + self.size//2),
+                                               (self.x + self.size//2, test_y + self.size//2)]:
+                        if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                            y_blocked = True
+                            break
+                    
+                    # 移動を適用
+                    if not x_blocked:
+                        self.x = test_x
+                    if not y_blocked:
+                        self.y = test_y
+                        
+                except Exception:
+                    # 障害物判定に失敗した場合は通常の移動
+                    self.x = new_x
+                    self.y = new_y
+            else:
+                # マップが無効な場合は障害物判定なしで移動
+                self.x = new_x
+                self.y = new_y
+            
             self.vx = nx * sp
             self.vy = ny * sp
         else:
@@ -766,3 +824,26 @@ class Player:
     def should_show_keyboard_cursor(self):
         """キーボードカーソルを表示すべきかどうか"""
         return self.show_keyboard_cursor
+    
+    def _adjust_spawn_position(self):
+        """障害物のない安全な開始位置に調整（マップが有効な場合のみ）"""
+        if not USE_STAGE_MAP:
+            return  # マップが無効な場合は何もしない
+            
+        try:
+            from stage import get_stage_map
+            stage_map = get_stage_map()
+            
+            # 安全な開始位置を見つける
+            safe_x, safe_y = stage_map.find_safe_spawn_position(self.x, self.y, self.size)
+            
+            # デバッグ出力
+            if safe_x != self.x or safe_y != self.y:
+                print(f"[INFO] Player spawn adjusted from ({self.x:.0f}, {self.y:.0f}) to ({safe_x:.0f}, {safe_y:.0f})")
+            
+            self.x = safe_x
+            self.y = safe_y
+        except Exception as e:
+            # ステージが初期化されていない場合はそのまま
+            print(f"[WARNING] Could not adjust spawn position: {e}")
+            pass

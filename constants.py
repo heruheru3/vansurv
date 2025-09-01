@@ -19,6 +19,9 @@ MAGENTA = (255, 0, 255)
 YELLOW = (255, 255, 0)
 PINK = (255, 192, 203)
 GRAY = (128, 128, 128)
+LIGHT_GRAY = (192, 192, 192)  # テスト用背景の薄いグレー
+DARK_GRAY = (36, 36, 36)  # テスト用背景の濃いグレー
+MOREDARK_GRAY = (24, 24, 24)  # テスト用背景のさらに濃いグレー
 
 # 所持できる武器の最大数（レベルアップで新規武器を取得できる上限）
 MAX_WEAPONS = 4
@@ -31,6 +34,10 @@ MAX_WEAPON_LEVEL = 5
 MAX_SUBITEM_LEVEL = 3
 
 DEBUG = False
+
+# マップ・ステージ設定
+USE_STAGE_MAP = False  # True: レトロマップチップ使用, False: 市松模様背景（テスト用）
+TEST_TILE_SIZE = 64    # テスト用背景の市松模様のタイルサイズ
 
 # プレイヤーが被弾後に一時的に無敵となる時間（ミリ秒）
 INVINCIBLE_MS = 200

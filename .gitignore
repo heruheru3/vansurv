@@ -11,6 +11,7 @@ main.spec
 .vscode
 .VSCodeCounter
 chat*
+_temp
 
 # pipでインストールされるパッケージ
 venv/

@@ -106,9 +106,79 @@ class Enemy:
 
     def move(self, player):
         angle = math.atan2(player.y - self.y, player.x - self.x)
-        # 移動は base_speed に基づく（プレイヤーの speed が変わっても影響を受けない）
-        self.x += math.cos(angle) * self.base_speed
-        self.y += math.sin(angle) * self.base_speed
+        
+        # 新しい位置を計算
+        new_x = self.x + math.cos(angle) * self.base_speed
+        new_y = self.y + math.sin(angle) * self.base_speed
+        
+        # 障害物との衝突判定（マップが有効な場合のみ）
+        if USE_STAGE_MAP:
+            try:
+                from stage import get_stage_map
+                stage_map = get_stage_map()
+                
+                # 敵の四隅をチェック
+                corners = [
+                    (new_x - self.size//2, new_y - self.size//2),
+                    (new_x + self.size//2, new_y - self.size//2),
+                    (new_x - self.size//2, new_y + self.size//2),
+                    (new_x + self.size//2, new_y + self.size//2),
+                ]
+                
+                # 障害物にぶつからない場合のみ移動
+                collision = False
+                for corner_x, corner_y in corners:
+                    if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                        collision = True
+                        break
+                
+                if not collision:
+                    self.x = new_x
+                    self.y = new_y
+                else:
+                    # 障害物がある場合は X軸かY軸のみの移動を試す
+                    x_only_corners = [
+                        (new_x - self.size//2, self.y - self.size//2),
+                        (new_x + self.size//2, self.y - self.size//2),
+                        (new_x - self.size//2, self.y + self.size//2),
+                        (new_x + self.size//2, self.y + self.size//2),
+                    ]
+                    
+                    y_only_corners = [
+                        (self.x - self.size//2, new_y - self.size//2),
+                        (self.x + self.size//2, new_y - self.size//2),
+                        (self.x - self.size//2, new_y + self.size//2),
+                        (self.x + self.size//2, new_y + self.size//2),
+                    ]
+                    
+                    # X軸のみの移動を試す
+                    x_collision = False
+                    for corner_x, corner_y in x_only_corners:
+                        if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                            x_collision = True
+                            break
+                    
+                    if not x_collision:
+                        self.x = new_x
+                    else:
+                        # Y軸のみの移動を試す
+                        y_collision = False
+                        for corner_x, corner_y in y_only_corners:
+                            if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                                y_collision = True
+                                break
+                        
+                        if not y_collision:
+                            self.y = new_y
+            
+            except Exception:
+                # 障害物判定に失敗した場合は通常の移動
+                self.x = new_x
+                self.y = new_y
+        else:
+            # マップが無効な場合は障害物判定なしで移動
+            self.x = new_x
+            self.y = new_y
 
         # ヒットフラッシュのタイマを減算（フレーム毎に呼ばれることを想定、60FPS基準）
         if self.hit_flash_timer > 0.0:
