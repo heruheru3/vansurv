@@ -58,6 +58,11 @@ def init_game(screen):
     particles = []  # パーティクルリストを追加
     # ダメージ記録: { weapon_type: total_damage }
     damage_stats = {}
+    # 無敵タイマー初期化（ミリ秒タイムスタンプ）
+    try:
+        player.last_hit_time = -999999
+    except Exception:
+        pass
     return player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats
 
 def enforce_experience_gems_limit(gems, max_gems=MAX_GEMS_ON_SCREEN):
@@ -504,16 +509,34 @@ def main():
                             # サブアイテムスピードアップ効果で攻撃を回避
                             particles.append(AvoidanceParticle(player.x, player.y))
                         else:
-                            particles.append(HurtFlash(player.x, player.y, size=player.size))
+                            # 無敵時間チェック
+                            now_ms = pygame.time.get_ticks()
+                            last_hit = getattr(player, 'last_hit_time', -999999)
+                            if now_ms - last_hit >= INVINCIBLE_MS:
+                                particles.append(HurtFlash(player.x, player.y, size=player.size))
 
-                            # サブアイテムアーマーの効果でダメージを軽減
-                            try:
-                                player.hp -= max(1, int(enemy.damage - player.get_defense()))
-                            except Exception:
-                                player.hp -= enemy.damage
-                            enemies.remove(enemy)
-                            if player.hp <= 0:
-                                game_over = True
+                                # サブアイテムアーマーの効果でダメージを軽減
+                                try:
+                                    player.hp -= max(1, int(enemy.damage - player.get_defense()))
+                                except Exception:
+                                    player.hp -= enemy.damage
+
+                                # 被弾時刻を更新
+                                try:
+                                    player.last_hit_time = now_ms
+                                except Exception:
+                                    pass
+
+                                # この敵は処理済み
+                                enemies.remove(enemy)
+                                if player.hp <= 0:
+                                    game_over = True
+                            else:
+                                # 無敵中はノーダメージ、敵だけ消す（多段ヒット防止）
+                                try:
+                                    enemies.remove(enemy)
+                                except Exception:
+                                    pass
 
                 for gem in experience_gems[:]:
                     gem.move_to_player(player)

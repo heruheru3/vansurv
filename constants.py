@@ -31,3 +31,6 @@ MAX_WEAPON_LEVEL = 5
 MAX_SUBITEM_LEVEL = 3
 
 DEBUG = False
+
+# プレイヤーが被弾後に一時的に無敵となる時間（ミリ秒）
+INVINCIBLE_MS = 200
