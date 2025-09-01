@@ -16,6 +16,7 @@ pyinstaller --noconfirm --onefile --windowed \
 --add-data "${SCRIPT_DIR}/enemy.py:." \
 --add-data "${SCRIPT_DIR}/player.py:." \
 --add-data "${SCRIPT_DIR}/resources.py:." \
+--add-data "${SCRIPT_DIR}/stage.py:." \
 --add-data "${SCRIPT_DIR}/subitems.py:." \
 --add-data "${SCRIPT_DIR}/ui.py:." \
 --add-data "${SCRIPT_DIR}/collision.py:." \
