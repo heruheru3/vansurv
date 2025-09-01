@@ -37,6 +37,7 @@ from ui import draw_ui, draw_minimap, draw_level_choice, draw_end_buttons, get_e
 from stage import draw_stage_background
 import stage
 import resources
+from territory import TerritoryManager  # 陣取りシステム
 from game_utils import init_game_state, limit_particles, enforce_experience_gems_limit
 from game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item_effect, 
                        update_difficulty, handle_player_level_up, collect_experience_gems, collect_items)
@@ -107,6 +108,11 @@ def main():
 
     # ゲーム状態の初期化
     player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+
+    # 陣取りシステムの初期化
+    territory_manager = TerritoryManager()
+    territory_manager.generate_territories(15)  # 15の拠点を生成
+    print(f"[INFO] Generated {territory_manager.get_total_territories()} territories")
 
     # カメラをプレイヤーの初期位置に設定
     camera_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, player.x - SCREEN_WIDTH // 2))
@@ -587,6 +593,17 @@ def main():
                 # マグネット効果の更新
                 player.update_magnet_effect()
 
+                # デルタタイムの計算（陣取りシステム用）
+                dt = clock.get_time() / 1000.0  # 秒単位
+
+                # 陣取りシステムの更新
+                territory_manager.update(dt, player)
+                
+                # 勝利条件のチェック（全拠点制圧）
+                if not game_clear and territory_manager.get_player_territories() == territory_manager.get_total_territories():
+                    game_clear = True
+                    print("[INFO] 全土統一達成！ゲームクリア！")
+
                 # 画面揺れエフェクトの更新
                 player.update_screen_shake()
 
@@ -941,6 +958,9 @@ def main():
             for item in items:
                 item.draw(world_surf, int_cam_x, int_cam_y)
 
+            # 拠点の描画
+            territory_manager.draw(world_surf, int_cam_x, int_cam_y)
+
             # まず武器のエフェクトを描画（プレイヤーより後ろに表示されるべきなので先に描く）
             player.draw_attacks(world_surf, int_cam_x, int_cam_y)
 
@@ -1045,6 +1065,11 @@ def main():
                 pass
             # UI描画を仮想画面に（スケーリングパラメーターは不要）
             draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status)
+            
+            # 陣取り情報の表示
+            from ui import draw_territory_info
+            draw_territory_info(virtual_screen, territory_manager)
+            
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
             if game_over or game_clear:
                 from ui import draw_end_buttons

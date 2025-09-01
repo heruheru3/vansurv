@@ -1162,3 +1162,60 @@ def draw_subitem_choice(screen, player, icons=None):
                     pass
     except Exception:
         pass
+
+
+def draw_territory_info(screen, territory_manager):
+    """陣取り情報を画面右上に表示"""
+    try:
+        font = get_font('default', 24)
+        small_font = get_font('default', 18)
+        
+        # 背景パネル
+        panel_width = 220
+        panel_height = 120
+        panel_x = SCREEN_WIDTH - panel_width - 10
+        panel_y = 10
+        
+        # 半透明背景
+        panel_surf = pygame.Surface((panel_width, panel_height))
+        panel_surf.set_alpha(160)
+        panel_surf.fill((20, 20, 40))
+        pygame.draw.rect(panel_surf, (100, 100, 150), (0, 0, panel_width, panel_height), 2)
+        screen.blit(panel_surf, (panel_x, panel_y))
+        
+        # 情報表示
+        y_offset = panel_y + 10
+        
+        # 拠点情報
+        player_territories = territory_manager.get_player_territories()
+        total_territories = territory_manager.get_total_territories()
+        territory_text = font.render(f"領土: {player_territories}/{total_territories}", True, WHITE)
+        screen.blit(territory_text, (panel_x + 10, y_offset))
+        y_offset += 30
+        
+        # 資源情報
+        resources = territory_manager.player_resources
+        gold_text = small_font.render(f"所持金: {resources['gold']}", True, (255, 215, 0))
+        income_text = small_font.render(f"収入: +{resources['income']}/秒", True, (150, 255, 150))
+        screen.blit(gold_text, (panel_x + 10, y_offset))
+        screen.blit(income_text, (panel_x + 10, y_offset + 20))
+        
+        # 勝利条件の表示
+        if player_territories == total_territories:
+            victory_text = small_font.render("全土統一達成！", True, (255, 255, 0))
+            screen.blit(victory_text, (panel_x + 10, y_offset + 45))
+        else:
+            progress = (player_territories / total_territories) * 100
+            progress_text = small_font.render(f"統一率: {progress:.1f}%", True, (200, 200, 255))
+            screen.blit(progress_text, (panel_x + 10, y_offset + 45))
+            
+    except Exception as e:
+        # エラーが発生した場合はシンプルなテキスト表示
+        try:
+            simple_font = pygame.font.SysFont(None, 24)
+            player_territories = territory_manager.get_player_territories()
+            total_territories = territory_manager.get_total_territories()
+            simple_text = simple_font.render(f"Territory: {player_territories}/{total_territories}", True, WHITE)
+            screen.blit(simple_text, (SCREEN_WIDTH - 200, 10))
+        except:
+            pass
