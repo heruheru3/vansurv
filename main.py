@@ -707,7 +707,7 @@ def main():
                                     items.append(GameItem(enemy.x, enemy.y, "heal"))
                                 elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE:
                                     items.append(GameItem(enemy.x, enemy.y, "bomb"))
-                                elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE + MAGNET_ITEM_DROP_RATE:
+                                elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE + player.get_magnet_drop_rate():
                                     items.append(GameItem(enemy.x, enemy.y, "magnet"))
                                 else:
                                     experience_gems.append(ExperienceGem(enemy.x, enemy.y))

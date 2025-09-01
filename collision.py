@@ -108,7 +108,7 @@ def check_attack_enemy_collision(attacks, enemies, particles, damage_stats, play
                 
                 # 敵死亡チェック
                 handle_enemy_death(enemy, enemies, [], [], particles, damage_stats,
-                                 player.x, player.y)
+                                 player.x, player.y, player)
                 
                 # ヒット時に消費する攻撃の処理
                 consumable_on_hit = {"magic_wand"}

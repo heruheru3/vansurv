@@ -59,6 +59,8 @@ class Player:
         # マグネット効果
         self.magnet_active = False
         self.magnet_end_time = 0
+        # gem_pickup_range取得によるmagnetの出現率倍率（初期値は1.0 = 100%）
+        self.magnet_drop_rate_multiplier = 1.0
 
         # 画面揺れエフェクト
         self.screen_shake_active = False
@@ -481,6 +483,15 @@ class Player:
                 self.hp = min(self.get_max_hp(), getattr(self, 'hp', 0) + add)
                 if DEBUG:
                     print(f"[DEBUG] Applied HP subitem delta: +{add} -> now_hp={self.hp}")
+            
+            # gem_pickup_rangeを取得した時、magnetの出現率を累積的に1.3倍
+            if chosen_key == 'gem_pickup_range' and chosen_key in self.subitems:
+                current_level = self.subitems[chosen_key].level
+                # 現在の出現率倍率を1.3倍する
+                old_multiplier = self.magnet_drop_rate_multiplier
+                self.magnet_drop_rate_multiplier = old_multiplier * 1.3
+                if DEBUG:
+                    print(f"[DEBUG] gem_pickup_range level {current_level}: magnet multiplier {old_multiplier:.6f} -> {self.magnet_drop_rate_multiplier:.6f}")
         except Exception:
             pass
 
@@ -782,6 +793,11 @@ class Player:
     def is_magnet_active(self):
         """マグネット効果が有効かどうかを返す"""
         return self.magnet_active
+
+    def get_magnet_drop_rate(self):
+        """現在のmagnetアイテムの出現率を取得（基本出現率×倍率）"""
+        from constants import MAGNET_ITEM_DROP_RATE
+        return MAGNET_ITEM_DROP_RATE * self.magnet_drop_rate_multiplier
 
     def activate_screen_shake(self, intensity=None):
         """画面揺れエフェクトを有効化"""
