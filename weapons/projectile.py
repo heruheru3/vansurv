@@ -559,8 +559,10 @@ class Thunder(Weapon):
             atk.strike_from_y = head_y - self.height_offset
             try:
                 if effective_num > 1:
-                    atk.spawn_delay = int(i * delay_step)
-                    atk._pending = True
+                    delay = int(i * delay_step)
+                    if delay > 0:
+                        atk.spawn_delay = delay
+                        atk._pending = True
             except Exception:
                 pass
             attacks.append(atk)
@@ -575,8 +577,10 @@ class Thunder(Weapon):
                 atk.strike_from_y = ry - self.height_offset
                 try:
                     if effective_num > 1:
-                        atk.spawn_delay = int(i * delay_step)
-                        atk._pending = True
+                        delay = int(i * delay_step)
+                        if delay > 0:
+                            atk.spawn_delay = delay
+                            atk._pending = True
                 except Exception:
                     pass
                 attacks.append(atk)

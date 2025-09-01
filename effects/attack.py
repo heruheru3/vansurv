@@ -51,7 +51,7 @@ class Attack:
 
     def update(self, camera_x=None, camera_y=None):
         # spawn_delay が設定されている場合は開始まで待機する
-        if getattr(self, 'spawn_delay', 0) > 0 and getattr(self, '_pending', False):
+        if getattr(self, '_pending', False) and getattr(self, 'spawn_delay', 0) > 0:
             now = pygame.time.get_ticks()
             if now - self.creation_time < self.spawn_delay:
                 # まだ待機中: 何もせず早期リターン
@@ -60,6 +60,9 @@ class Attack:
                 # 待機終了: 開始時刻を現在にリセットして通常処理へ
                 self.creation_time = now
                 self._pending = False
+        elif getattr(self, '_pending', False) and getattr(self, 'spawn_delay', 0) <= 0:
+            # 安全策: 遅延なしで pending になっていたら即時有効化
+            self._pending = False
 
         if self.follow_player:
             # follow_player の共通処理（位置追従）
