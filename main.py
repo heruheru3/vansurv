@@ -1,0 +1,1046 @@
+import pygame
+import sys
+import math
+import random
+import os
+from constants import *
+
+def draw_test_checkerboard(surface, camera_x, camera_y):
+    """テスト用の市松模様背景を描画"""
+    # 描画範囲を計算
+    start_tile_x = int(camera_x // TEST_TILE_SIZE)
+    end_tile_x = int((camera_x + SCREEN_WIDTH) // TEST_TILE_SIZE) + 1
+    start_tile_y = int(camera_y // TEST_TILE_SIZE)
+    end_tile_y = int((camera_y + SCREEN_HEIGHT) // TEST_TILE_SIZE) + 1
+    
+    for tile_y in range(start_tile_y, end_tile_y):
+        for tile_x in range(start_tile_x, end_tile_x):
+            # 市松模様の色を決定
+            if (tile_x + tile_y) % 2 == 0:
+                color = DARK_GRAY
+            else:
+                color = MOREDARK_GRAY
+
+            # タイルの位置を計算
+            screen_x = tile_x * TEST_TILE_SIZE - camera_x
+            screen_y = tile_y * TEST_TILE_SIZE - camera_y
+            
+            # タイルを描画
+            pygame.draw.rect(surface, color, 
+                           (screen_x, screen_y, TEST_TILE_SIZE, TEST_TILE_SIZE))
+
+from player import Player
+from enemy import Enemy
+from effects.items import ExperienceGem, GameItem
+from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber, AvoidanceParticle, HealEffect, AutoHealEffect
+from ui import draw_ui, draw_minimap, draw_level_choice, draw_end_buttons, get_end_button_rects
+from stage import draw_stage_background
+import stage
+import resources
+from game_utils import init_game_state, limit_particles, enforce_experience_gems_limit
+from game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item_effect, 
+                       update_difficulty, handle_player_level_up, collect_experience_gems, collect_items)
+from collision import check_player_enemy_collision, check_attack_enemy_collision
+
+# ランタイムで切り替え可能なデバッグフラグ（F3でトグル）
+DEBUG_MODE = DEBUG
+
+
+def main():
+    global DEBUG_MODE
+    # 初期化
+    pygame.init()
+    
+    # ステージを最初に初期化（プレイヤーの安全な開始位置決定のため、マップが有効な場合のみ）
+    if USE_STAGE_MAP:
+        stage.init_stage()
+    
+    # ディスプレイ情報取得（フルスクリーン切替に使用）
+    try:
+        display_info = pygame.display.Info()
+    except Exception:
+        display_info = None
+
+    # ウィンドウサイズ（通常モード）
+    windowed_size = (SCREEN_WIDTH, SCREEN_HEIGHT)
+    current_size = windowed_size
+    # フルスクリーンフラグ（ウィンドウフルスクリーンタイプのトグルに使用）
+    is_fullscreen = False
+
+    # 初期はリサイズ可能なウィンドウモードで開始
+    screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
+    pygame.display.set_caption("Van Survivor Clone")
+    
+    # 仮想画面（ゲームロジックは常にこのサイズで動作）
+    virtual_screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    
+    # スケーリング係数（描画用）
+    scale_factor = 1.0
+    offset_x = 0
+    offset_y = 0
+
+    # リソースをプリロード（アイコン・フォント・サウンド等）
+    preload_res = resources.preload_all(icon_size=16)
+    ICONS = preload_res.get('icons', {})
+
+    clock = pygame.time.Clock()
+    # 画面右下に小さなプレイヤーステータスを表示するかどうかのフラグ（F4でトグル）
+    show_status = True
+    # デバッグ表示フラグ（F5でトグル：攻撃範囲+障害物）
+    show_debug_visuals = False
+    try:
+        debug_font = pygame.font.SysFont(None, 14)
+    except Exception:
+        debug_font = None
+
+    # カメラ初期値とスムージング係数（0.0: 固定、1.0: 即時追従）
+    camera_x = 0.0
+    camera_y = 0.0
+    CAMERA_LERP = 0.18
+
+    # ゲーム状態の初期化
+    player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+
+    # カメラをプレイヤーの初期位置に設定
+    camera_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, player.x - SCREEN_WIDTH // 2))
+    camera_y = max(0, min(WORLD_HEIGHT - SCREEN_HEIGHT, player.y - SCREEN_HEIGHT // 2))
+
+    # HP回復エフェクト用のコールバックを設定
+    def heal_effect_callback(x, y, heal_amount, is_auto=False):
+        if is_auto:
+            particles.append(AutoHealEffect(x, y))
+        particles.append(HealEffect(x, y, heal_amount))
+    
+    player.heal_effect_callback = heal_effect_callback
+
+    # デバッグ: 初期状態の選択フラグ確認
+    try:
+        print(f"[DEBUG] initial awaiting_weapon_choice={getattr(player,'awaiting_weapon_choice', False)} last_level_choices={getattr(player,'last_level_choices', [])}")
+    except Exception:
+        pass
+
+    # メインゲームループ
+    running = True
+    print("[INFO] Entering main loop")
+    while running:
+        try:
+            # イベント処理
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.VIDEORESIZE:
+                    # ウィンドウリサイズ処理（アスペクト比16:9を維持）
+                    new_width, new_height = event.w, event.h
+                    
+                    # 最小サイズを元のサイズの半分に制限
+                    min_width = SCREEN_WIDTH // 2
+                    min_height = SCREEN_HEIGHT // 2
+                    new_width = max(new_width, min_width)
+                    new_height = max(new_height, min_height)
+                    
+                    # アスペクト比を維持するためのスケール計算
+                    target_aspect = SCREEN_WIDTH / SCREEN_HEIGHT  # 16:9 = 1.777...
+                    current_aspect = new_width / new_height
+                    
+                    if current_aspect > target_aspect:
+                        # ウィンドウが横に広すぎる場合、高さを基準にする
+                        scale_factor = new_height / SCREEN_HEIGHT
+                        scaled_width = int(SCREEN_WIDTH * scale_factor)
+                        scaled_height = new_height
+                        offset_x = (new_width - scaled_width) // 2
+                        offset_y = 0
+                    else:
+                        # ウィンドウが縦に長すぎる場合、幅を基準にする
+                        scale_factor = new_width / SCREEN_WIDTH
+                        scaled_width = new_width
+                        scaled_height = int(SCREEN_HEIGHT * scale_factor)
+                        offset_x = 0
+                        offset_y = (new_height - scaled_height) // 2
+                    
+                    current_size = (new_width, new_height)
+                    screen = pygame.display.set_mode(current_size, pygame.RESIZABLE)
+                    
+                elif event.type == pygame.KEYDOWN:
+                    # デバッグログのオン/オフ切り替え（F3）
+                    if event.key == pygame.K_F3:
+                        DEBUG_MODE = not DEBUG_MODE
+                        # 他モジュールで直接 DEBUG を参照している箇所があるため、読み込まれているモジュール内の DEBUG 変数を一括更新する
+                        try:
+                            for m in list(sys.modules.values()):
+                                try:
+                                    setattr(m, 'DEBUG', DEBUG_MODE)
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+                        print(f"[INFO] DEBUG_MODE set to {DEBUG_MODE}")
+                        continue
+
+                    # プレイヤーステータス表示のオン/オフ切り替え（F4）
+                    if event.key == pygame.K_F4:
+                        show_status = not show_status
+                        print(f"[INFO] show_status set to {show_status}")
+                        continue
+
+                    # デバッグ表示のトグル（F5：攻撃範囲+障害物）
+                    if event.key == pygame.K_F5:
+                        show_debug_visuals = not show_debug_visuals
+                        print(f"[INFO] show_debug_visuals set to {show_debug_visuals}")
+                        continue
+
+                    # フルスクリーン切替（F11） -- 元の変更を取り消して一旦無効化
+                    if event.key == pygame.K_F11:
+                        # フルスクリーン系の変更は一旦戻しました。必要なら再度実装してください。
+                        try:
+                            print("[INFO] F11 fullscreen toggle is disabled (reverted).")
+                        except Exception:
+                            pass
+                        continue
+
+                    # 武器/サブアイテム選択のキー処理
+                    try:
+                        if getattr(player, 'awaiting_weapon_choice', False) and getattr(player, 'last_level_choices', None):
+                            n = len(player.last_level_choices)
+                            if n > 0:
+                                # 初期武器選択（グリッド形式）の場合
+                                if getattr(player, 'is_initial_weapon_selection', False):
+                                    grid_size = 3
+                                    current_index = getattr(player, 'selected_weapon_choice_index', 0)
+                                    current_row = current_index // grid_size
+                                    current_col = current_index % grid_size
+                                    
+                                    new_index = current_index
+                                    
+                                    if event.key in (pygame.K_LEFT, pygame.K_a):
+                                        new_col = (current_col - 1) % grid_size
+                                        new_index = current_row * grid_size + new_col
+                                    elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                        new_col = (current_col + 1) % grid_size
+                                        new_index = current_row * grid_size + new_col
+                                    elif event.key in (pygame.K_UP, pygame.K_w):
+                                        new_row = (current_row - 1) % grid_size
+                                        new_index = new_row * grid_size + current_col
+                                    elif event.key in (pygame.K_DOWN, pygame.K_s):
+                                        new_row = (current_row + 1) % grid_size
+                                        new_index = new_row * grid_size + current_col
+                                    elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5,
+                                                       pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9):
+                                        # 数字キーで直接選択
+                                        digit = event.key - pygame.K_1  # 0-8
+                                        if digit < n:
+                                            new_index = digit
+                                    elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                        # 選択確定
+                                        player.set_input_method("keyboard")
+                                        idx = max(0, min(current_index, n - 1))
+                                        choice = player.last_level_choices[idx]
+                                        player.apply_level_choice(choice)
+                                        player.is_initial_weapon_selection = False
+                                        try:
+                                            for _ in range(8):
+                                                particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        continue
+                                    
+                                    # インデックス更新
+                                    if new_index != current_index and new_index < n:
+                                        player.set_input_method("keyboard")
+                                        player.selected_weapon_choice_index = new_index
+                                        try:
+                                            particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                    continue
+                                else:
+                                    # 通常のレベルアップ選択（横並び3択）
+                                    if event.key in (pygame.K_LEFT, pygame.K_a):
+                                        player.set_input_method("keyboard")
+                                        player.selected_weapon_choice_index = (player.selected_weapon_choice_index - 1) % n
+                                        try:
+                                            particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        continue
+                                    elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                        player.set_input_method("keyboard")
+                                        player.selected_weapon_choice_index = (player.selected_weapon_choice_index + 1) % n
+                                        try:
+                                            particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        continue
+                                    elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                        player.set_input_method("keyboard")
+                                        idx = max(0, min(player.selected_weapon_choice_index, n - 1))
+                                        choice = player.last_level_choices[idx]
+                                        player.apply_level_choice(choice)
+                                        try:
+                                            for _ in range(8):
+                                                particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        continue
+                        elif getattr(player, 'awaiting_subitem_choice', False) and getattr(player, 'last_subitem_choices', None):
+                            n = len(player.last_subitem_choices)
+                            if n > 0:
+                                if event.key in (pygame.K_LEFT, pygame.K_a):
+                                    player.set_input_method("keyboard")
+                                    player.selected_subitem_choice_index = (player.selected_subitem_choice_index - 1) % n
+                                    try:
+                                        particles.append(DeathParticle(player.x, player.y, CYAN))
+                                    except Exception:
+                                        pass
+                                    continue
+                                elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                    player.set_input_method("keyboard")
+                                    player.selected_subitem_choice_index = (player.selected_subitem_choice_index + 1) % n
+                                    try:
+                                        particles.append(DeathParticle(player.x, player.y, CYAN))
+                                    except Exception:
+                                        pass
+                                    continue
+                                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                    player.set_input_method("keyboard")
+                                    idx = max(0, min(player.selected_subitem_choice_index, n - 1))
+                                    key = player.last_subitem_choices[idx]
+                                    player.apply_subitem_choice(key)
+                                    try:
+                                        for _ in range(8):
+                                            particles.append(DeathParticle(player.x, player.y, CYAN))
+                                    except Exception:
+                                        pass
+                                    continue
+                    except Exception:
+                        pass
+
+                    if event.key == pygame.K_RETURN and (game_over or game_clear):
+                        # ゲームクリア後は（規定時間生存）プレイヤー状態を保持して続行する
+                        if game_clear:
+                            print("[INFO] Survived required time - continuing without resetting player/weapons.")
+                            enemies = []
+                            experience_gems = []
+                            items = []
+                            particles = []
+                            spawn_timer = 0
+                            spawn_interval = 60
+                            game_time = 0
+                            last_difficulty_increase = 0
+                            game_clear = False
+                        else:
+                            # 通常のリスタート（全て再初期化）
+                            player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+                            # HP回復エフェクト用のコールバックを設定
+                            def heal_effect_callback(x, y, heal_amount, is_auto=False):
+                                if is_auto:
+                                    particles.append(AutoHealEffect(x, y))
+                                particles.append(HealEffect(x, y, heal_amount))
+                            player.heal_effect_callback = heal_effect_callback
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    # マウス座標を仮想画面座標に変換
+                    def convert_mouse_pos(mouse_x, mouse_y):
+                        # オフセットを引いてからスケールで割る
+                        virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                        virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                        # 仮想画面の範囲内にクランプ
+                        virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
+                        virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
+                        return int(virtual_x), int(virtual_y)
+                    
+                    # マウスで選択可能ならクリック位置を判定
+                    if getattr(player, 'awaiting_weapon_choice', False) and event.button == 1:
+                        player.set_input_method("mouse")
+                        mx, my = convert_mouse_pos(*event.pos)
+                        
+                        choices = getattr(player, 'last_level_choices', [])
+                        if choices:
+                            # 初期武器選択（グリッド形式）の場合
+                            if getattr(player, 'is_initial_weapon_selection', False):
+                                # グリッドパネルの当たり判定（レベルアップと同じレイアウト）
+                                grid_size = 3
+                                cw = min(880, SCREEN_WIDTH - 160)
+                                option_w = (cw - 40) // grid_size
+                                option_h = 142
+                                cell_margin = 8
+                                panel_w = cw
+                                panel_h = grid_size * (option_h + cell_margin) + 100
+                                
+                                cx = SCREEN_WIDTH // 2
+                                cy = SCREEN_HEIGHT // 2
+                                # パネルが画面からはみ出ないように調整
+                                panel_y = max(20, cy - panel_h // 2)
+                                if panel_y + panel_h > SCREEN_HEIGHT - 20:
+                                    panel_y = SCREEN_HEIGHT - panel_h - 20
+                                panel_rect = pygame.Rect(cx - panel_w // 2, panel_y, panel_w, panel_h)
+                                accent_h = 54
+                                
+                                for i, weapon_key in enumerate(choices[:9]):
+                                    row = i // grid_size
+                                    col = i % grid_size
+                                    
+                                    rect_x = panel_rect.x + 20 + col * option_w
+                                    rect_y = panel_rect.y + accent_h + 12 + row * (option_h + cell_margin)
+                                    rect = pygame.Rect(rect_x, rect_y, option_w - 8, option_h)
+                                    
+                                    if rect.collidepoint(mx, my):
+                                        choice = choices[i]
+                                        player.apply_level_choice(choice)
+                                        player.is_initial_weapon_selection = False
+                                        try:
+                                            for _ in range(8):
+                                                particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        break
+                            else:
+                                # 通常のレベルアップ選択（横並び3択）
+                                cw = min(880, SCREEN_WIDTH - 160)
+                                ch = 180
+                                cx = SCREEN_WIDTH // 2
+                                cy = SCREEN_HEIGHT // 2
+                                panel_rect = pygame.Rect(cx - cw//2, cy - ch//2, cw, ch)
+                                option_w = (cw - 40) // len(choices)
+                                option_h = ch - 60
+                                hit = False
+                                for i, choice in enumerate(choices):
+                                    ox = panel_rect.x + 20 + i * option_w
+                                    oy = panel_rect.y + 40
+                                    rect = pygame.Rect(ox, oy, option_w - 8, option_h)
+                                    if rect.collidepoint(mx, my):
+                                        player.apply_level_choice(choice)
+                                        try:
+                                            for _ in range(8):
+                                                particles.append(DeathParticle(player.x, player.y, CYAN))
+                                        except Exception:
+                                            pass
+                                        hit = True
+                                        break
+                                if hit:
+                                    continue
+                    # サブアイテム選択のマウスクリック判定
+                    if getattr(player, 'awaiting_subitem_choice', False) and event.button == 1:
+                        player.set_input_method("mouse")
+                        mx, my = convert_mouse_pos(*event.pos)
+                        choices = getattr(player, 'last_subitem_choices', [])
+                        if choices:
+                            cw = min(700, SCREEN_WIDTH - 200)
+                            ch = 180
+                            cx = SCREEN_WIDTH // 2
+                            cy = SCREEN_HEIGHT // 2
+                            panel_rect = pygame.Rect(cx - cw//2, cy - ch//2, cw, ch)
+                            option_w = (cw - 40) // len(choices)
+                            option_h = ch - 60
+                            hit = False
+                            for i, key in enumerate(choices):
+                                ox = panel_rect.x + 20 + i * option_w
+                                oy = panel_rect.y + 48
+                                rect = pygame.Rect(ox, oy, option_w - 8, option_h)
+                                if rect.collidepoint(mx, my):
+                                    player.apply_subitem_choice(key)
+                                    try:
+                                        for _ in range(8):
+                                            particles.append(DeathParticle(player.x, player.y, CYAN))
+                                    except Exception:
+                                        pass
+                                    hit = True
+                                    break
+                            if hit:
+                                continue
+
+                    # エンド画面のボタン処理（GAME OVER / CLEAR）
+                    if (game_over or game_clear) and event.button == 1:
+                        mx, my = convert_mouse_pos(*event.pos)
+                        try:
+                            rects = get_end_button_rects()
+                            # Continue はゲームオーバー時のみ有効
+                            if game_over and rects.get('continue') and rects['continue'].collidepoint(mx, my):
+                                try:
+                                    player.hp = player.get_max_hp()
+                                except Exception:
+                                    player.hp = getattr(player, 'max_hp', 100)
+                                game_over = False
+                                for _ in range(8):
+                                    particles.append(DeathParticle(player.x, player.y, CYAN))
+                                continue
+                            # GAME CLEAR の Continue: 残り時間を規定値に戻して続行
+                            if game_clear and rects.get('continue') and rects['continue'].collidepoint(mx, my):
+                                try:
+                                    # reset game_time to 0 on continue from game clear
+                                    game_time = 0
+                                except Exception:
+                                    game_time = 0
+                                game_clear = False
+                                # 画面エフェクト
+                                for _ in range(8):
+                                    particles.append(DeathParticle(player.x, player.y, CYAN))
+                                continue
+                            # Restart
+                            if rects.get('restart') and rects['restart'].collidepoint(mx, my):
+                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+                                # HP回復エフェクト用のコールバックを設定
+                                def heal_effect_callback(x, y, heal_amount, is_auto=False):
+                                    if is_auto:
+                                        particles.append(AutoHealEffect(x, y))
+                                    particles.append(HealEffect(x, y, heal_amount))
+                                player.heal_effect_callback = heal_effect_callback
+                                continue
+                        except Exception:
+                            pass
+
+            # キーボードでのレベルアップ選択処理は KEYDOWN イベントで単発処理に変更済み
+
+            # ループ冒頭でプレイヤー位置からターゲットカメラを算出（まだスムーズは適用しない）
+            target_cam_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, int(player.x - SCREEN_WIDTH // 2)))
+            target_cam_y = max(0, min(WORLD_HEIGHT - SCREEN_HEIGHT, int(player.y - SCREEN_HEIGHT // 2)))
+
+            # UI が表示されてゲームを停止すべきかを判定する。
+            # フラグだけでなく、実際に候補リストが存在するかもチェックする（フラグが残留していると攻撃できなくなる不具合対策）。
+            awaiting_weapon_active = bool(getattr(player, 'awaiting_weapon_choice', False) and getattr(player, 'last_level_choices', None))
+            awaiting_subitem_active = bool(getattr(player, 'awaiting_subitem_choice', False) and getattr(player, 'last_subitem_choices', None))
+
+            # UI表示中のマウス移動検出（入力メソッド切り替え用）
+            if awaiting_weapon_active or awaiting_subitem_active:
+                # 仮想マウス座標を取得してマウス移動検出に使用
+                def get_virtual_mouse_pos_for_detection():
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                    virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                    virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
+                    virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
+                    return int(virtual_x), int(virtual_y)
+                
+                virtual_mouse_pos = get_virtual_mouse_pos_for_detection()
+                # マウスの位置が変化した場合は入力メソッドをマウスに切り替え
+                if hasattr(player, '_last_virtual_mouse_pos'):
+                    if player._last_virtual_mouse_pos != virtual_mouse_pos:
+                        player.set_input_method("mouse")
+                player._last_virtual_mouse_pos = virtual_mouse_pos
+
+            # ゲームの更新処理。武器/サブアイテム選択UIが開いている間はゲームを一時停止する
+            if not game_over and not game_clear and not (awaiting_weapon_active or awaiting_subitem_active):
+                # マウス座標変換関数を定義
+                def get_virtual_mouse_pos():
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    # オフセットを引いてからスケールで割る
+                    virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                    virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                    # 仮想画面の範囲内にクランプ
+                    virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
+                    virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
+                    return int(virtual_x), int(virtual_y)
+                
+                # プレイヤーの移動（現在のカメラ位置と仮想マウス座標を渡す）
+                player.move(int(camera_x), int(camera_y), get_virtual_mouse_pos)
+
+                # 自動攻撃の更新（仮想マウス座標も渡す）
+                player.update_attacks(enemies, camera_x=int(camera_x), camera_y=int(camera_y), get_virtual_mouse_pos=get_virtual_mouse_pos)
+
+                # 自然回復（HPサブアイテム所持時のみ、2秒で1回復）
+                try:
+                    player.update_regen()
+                except Exception:
+                    pass
+
+                # マグネット効果の更新
+                player.update_magnet_effect()
+
+                # 画面揺れエフェクトの更新
+                player.update_screen_shake()
+
+                # 攻撃と敵の当たり判定
+                for attack in player.active_attacks[:]:
+                    # spawn_delay によってまだ発生していない攻撃は無視する
+                    if getattr(attack, '_pending', False):
+                        continue
+                    for enemy in enemies[:]:
+                        # sqrt を避けて二乗距離で比較（高速化）
+                        dx = enemy.x - attack.x
+                        dy = enemy.y - attack.y
+                        r = (getattr(attack, 'size', 0) + getattr(enemy, 'size', 0))
+                        if dx*dx + dy*dy < (r * r):
+                            # 持続系攻撃は0.2秒ごとにダメージ再発生
+                            persistent_types = {"garlic", "holy_water"}
+                            is_persistent = getattr(attack, 'type', '') in persistent_types
+
+                            # attack に必要な構造を初期化（動的に追加）
+                            if not hasattr(attack, 'hit_targets'):
+                                attack.hit_targets = set()
+                            if not hasattr(attack, 'last_hit_times'):
+                                attack.last_hit_times = {}
+
+                            # 非持続系は一度ヒットしたら再ヒットさせない
+                            if not is_persistent:
+                                if id(enemy) in attack.hit_targets:
+                                    continue
+                            else:
+                                # 持続系は最後にダメージを与えた時刻から0.2秒以上経過していれば再ダメージ
+                                last = attack.last_hit_times.get(id(enemy), -999)
+                                if game_time - last < 0.2:
+                                    continue
+
+                            # 攻撃のダメージを適用
+                            dmg = getattr(attack, 'damage', 0) or 0
+                            try:
+                                dmg = float(dmg)
+                            except Exception:
+                                dmg = 0.0
+                            # ダメージにランダム性を追加（±10%の範囲）
+                            variance = random.uniform(-0.1, 0.1)
+                            dmg = max(0.0, dmg * (1.0 + variance))
+                            hp_before = enemy.hp
+                            enemy.hp -= dmg
+                            # デバッグ出力（DEBUG フラグが有効な場合）
+                            if DEBUG_MODE:
+                                print(f"[DEBUG] attack_type={getattr(attack,'type','?')} damage={dmg} enemy_type={getattr(enemy,'enemy_type','?')} hp: {hp_before} -> {enemy.hp}")
+
+                            # ヒット時の記録: 非持続系は hit_targets に追加、持続系は last_hit_times を更新
+                            if is_persistent:
+                                attack.last_hit_times[id(enemy)] = game_time
+                            else:
+                                attack.hit_targets.add(id(enemy))
+
+                            # ダメージ集計: 武器(type)ごとに合計ダメージを記録
+                            try:
+                                atk_type = getattr(attack, 'type', 'unknown') or 'unknown'
+                                damage_stats[atk_type] = damage_stats.get(atk_type, 0) + dmg
+                            except Exception:
+                                pass
+
+                            # Garlic がヒットしたらプレイヤーを1回復する（クールダウン: 500ms）
+                            try:
+                                if getattr(attack, 'type', '') == 'garlic':
+                                    now = pygame.time.get_ticks()
+                                    # attack にクールダウン時刻を保持
+                                    if not hasattr(attack, 'last_garlic_heal_time'):
+                                        attack.last_garlic_heal_time = -999999
+                                    if now - attack.last_garlic_heal_time >= GARLIC_HEAL_INTERVAL_MS:
+                                        try:
+                                            # HPサブアイテムのレベルに応じた回復量を使用
+                                            garlic_heal_amount = player.get_garlic_heal_amount()
+                                            player.heal(garlic_heal_amount, "garlic")
+                                        except Exception:
+                                            # 万が一何か問題があってもHPは最低限設定
+                                            try:
+                                                player.hp = min(player.get_max_hp(), getattr(player, 'hp', 0) + 1)
+                                            except Exception:
+                                                # 最終フォールバック
+                                                player.hp = min(100, getattr(player, 'hp', 0) + 1)
+                                        attack.last_garlic_heal_time = now
+                            except Exception:
+                                pass
+
+                            # ヒット時の小エフェクト
+                            try:
+                                if hasattr(enemy, 'on_hit') and callable(enemy.on_hit):
+                                    enemy.on_hit()
+                            except Exception:
+                                pass
+
+                            for _ in range(4):
+                                particles.append(DeathParticle(enemy.x, enemy.y, enemy.color))
+
+                            # ダメージ数表示を追加（敵の上部に素早くフェードイン・アウト）
+                            try:
+                                dval = float(dmg)
+                                if dval <= 10.0:
+                                    color = WHITE
+                                else:
+                                    t = min(1.0, max(0.0, (dval - 10.0) / 40.0))
+                                    r = 255
+                                    g = int(255 - (215 * t))
+                                    b = int(255 - (215 * t))
+                                    color = (r, g, b)
+                                particles.append(DamageNumber(enemy.x, enemy.y - enemy.size - 6, int(dmg), color=color))
+                            except Exception:
+                                pass
+
+                            # 敵のHPが0以下なら死亡処理
+                            if enemy.hp <= 0:
+                                for _ in range(8):
+                                    particles.append(DeathParticle(enemy.x, enemy.y, enemy.color))
+
+                                rand = random.random()
+                                if rand < HEAL_ITEM_DROP_RATE:
+                                    items.append(GameItem(enemy.x, enemy.y, "heal"))
+                                elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE:
+                                    items.append(GameItem(enemy.x, enemy.y, "bomb"))
+                                elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE + MAGNET_ITEM_DROP_RATE:
+                                    items.append(GameItem(enemy.x, enemy.y, "magnet"))
+                                else:
+                                    experience_gems.append(ExperienceGem(enemy.x, enemy.y))
+                                    enforce_experience_gems_limit(experience_gems, player_x=player.x, player_y=player.y)
+
+                                if enemy in enemies:
+                                    enemies.remove(enemy)
+
+                            # ヒット時に消費する攻撃（弾丸系など）のみ削除する
+                            consumable_on_hit = {"magic_wand"}
+                            if getattr(attack, 'type', '') in consumable_on_hit:
+                                if attack in player.active_attacks:
+                                    player.active_attacks.remove(attack)
+
+                            # stone は貫通させるため、貫通攻撃の一覧を定義
+                            penetrating_types = {"stone"}
+                            if getattr(attack, 'type', '') not in penetrating_types:
+                                break
+
+                # ゲーム時間の更新（60FPSを想定）
+                game_time += 1/60
+
+                # クリア判定
+                if game_time >= SURVIVAL_TIME:
+                    game_clear = True
+
+                # 15秒ごとに難易度アップ（間隔を短縮）
+                if game_time - last_difficulty_increase >= 15:
+                    spawn_interval = max(10, spawn_interval - 5)
+                    last_difficulty_increase = game_time
+
+                # 敵の生成を爆発的に
+                spawn_timer += 1
+                if spawn_timer >= spawn_interval:
+                    if game_time <= 30:
+                        num_enemies = 1 + int(game_time // 10)
+                    else:
+                        base_enemies = 1 + int((game_time - 30) // 20)
+                        num_enemies = base_enemies + int((game_time ** 1.2) / 15)
+
+                    if game_time > SURVIVAL_TIME * 0.7:
+                        num_enemies = int(num_enemies * 1.3)
+
+                    num_enemies = min(num_enemies, 12)
+
+                    for _ in range(num_enemies):
+                        cam_vx = int(camera_x)
+                        cam_vy = int(camera_y)
+                        margin = 32
+                        side = random.randint(0, 3)
+                        if side == 0:
+                            sx = random.randint(cam_vx - margin, cam_vx + SCREEN_WIDTH + margin)
+                            sy = cam_vy - margin
+                        elif side == 1:
+                            sx = cam_vx + SCREEN_WIDTH + margin
+                            sy = random.randint(cam_vy - margin, cam_vy + SCREEN_HEIGHT + margin)
+                        elif side == 2:
+                            sx = random.randint(cam_vx - margin, cam_vx + SCREEN_WIDTH + margin)
+                            sy = cam_vy + SCREEN_HEIGHT + margin
+                        else:
+                            sx = cam_vx - margin
+                            sy = random.randint(cam_vy - margin, cam_vy + SCREEN_HEIGHT + margin)
+
+                        sx = max(-margin, min(WORLD_WIDTH + margin, sx))
+                        sy = max(-margin, min(WORLD_HEIGHT + margin, sy))
+
+                        enemy = Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, spawn_side=side)
+                        enemies.append(enemy)
+                        particles.append(SpawnParticle(enemy.x, enemy.y, enemy.color))
+                    spawn_timer = 0
+
+                for enemy in enemies[:]:
+                    enemy.move(player)
+                    # プレイヤーとの当たり判定も二乗距離で比較
+                    dx = player.x - enemy.x
+                    dy = player.y - enemy.y
+                    r = (getattr(player, 'size', 0) + getattr(enemy, 'size', 0))
+                    if dx*dx + dy*dy < (r * r):
+                        if random.random() < player.get_avoidance():
+                            # サブアイテムスピードアップ効果で攻撃を回避
+                            particles.append(AvoidanceParticle(player.x, player.y))
+                            try:
+                                from effects.particles import LuckyText
+                                particles.append(LuckyText(player.x, player.y - getattr(player, 'size', 32) - 6, "Lukey!", color=CYAN))
+                            except Exception:
+                                pass
+                        else:
+                            # 無敵時間チェック
+                            now_ms = pygame.time.get_ticks()
+                            last_hit = getattr(player, 'last_hit_time', -999999)
+                            if now_ms - last_hit >= INVINCIBLE_MS:
+                                particles.append(HurtFlash(player.x, player.y, size=player.size))
+
+                                # サブアイテムアーマーの効果でダメージを軽減
+                                try:
+                                    player.hp -= max(1, int(enemy.damage - player.get_defense()))
+                                except Exception:
+                                    player.hp -= enemy.damage
+
+                                # 被弾時刻を更新
+                                try:
+                                    player.last_hit_time = now_ms
+                                except Exception:
+                                    pass
+
+                                # この敵は処理済み
+                                enemies.remove(enemy)
+                                if player.hp <= 0:
+                                    game_over = True
+                            else:
+                                # 無敵中はノーダメージ、敵だけ消す（多段ヒット防止）
+                                try:
+                                    enemies.remove(enemy)
+                                except Exception:
+                                    pass
+
+                for gem in experience_gems[:]:
+                    gem.move_to_player(player)
+                    # 経験値ジェムの取得判定も二乗距離で比較
+                    dx = player.x - gem.x
+                    dy = player.y - gem.y
+                    # プレイヤーの基準取得半径は player.size + gem.size
+                    base_r = (getattr(player, 'size', 0) + getattr(gem, 'size', 0))
+                    # サブアイテムから追加されるピクセル半径を取得
+                    try:
+                        extra = float(getattr(player, 'get_gem_pickup_range', lambda: 0.0)())
+                    except Exception:
+                        extra = 0.0
+                    r = base_r + extra
+                    if dx*dx + dy*dy < (r * r):
+                        prev_level = player.level
+                        # ジェムごとの価値を付与
+                        player.add_exp(getattr(gem, 'value', 1))
+                        experience_gems.remove(gem)
+                        if player.level > prev_level:
+                            particles.append(LevelUpEffect(player.x, player.y))
+                            for _ in range(12):
+                                particles.append(DeathParticle(player.x, player.y, CYAN))
+
+                for item in items[:]:
+                    item.move_to_player(player)
+                    # アイテム取得判定も二乗距離比較に変更
+                    dx = player.x - item.x
+                    dy = player.y - item.y
+                    r = (getattr(player, 'size', 0) + getattr(item, 'size', 0))
+                    if dx*dx + dy*dy < (r * r):
+                        if item.type == "heal":
+                            # 体力回復（割合回復）
+                            player.heal(HEAL_ITEM_AMOUNT, "item")
+                        elif item.type == "bomb":
+                            # 画面揺れエフェクトを発生させる
+                            player.activate_screen_shake()
+                            for enemy in enemies[:]:
+                                experience_gems.append(ExperienceGem(enemy.x, enemy.y))
+                                # 各追加ごとに上限をチェックしてプレイヤーから遠いものを削除しつつ価値を集約
+                                enforce_experience_gems_limit(experience_gems, player_x=player.x, player_y=player.y)
+                            enemies.clear()
+                        elif item.type == "magnet":
+                            # マグネット効果を有効化
+                            player.activate_magnet()
+                        items.remove(item)
+
+            # パーティクルの更新と描画
+            # パーティクルはカメラに依存しないため従来通り呼び出す
+            # パーティクル数が多すぎる場合は古いものから削減して負荷を抑える
+            if len(particles) > PARTICLE_LIMIT:
+                # 最も新しいものを残す（古いものは削除）
+                particles = particles[-PARTICLE_TRIM_TO:]
+
+            # 安全に順次更新して生存するものだけ残す
+            new_particles = []
+            for p in particles:
+                try:
+                    if p.update():
+                        new_particles.append(p)
+                except Exception:
+                    # エフェクトの update で例外が出てもゲームを継続する
+                    pass
+            particles = new_particles
+
+            # カメラ目標を現在のプレイヤー位置から再計算（プレイヤー移動後）
+            # 仮想画面サイズ（常に1280x720）を基準にカメラ計算
+            desired_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, player.x - SCREEN_WIDTH // 2))
+            desired_y = max(0, min(WORLD_HEIGHT - SCREEN_HEIGHT, player.y - SCREEN_HEIGHT // 2))
+            # 補間（スムージング）
+            camera_x += (desired_x - camera_x) * CAMERA_LERP
+            camera_y += (desired_y - camera_y) * CAMERA_LERP
+            
+            # 画面揺れオフセットを適用
+            shake_offset_x, shake_offset_y = player.get_screen_shake_offset()
+            
+            # 描画で使用する整数カメラ座標（画面揺れを加味）
+            int_cam_x = int(camera_x) + shake_offset_x
+            int_cam_y = int(camera_y) + shake_offset_y
+
+            # 仮想画面をクリア
+            virtual_screen.fill((0, 0, 0))
+
+            # ワールド用サーフェスに描画してから仮想画面にブリットする
+            world_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+
+            # 背景描画（設定により切り替え）
+            if USE_STAGE_MAP:
+                # レトロマップチップ背景
+                draw_stage_background(world_surf, int_cam_x, int_cam_y)
+            else:
+                # テスト用市松模様背景
+                draw_test_checkerboard(world_surf, int_cam_x, int_cam_y)
+            
+            # 敵の描画（プレイヤーより背後に表示）
+            for enemy in enemies:
+                enemy.draw(world_surf, int_cam_x, int_cam_y)
+
+            # パーティクル（ワールド座標）の描画（エネミーの後、攻撃エフェクトの前に追加）
+            # HurtFlash, LevelUpEffect は画面オーバーレイなので別途画面に描画する
+            world_particles = [p for p in particles if not isinstance(p, (HurtFlash, LevelUpEffect))]
+            overlay_particles = [p for p in particles if isinstance(p, (HurtFlash, LevelUpEffect))]
+            for particle in world_particles:
+                # 各パーティクルは world_surf 上に描画する（カメラオフセットを渡す）
+                try:
+                    particle.draw(world_surf, int_cam_x, int_cam_y)
+                except TypeError:
+                    # 古いインターフェースのままなら位置をオフセットして描画
+                    particle.draw(world_surf)
+
+            # 経験値ジェムの描画
+            for gem in experience_gems:
+                gem.draw(world_surf, int_cam_x, int_cam_y)
+
+            # アイテムの描画
+            for item in items:
+                item.draw(world_surf, int_cam_x, int_cam_y)
+
+            # まず武器のエフェクトを描画（プレイヤーより後ろに表示されるべきなので先に描く）
+            player.draw_attacks(world_surf, int_cam_x, int_cam_y)
+
+            # プレイヤー本体は武器エフェクトより手前に表示する
+            player.draw(world_surf, int_cam_x, int_cam_y)
+
+            # デバッグ表示: 攻撃範囲と障害物の可視化（world_surf に描画）
+            if show_debug_visuals:
+                try:
+                    # 障害物を赤い半透明で表示
+                    stage_map = stage.get_stage_map()
+                    
+                    # 画面内の障害物のみチェック（パフォーマンス向上）
+                    start_tile_x = max(0, int(int_cam_x // stage.TILE_SIZE))
+                    end_tile_x = min(stage.WORLD_WIDTH // stage.TILE_SIZE, 
+                                   int((int_cam_x + SCREEN_WIDTH) // stage.TILE_SIZE) + 1)
+                    start_tile_y = max(0, int(int_cam_y // stage.TILE_SIZE))
+                    end_tile_y = min(stage.WORLD_HEIGHT // stage.TILE_SIZE, 
+                                   int((int_cam_y + SCREEN_HEIGHT) // stage.TILE_SIZE) + 1)
+                    
+                    obstacle_surface = pygame.Surface((stage.TILE_SIZE, stage.TILE_SIZE))
+                    obstacle_surface.set_alpha(120)  # 少し濃い半透明
+                    obstacle_surface.fill((255, 100, 100))  # 赤っぽいピンク
+                    pygame.draw.rect(obstacle_surface, (255, 0, 0), 
+                                   (0, 0, stage.TILE_SIZE, stage.TILE_SIZE), 2)  # 赤い境界線
+                    
+                    for tile_y in range(start_tile_y, end_tile_y):
+                        for tile_x in range(start_tile_x, end_tile_x):
+                            world_x = tile_x * stage.TILE_SIZE
+                            world_y = tile_y * stage.TILE_SIZE
+                            if stage_map.is_obstacle_at_world_pos(world_x + stage.TILE_SIZE//2, 
+                                                                world_y + stage.TILE_SIZE//2):
+                                screen_x = world_x - int_cam_x
+                                screen_y = world_y - int_cam_y
+                                world_surf.blit(obstacle_surface, (screen_x, screen_y))
+                    
+                    # 攻撃エフェクトの範囲を例示（黄色い円）
+                    for atk in player.active_attacks:
+                        try:
+                            ax = int(atk.x - int_cam_x)
+                            ay = int(atk.y - int_cam_y)
+                            w = int(getattr(atk, 'size_x', getattr(atk, 'size', 16) * 2))
+                            h = int(getattr(atk, 'size_y', getattr(atk, 'size', 16) * 2))
+                            tx = ax - w // 2
+                            ty = ay - h // 2
+                            s = pygame.Surface((max(1, w), max(1, h)), pygame.SRCALPHA)
+                            s.fill((255, 255, 0, 40))
+                            try:
+                                pygame.draw.rect(s, (255, 200, 0, 180), (0, 0, w, h), 2)
+                            except Exception:
+                                pass
+                            world_surf.blit(s, (tx, ty))
+                            if debug_font:
+                                t = str(getattr(atk, 'type', '?'))
+                                try:
+                                    txt = debug_font.render(t, True, (220, 220, 60))
+                                    world_surf.blit(txt, (ax + 6, ay - 6))
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+                    # 敵の当たり判定も表示
+                    for e in enemies:
+                        try:
+                            ex = int(e.x - int_cam_x)
+                            ey = int(e.y - int_cam_y)
+                            rs = int(getattr(e, 'size', 12))
+                            try:
+                                pygame.draw.circle(world_surf, (255, 80, 80, 160), (ex, ey), rs, 2)
+                            except Exception:
+                                pygame.draw.circle(world_surf, (255, 80, 80), (ex, ey), rs, 2)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            # ワールドを仮想画面にブリット
+            virtual_screen.blit(world_surf, (0, 0))
+
+            # オーバーレイ系パーティクルを仮想画面に直接描画（全画面フラッシュ等）
+            for particle in overlay_particles:
+                # overlay パーティクルはワールド座標を保持しているためカメラオフセットを渡す
+                try:
+                    particle.draw(virtual_screen, int_cam_x, int_cam_y)
+                except TypeError:
+                    particle.draw(virtual_screen)
+
+            # 右上にミニマップを描画
+            try:
+                draw_minimap(virtual_screen, player, enemies, experience_gems, items, int_cam_x, int_cam_y)
+            except Exception:
+                pass
+
+            # デバッグ: ゲーム終了時に damage_stats の中身をログ出力 (表が出ない原因調査用)
+            try:
+                if (game_over or game_clear) and DEBUG_MODE:
+                    if not damage_stats:
+                        print("[DEBUG] damage_stats is empty at game end")
+                    else:
+                        print(f"[DEBUG] damage_stats keys={list(damage_stats.items())[:8]}")
+            except Exception:
+                pass
+            # UI描画を仮想画面に（スケーリングパラメーターは不要）
+            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status)
+            # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
+            if game_over or game_clear:
+                from ui import draw_end_buttons
+                draw_end_buttons(virtual_screen, game_over, game_clear)
+            
+            # レベルアップ候補がある場合はポップアップを ui.draw_level_choice に任せる
+            # サブアイテム選択 UI を優先して表示
+            if getattr(player, 'awaiting_subitem_choice', False) and getattr(player, 'last_subitem_choices', None):
+                # サブアイテム選択は ui.draw_subitem_choice を使う
+                from ui import draw_subitem_choice
+                draw_subitem_choice(virtual_screen, player, ICONS)
+            elif getattr(player, 'awaiting_weapon_choice', False) and getattr(player, 'last_level_choices', None):
+                draw_level_choice(virtual_screen, player, ICONS)
+
+            # 仮想画面を実際の画面にスケールして転送
+            screen.fill((0, 0, 0))  # レターボックス部分を黒で塗りつぶし
+            
+            if scale_factor != 1.0:
+                # スケールして描画
+                scaled_size = (int(SCREEN_WIDTH * scale_factor), int(SCREEN_HEIGHT * scale_factor))
+                scaled_surface = pygame.transform.scale(virtual_screen, scaled_size)
+                screen.blit(scaled_surface, (offset_x, offset_y))
+            else:
+                # 等倍で描画
+                screen.blit(virtual_screen, (offset_x, offset_y))
+
+            pygame.display.flip()
+            clock.tick(FPS)
+
+        except Exception as e:
+            # 例外が発生したら詳細をログ出力してループを抜ける
+            import traceback
+            print("[ERROR] Exception in main loop:", e)
+            traceback.print_exc()
+            running = False
+
+    print("[INFO] Exited main loop")
+    pygame.quit()
+
+if __name__ == "__main__":
+    main()
+    sys.exit(0)
