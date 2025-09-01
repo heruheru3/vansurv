@@ -219,3 +219,56 @@ class DamageNumber:
         except Exception:
             pass
         screen.blit(text_surf, (int(self.x - text_surf.get_width() / 2 - camera_x), int(self.y - text_surf.get_height() / 2 - camera_y)))
+
+
+class LuckyText:
+    """回避成功時にプレイヤー上部へ小さく表示するテキスト（短時間）。"""
+    font = None
+
+    def __init__(self, x, y, text="Lukey!", color=CYAN):
+        self.x = x
+        self.y = y
+        self.text = text
+        self.color = color
+        self.duration = 20  # 短め
+        self.timer = self.duration
+        self.vy = -0.5
+        if LuckyText.font is None:
+            try:
+                LuckyText.font = get_font(14)  # 小さめ
+            except Exception:
+                LuckyText.font = pygame.font.SysFont(None, 14)
+
+    def update(self):
+        self.y += self.vy
+        self.timer -= 1
+        return self.timer > 0
+
+    def draw(self, screen, camera_x=0, camera_y=0):
+        elapsed = self.duration - self.timer
+        if elapsed < 4:
+            alpha = int(255 * (elapsed / 4))
+        elif self.timer < 6:
+            alpha = int(255 * (self.timer / 6))
+        else:
+            alpha = 255
+        alpha = max(0, min(255, alpha))
+
+        text_surf = LuckyText.font.render(str(self.text), True, self.color)
+        try:
+            text_surf.set_alpha(alpha)
+        except Exception:
+            pass
+
+        sx = int(self.x - camera_x)
+        sy = int(self.y - camera_y)
+        rect = text_surf.get_rect(center=(sx, sy))
+
+        # ささやかなシャドウ
+        try:
+            shadow = LuckyText.font.render(str(self.text), True, (0, 0, 0))
+            shadow.set_alpha(max(40, int(alpha * 0.6)))
+            screen.blit(shadow, rect.move(1, 1))
+        except Exception:
+            pass
+        screen.blit(text_surf, rect)

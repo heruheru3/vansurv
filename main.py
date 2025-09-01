@@ -508,6 +508,11 @@ def main():
                         if random.random() < player.get_avoidance():
                             # サブアイテムスピードアップ効果で攻撃を回避
                             particles.append(AvoidanceParticle(player.x, player.y))
+                            try:
+                                from effects.particles import LuckyText
+                                particles.append(LuckyText(player.x, player.y - getattr(player, 'size', 32) - 6, "Lukey!", color=CYAN))
+                            except Exception:
+                                pass
                         else:
                             # 無敵時間チェック
                             now_ms = pygame.time.get_ticks()
