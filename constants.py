@@ -49,6 +49,11 @@ MAGNET_ITEM_DROP_RATE = 0.001  # 0.1%の確率でマグネットアイテム
 
 # パーティクル関連の制限（パフォーマンス改善用）
 PARTICLE_LIMIT = 300        # これ以上は古いパーティクルから切る
+
+# パフォーマンス最適化設定
+FULLSCREEN_FPS_THRESHOLD = 2.5  # この倍率以上でFPS調整
+FULLSCREEN_FPS = 45  # フルスクリーン時の目標FPS（大画面時）
+NORMAL_FPS = 60  # 通常時のFPS
 PARTICLE_TRIM_TO = 220      # 切るときに残す数
 
 # 画面上に存在可能な経験値ジェムの上限

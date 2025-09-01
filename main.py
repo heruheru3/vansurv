@@ -74,10 +74,11 @@ def main():
     # 仮想画面（ゲームロジックは常にこのサイズで動作）
     virtual_screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
     
-    # スケーリング係数（描画用）
+    # スケーリング係数（描画用）とキャッシュサーフェス
     scale_factor = 1.0
     offset_x = 0
     offset_y = 0
+    scaled_surface = None  # スケール済みサーフェスのキャッシュ
 
     # リソースをプリロード（アイコン・フォント・サウンド等）
     preload_res = resources.preload_all(icon_size=16)
@@ -157,6 +158,9 @@ def main():
                         offset_x = 0
                         offset_y = (new_height - scaled_height) // 2
                     
+                    # スケール済みサーフェスのキャッシュをクリア
+                    scaled_surface = None
+                    
                     current_size = (new_width, new_height)
                     screen = pygame.display.set_mode(current_size, pygame.RESIZABLE)
                     
@@ -188,13 +192,46 @@ def main():
                         print(f"[INFO] show_debug_visuals set to {show_debug_visuals}")
                         continue
 
-                    # フルスクリーン切替（F11） -- 元の変更を取り消して一旦無効化
+                    # フルスクリーン切替（F11）
                     if event.key == pygame.K_F11:
-                        # フルスクリーン系の変更は一旦戻しました。必要なら再度実装してください。
                         try:
-                            print("[INFO] F11 fullscreen toggle is disabled (reverted).")
-                        except Exception:
-                            pass
+                            is_fullscreen = not is_fullscreen
+                            if is_fullscreen:
+                                # フルスクリーンモードに切り替え
+                                screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                                current_size = screen.get_size()
+                                print(f"[INFO] Switched to fullscreen: {current_size}")
+                            else:
+                                # ウィンドウモードに戻す
+                                screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
+                                current_size = windowed_size
+                                print(f"[INFO] Switched to windowed: {current_size}")
+                            
+                            # スケーリング パラメータを再計算
+                            new_width, new_height = current_size
+                            aspect_ratio = SCREEN_WIDTH / SCREEN_HEIGHT
+                            screen_aspect_ratio = new_width / new_height
+                            
+                            if screen_aspect_ratio > aspect_ratio:
+                                # 画面の方が横長：高さベースでスケール
+                                scale_factor = new_height / SCREEN_HEIGHT
+                                scaled_width = int(SCREEN_WIDTH * scale_factor)
+                                scaled_height = new_height
+                                offset_x = (new_width - scaled_width) // 2
+                                offset_y = 0
+                            else:
+                                # 画面の方が縦長：幅ベースでスケール
+                                scale_factor = new_width / SCREEN_WIDTH
+                                scaled_width = new_width
+                                scaled_height = int(SCREEN_HEIGHT * scale_factor)
+                                offset_x = 0
+                                offset_y = (new_height - scaled_height) // 2
+                            
+                            # スケール済みサーフェスのキャッシュをクリア
+                            scaled_surface = None
+                            
+                        except Exception as e:
+                            print(f"[ERROR] Failed to toggle fullscreen: {e}")
                         continue
 
                     # 武器/サブアイテム選択のキー処理
@@ -1020,16 +1057,25 @@ def main():
             screen.fill((0, 0, 0))  # レターボックス部分を黒で塗りつぶし
             
             if scale_factor != 1.0:
-                # スケールして描画
+                # スケール済みサーフェスをキャッシュして再利用
                 scaled_size = (int(SCREEN_WIDTH * scale_factor), int(SCREEN_HEIGHT * scale_factor))
-                scaled_surface = pygame.transform.scale(virtual_screen, scaled_size)
+                if scaled_surface is None or scaled_surface.get_size() != scaled_size:
+                    # キャッシュが無効またはサイズが変わった場合のみ新しいサーフェスを作成
+                    scaled_surface = pygame.Surface(scaled_size)
+                    print(f"[INFO] Created scaled surface cache: {scaled_size}")
+                
+                # キャッシュされたサーフェスにスケールして描画（最適化版）
+                pygame.transform.scale(virtual_screen, scaled_size, scaled_surface)
                 screen.blit(scaled_surface, (offset_x, offset_y))
             else:
-                # 等倍で描画
+                # 等倍で描画（キャッシュ不要）
                 screen.blit(virtual_screen, (offset_x, offset_y))
 
             pygame.display.flip()
-            clock.tick(FPS)
+            
+            # パフォーマンス最適化：大きなスケーリング時はFPSを調整
+            target_fps = FULLSCREEN_FPS if scale_factor > FULLSCREEN_FPS_THRESHOLD else NORMAL_FPS
+            clock.tick(target_fps)
 
         except Exception as e:
             # 例外が発生したら詳細をログ出力してループを抜ける
