@@ -162,9 +162,9 @@ def collect_items(player, items, enemies, experience_gems, particles):
         distance = ((item.x - player.x) ** 2 + (item.y - player.y) ** 2) ** 0.5
         if distance <= collection_range:
             if item.type == "heal":
-                # 体力回復
-                heal_amount = 20
-                player.hp = min(100, player.hp + heal_amount)
+                # 体力回復（割合回復）
+                player.heal(HEAL_ITEM_AMOUNT, "item")
+                        
             elif item.type == "bomb":
                 # ボム効果
                 handle_bomb_item_effect(enemies, experience_gems, particles, 

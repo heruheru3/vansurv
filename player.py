@@ -323,7 +323,7 @@ class Player:
                     pass
 
         if getattr(self, 'auto_heal_on_level_up', False):
-            self.hp = min(self.get_max_hp(), self.hp + 20)
+            self.heal(LEVELUP_HEAL_AMOUNT, "auto")
 
     def prepare_subitem_choices(self, count=1):
         """サブアイテム選択UIの候補を準備する"""
@@ -621,7 +621,7 @@ class Player:
         except Exception:
             return []
     def update_regen(self):
-        """自然回復（HPサブアイテム所持時のみ有効）。5秒ごとに1回復。"""
+        """自然回復（HPサブアイテム所持時のみ有効）。2秒ごとに1回復。"""
         try:
             now = pygame.time.get_ticks()
             # 死亡中は回復しない
@@ -629,8 +629,57 @@ class Player:
                 self.last_regen_ms = now
                 return
             if 'hp' in self.subitems and self.hp < self.get_max_hp():
-                if now - getattr(self, 'last_regen_ms', 0) >= 5000:
-                    self.hp = min(self.get_max_hp(), self.hp + 1)
+                # 自然回復：設定された間隔で回復
+                if now - getattr(self, 'last_regen_ms', 0) >= NATURAL_HEAL_INTERVAL_MS:
+                    # HPサブアイテムのレベルに応じた回復量を取得
+                    natural_heal_amount = self.get_natural_heal_amount()
+                    heal_amount = self.heal(natural_heal_amount, "auto")
                     self.last_regen_ms = now
+                    
+                    # デバッグログ
+                    if heal_amount > 0:
+                        print(f"[DEBUG] Natural heal: {heal_amount} HP (Level {self.subitems['hp'].level if 'hp' in self.subitems else 0}) at ({self.x}, {self.y})")
         except Exception:
             pass
+
+    def heal(self, amount, heal_type="normal"):
+        """共通の回復処理
+        
+        Args:
+            amount: 回復量または割合（heal_typeが"item"の場合は割合）
+            heal_type: 回復の種類 ("normal", "auto", "garlic", "item")
+        
+        Returns:
+            実際の回復量
+        """
+        # ヒールアイテムの場合は割合計算
+        if heal_type == "item":
+            heal_amount = int(self.get_max_hp() * amount)  # 割合から実数値に変換
+        else:
+            heal_amount = amount
+        
+        old_hp = self.hp
+        self.hp = min(self.get_max_hp(), self.hp + heal_amount)
+        actual_heal = self.hp - old_hp
+        
+        if actual_heal > 0 and hasattr(self, 'heal_effect_callback') and callable(self.heal_effect_callback):
+            is_auto = heal_type in ["auto", "garlic"]  # 自動回復系はAutoHealEffectも表示
+            self.heal_effect_callback(self.x, self.y, actual_heal, is_auto=is_auto)
+            
+        return actual_heal
+
+    def get_natural_heal_amount(self):
+        """自然回復量を取得（HPサブアイテムのレベルに応じて増加）"""
+        base_heal = NATURAL_HEAL_AMOUNT  # 基本回復量: 1
+        
+        if 'hp' in self.subitems:
+            hp_subitem = self.subitems['hp']
+            hp_level = getattr(hp_subitem, 'level', 0)
+            # HPサブアイテムのレベル1につき回復量+1
+            return base_heal + hp_level
+        
+        return base_heal
+
+    def get_garlic_heal_amount(self):
+        """ガーリック回復量を取得（固定値）"""
+        return GARLIC_HEAL_AMOUNT  # 基本回復量: 1（HPサブアイテムの影響を受けない）

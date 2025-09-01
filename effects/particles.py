@@ -272,3 +272,123 @@ class LuckyText:
         except Exception:
             pass
         screen.blit(text_surf, rect)
+
+
+class HealEffect:
+    """HP回復時のエフェクト"""
+    def __init__(self, x, y, heal_amount=20):
+        self.x = x
+        self.y = y
+        self.heal_amount = heal_amount
+        self.timer = 80  # エフェクトの持続時間（フレーム）を少し長く
+        self.font = get_font(18)  # フォントサイズを少し大きく
+        self.initial_y = y
+        
+    def update(self):
+        self.timer -= 1
+        # 上に浮上する動き
+        self.y -= 0.8
+        return self.timer > 0
+        
+    def draw(self, screen, camera_x=0, camera_y=0):
+        if self.timer <= 0:
+            return
+            
+        # フェードアウト効果
+        alpha = int(255 * (self.timer / 80))
+        alpha = max(0, min(255, alpha))
+        
+        # 回復量を表示
+        text = f"+{self.heal_amount} HP"
+        color = (50, 255, 50)  # より明るい緑色
+        
+        text_surf = self.font.render(text, True, color)
+        try:
+            text_surf.set_alpha(alpha)
+        except Exception:
+            pass
+        
+        # 描画位置計算
+        sx = int(self.x - camera_x)
+        sy = int(self.y - camera_y)
+        rect = text_surf.get_rect(center=(sx, sy))
+        
+        # より濃い影を描画
+        try:
+            shadow = self.font.render(text, True, (0, 0, 0))
+            shadow.set_alpha(max(30, int(alpha * 0.5)))
+            screen.blit(shadow, rect.move(2, 2))
+        except Exception:
+            pass
+            
+        # メインテキストを描画
+        screen.blit(text_surf, rect)
+
+
+class AutoHealEffect:
+    """自動回復のエフェクト（プレイヤー周りに緑の輝き）"""
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.timer = 45  # エフェクトの持続時間
+        self.max_radius = 25
+        self.particles = []
+        
+        # 小さな緑のパーティクルを生成
+        for _ in range(8):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(1, 3)
+            self.particles.append({
+                'x': x + random.uniform(-10, 10),
+                'y': y + random.uniform(-10, 10),
+                'dx': math.cos(angle) * speed * 0.5,
+                'dy': math.sin(angle) * speed * 0.5,
+                'life': random.randint(30, 45)
+            })
+    
+    def update(self):
+        self.timer -= 1
+        
+        # パーティクルを更新
+        for particle in self.particles[:]:
+            particle['x'] += particle['dx']
+            particle['y'] += particle['dy']
+            particle['life'] -= 1
+            if particle['life'] <= 0:
+                self.particles.remove(particle)
+                
+        return self.timer > 0
+        
+    def draw(self, screen, camera_x=0, camera_y=0):
+        if self.timer <= 0:
+            return
+            
+        # メイン輝きの描画
+        progress = 1 - (self.timer / 45)
+        radius = int(self.max_radius * (0.5 + 0.5 * math.sin(progress * math.pi)))
+        alpha = int(80 * (self.timer / 45))
+        
+        # 緑の輝く円を描画
+        sx = int(self.x - camera_x)
+        sy = int(self.y - camera_y)
+        
+        if radius > 0:
+            # 外側の薄い円
+            try:
+                heal_surface = pygame.Surface((radius * 4, radius * 4), pygame.SRCALPHA)
+                pygame.draw.circle(heal_surface, (0, 255, 0, alpha // 3), 
+                                 (radius * 2, radius * 2), radius * 2)
+                pygame.draw.circle(heal_surface, (0, 255, 0, alpha // 2), 
+                                 (radius * 2, radius * 2), radius)
+                screen.blit(heal_surface, (sx - radius * 2, sy - radius * 2))
+            except Exception:
+                # フォールバック：通常の円描画
+                pygame.draw.circle(screen, (0, 255, 0), (sx, sy), radius, 2)
+        
+        # 小さなパーティクルを描画
+        for particle in self.particles:
+            p_alpha = int(255 * (particle['life'] / 45))
+            if p_alpha > 0:
+                px = int(particle['x'] - camera_x)
+                py = int(particle['y'] - camera_y)
+                pygame.draw.circle(screen, (100, 255, 100), (px, py), 2)

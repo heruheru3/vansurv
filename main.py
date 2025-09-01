@@ -7,7 +7,7 @@ from constants import *
 from player import Player
 from enemy import Enemy
 from effects.items import ExperienceGem, GameItem
-from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber, AvoidanceParticle
+from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber, AvoidanceParticle, HealEffect, AutoHealEffect
 from ui import draw_ui, draw_minimap, draw_background, draw_level_choice, draw_end_buttons, get_end_button_rects
 import resources
 from game_utils import init_game_state, limit_particles, enforce_experience_gems_limit
@@ -59,6 +59,14 @@ def main():
 
     # ゲーム状態の初期化
     player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+
+    # HP回復エフェクト用のコールバックを設定
+    def heal_effect_callback(x, y, heal_amount, is_auto=False):
+        if is_auto:
+            particles.append(AutoHealEffect(x, y))
+        particles.append(HealEffect(x, y, heal_amount))
+    
+    player.heal_effect_callback = heal_effect_callback
 
     # デバッグ: 初期状態の選択フラグ確認
     try:
@@ -188,6 +196,12 @@ def main():
                         else:
                             # 通常のリスタート（全て再初期化）
                             player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+                            # HP回復エフェクト用のコールバックを設定
+                            def heal_effect_callback(x, y, heal_amount, is_auto=False):
+                                if is_auto:
+                                    particles.append(AutoHealEffect(x, y))
+                                particles.append(HealEffect(x, y, heal_amount))
+                            player.heal_effect_callback = heal_effect_callback
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     # マウスで選択可能ならクリック位置を判定
                     if getattr(player, 'awaiting_weapon_choice', False) and event.button == 1:
@@ -278,6 +292,12 @@ def main():
                             # Restart
                             if rects.get('restart') and rects['restart'].collidepoint(mx, my):
                                 player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+                                # HP回復エフェクト用のコールバックを設定
+                                def heal_effect_callback(x, y, heal_amount, is_auto=False):
+                                    if is_auto:
+                                        particles.append(AutoHealEffect(x, y))
+                                    particles.append(HealEffect(x, y, heal_amount))
+                                player.heal_effect_callback = heal_effect_callback
                                 continue
                         except Exception:
                             pass
@@ -300,7 +320,7 @@ def main():
                 # 自動攻撃の更新
                 player.update_attacks(enemies, camera_x=int(camera_x), camera_y=int(camera_y))
 
-                # 自然回復（HPサブアイテム所持時のみ、5秒で1回復）
+                # 自然回復（HPサブアイテム所持時のみ、2秒で1回復）
                 try:
                     player.update_regen()
                 except Exception:
@@ -372,17 +392,11 @@ def main():
                                     # attack にクールダウン時刻を保持
                                     if not hasattr(attack, 'last_garlic_heal_time'):
                                         attack.last_garlic_heal_time = -999999
-                                    COOLDOWN_MS = 500
-                                    if now - attack.last_garlic_heal_time >= COOLDOWN_MS:
+                                    if now - attack.last_garlic_heal_time >= GARLIC_HEAL_INTERVAL_MS:
                                         try:
-                                            prev_hp = int(getattr(player, 'hp', 0))
-                                            # ここはハードコードの100ではなくプレイヤーの最大HPを使う
-                                            new_hp = min(player.get_max_hp(), prev_hp + 1)
-                                            healed = new_hp - prev_hp
-                                            if healed > 0:
-                                                player.hp = new_hp
-                                                # プレイヤー上に緑色で回復量を表示
-                                                particles.append(DamageNumber(player.x, player.y - getattr(player, 'size', 32) - 6, f"+{int(healed)}", color=GREEN))
+                                            # HPサブアイテムのレベルに応じた回復量を使用
+                                            garlic_heal_amount = player.get_garlic_heal_amount()
+                                            player.heal(garlic_heal_amount, "garlic")
                                         except Exception:
                                             # 万が一何か問題があってもHPは最低限設定
                                             try:
@@ -575,25 +589,8 @@ def main():
                     r = (getattr(player, 'size', 0) + getattr(item, 'size', 0))
                     if dx*dx + dy*dy < (r * r):
                         if item.type == "heal":
-                            try:
-                                prev_hp = int(getattr(player, 'hp', 0))
-                                # 最大HPの30%を回復（最低1）
-                                heal_amount = max(1, int(player.get_max_hp() * 0.3))
-                                new_hp = min(player.get_max_hp(), prev_hp + heal_amount)
-                                healed = new_hp - prev_hp
-                                if healed > 0:
-                                    player.hp = new_hp
-                                    particles.append(DamageNumber(player.x, player.y - getattr(player, 'size', 32) - 6, f"+{int(healed)}", color=GREEN))
-                            except Exception:
-                                try:
-                                    try:
-                                        max_hp = player.get_max_hp()
-                                    except Exception:
-                                        max_hp = 100
-                                    heal_amount = max(1, int(max_hp * 0.3))
-                                    player.hp = min(max_hp, getattr(player, 'hp', 0) + heal_amount)
-                                except Exception:
-                                    player.hp = min(100, getattr(player, 'hp', 0) + 30)
+                            # 体力回復（割合回復）
+                            player.heal(HEAL_ITEM_AMOUNT, "item")
                         elif item.type == "bomb":
                             for enemy in enemies[:]:
                                 experience_gems.append(ExperienceGem(enemy.x, enemy.y))

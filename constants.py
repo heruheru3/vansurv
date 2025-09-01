@@ -45,3 +45,17 @@ PARTICLE_TRIM_TO = 220      # 切るときに残す数
 
 # 画面上に存在可能な経験値ジェムの上限
 MAX_GEMS_ON_SCREEN = 200
+
+# HP自然回復設定
+NATURAL_HEAL_INTERVAL_MS = 2000  # 自然回復の間隔（ミリ秒）
+NATURAL_HEAL_AMOUNT = 0          # 自然回復時の基本回復量（HPサブアイテムレベル分が追加される）
+
+# ガーリック回復設定
+GARLIC_HEAL_INTERVAL_MS = 500    # ガーリック回復の間隔（ミリ秒）
+GARLIC_HEAL_AMOUNT = 1           # ガーリック回復時の基本回復量（HPサブアイテムレベル分が追加される）
+
+# 回復アイテム設定
+HEAL_ITEM_AMOUNT = 0.20          # 回復アイテムの回復量（割合：0.20 = 20%）
+
+# レベルアップ時の自動回復量
+LEVELUP_HEAL_AMOUNT = 20         # レベルアップ時の回復量
