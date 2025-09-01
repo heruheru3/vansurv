@@ -25,10 +25,18 @@ class ExperienceGem:
         except Exception:
             extra = 0.0
         attract_threshold = 100.0 + extra
+        
+        # マグネット効果が有効な場合、全画面からの引き寄せ＋速度アップ
+        if hasattr(player, 'is_magnet_active') and player.is_magnet_active():
+            attract_threshold = float('inf')  # 距離制限なし
+            speed_multiplier = MAGNET_FORCE_MULTIPLIER
+        else:
+            speed_multiplier = 1.0
 
         if distance < attract_threshold and distance != 0:
-            self.x += (dx / distance) * self.speed
-            self.y += (dy / distance) * self.speed
+            move_speed = self.speed * speed_multiplier
+            self.x += (dx / distance) * move_speed
+            self.y += (dy / distance) * move_speed
 
     def draw(self, screen, camera_x=0, camera_y=0):
         # ジェムの色を value に応じて変更する
@@ -178,4 +186,27 @@ class GameItem:
                 pygame.draw.circle(surf, base + (240,), (int(cx - r*0.4), int(cy - r*0.4)), r)
                 pygame.draw.circle(surf, highlight + (160,), (int(cx - r*0.8), int(cy - r*0.8)), int(r*0.4))
                 pygame.draw.line(surf, YELLOW, (cx + r, cy - r), (cx + r + 6, cy - r - 6), 3)
+                screen.blit(surf, (int(self.x - cx - camera_x), int(self.y - cy - camera_y)))
+            elif self.type == "magnet":
+                r = self.size
+                surf = pygame.Surface((r*4, r*4), pygame.SRCALPHA)
+                cx, cy = r*2, r*2
+                
+                # マグネットの U字形を描画
+                # 背景グロー
+                pygame.draw.circle(surf, (0, 100, 255, 60), (cx, cy), r+6)
+                
+                # U字の外側（影）
+                pygame.draw.arc(surf, (0, 0, 100), (cx-r, cy-r, r*2, r*2), 0, math.pi, 6)
+                pygame.draw.line(surf, (0, 0, 100), (cx-r+1, cy+1), (cx-r+1, cy+r+1), 6)
+                pygame.draw.line(surf, (0, 0, 100), (cx+r-1, cy+1), (cx+r-1, cy+r+1), 6)
+                
+                # U字の本体
+                pygame.draw.arc(surf, BLUE, (cx-r, cy-r, r*2, r*2), 0, math.pi, 4)
+                pygame.draw.line(surf, BLUE, (cx-r, cy), (cx-r, cy+r), 4)
+                pygame.draw.line(surf, BLUE, (cx+r, cy), (cx+r, cy+r), 4)
+                
+                # ハイライト
+                pygame.draw.arc(surf, CYAN, (cx-r+2, cy-r+2, r*2-4, r*2-4), 0, math.pi, 2)
+                
                 screen.blit(surf, (int(self.x - cx - camera_x), int(self.y - cy - camera_y)))

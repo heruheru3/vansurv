@@ -326,6 +326,9 @@ def main():
                 except Exception:
                     pass
 
+                # マグネット効果の更新
+                player.update_magnet_effect()
+
                 # 攻撃と敵の当たり判定
                 for attack in player.active_attacks[:]:
                     # spawn_delay によってまだ発生していない攻撃は無視する
@@ -441,8 +444,10 @@ def main():
                                 rand = random.random()
                                 if rand < HEAL_ITEM_DROP_RATE:
                                     items.append(GameItem(enemy.x, enemy.y, "heal"))
-                                elif rand < BOMB_ITEM_DROP_RATE:
+                                elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE:
                                     items.append(GameItem(enemy.x, enemy.y, "bomb"))
+                                elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE + MAGNET_ITEM_DROP_RATE:
+                                    items.append(GameItem(enemy.x, enemy.y, "magnet"))
                                 else:
                                     experience_gems.append(ExperienceGem(enemy.x, enemy.y))
                                     enforce_experience_gems_limit(experience_gems, player_x=player.x, player_y=player.y)
@@ -597,6 +602,9 @@ def main():
                                 # 各追加ごとに上限をチェックしてプレイヤーから遠いものを削除しつつ価値を集約
                                 enforce_experience_gems_limit(experience_gems, player_x=player.x, player_y=player.y)
                             enemies.clear()
+                        elif item.type == "magnet":
+                            # マグネット効果を有効化
+                            player.activate_magnet()
                         items.remove(item)
 
             # パーティクルの更新と描画

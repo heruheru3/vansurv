@@ -52,6 +52,10 @@ class Player:
         self.vx = 0.0
         self.vy = 0.0
 
+        # マグネット効果
+        self.magnet_active = False
+        self.magnet_end_time = 0
+
         # 見た目（オーブ + スプライト）
         orb_size = max(32, self.size * 3)
         self.orb_base = pygame.Surface((orb_size, orb_size), pygame.SRCALPHA)
@@ -683,3 +687,20 @@ class Player:
     def get_garlic_heal_amount(self):
         """ガーリック回復量を取得（固定値）"""
         return GARLIC_HEAL_AMOUNT  # 基本回復量: 1（HPサブアイテムの影響を受けない）
+
+    def activate_magnet(self):
+        """マグネット効果を有効化"""
+        current_time = pygame.time.get_ticks()
+        self.magnet_active = True
+        self.magnet_end_time = current_time + MAGNET_EFFECT_DURATION_MS
+
+    def update_magnet_effect(self):
+        """マグネット効果の状態を更新"""
+        if self.magnet_active:
+            current_time = pygame.time.get_ticks()
+            if current_time >= self.magnet_end_time:
+                self.magnet_active = False
+
+    def is_magnet_active(self):
+        """マグネット効果が有効かどうかを返す"""
+        return self.magnet_active

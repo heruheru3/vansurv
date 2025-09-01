@@ -75,8 +75,10 @@ def handle_enemy_death(enemy, enemies, experience_gems, items, particles, damage
         rand = random.random()
         if rand < HEAL_ITEM_DROP_RATE:
             items.append(GameItem(enemy.x, enemy.y, "heal"))
-        elif rand < BOMB_ITEM_DROP_RATE:
+        elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE:
             items.append(GameItem(enemy.x, enemy.y, "bomb"))
+        elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE + MAGNET_ITEM_DROP_RATE:
+            items.append(GameItem(enemy.x, enemy.y, "magnet"))
         else:
             experience_gems.append(ExperienceGem(enemy.x, enemy.y))
             enforce_experience_gems_limit(experience_gems, player_x=player_x, player_y=player_y)
@@ -169,5 +171,9 @@ def collect_items(player, items, enemies, experience_gems, particles):
                 # ボム効果
                 handle_bomb_item_effect(enemies, experience_gems, particles, 
                                       player.x, player.y)
+            
+            elif item.type == "magnet":
+                # マグネット効果を有効化
+                player.activate_magnet()
             
             items.remove(item)

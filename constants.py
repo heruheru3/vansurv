@@ -38,6 +38,7 @@ INVINCIBLE_MS = 200
 # アイテムドロップ確率設定
 HEAL_ITEM_DROP_RATE = 0.005    # 0.5%の確率で回復アイテム
 BOMB_ITEM_DROP_RATE = 0.002   # 0.2%の確率でボムアイテム（0.01 + 0.002）
+MAGNET_ITEM_DROP_RATE = 0.001  # 0.1%の確率でマグネットアイテム
 
 # パーティクル関連の制限（パフォーマンス改善用）
 PARTICLE_LIMIT = 300        # これ以上は古いパーティクルから切る
@@ -56,6 +57,10 @@ GARLIC_HEAL_AMOUNT = 1           # ガーリック回復時の基本回復量（
 
 # 回復アイテム設定
 HEAL_ITEM_AMOUNT = 0.20          # 回復アイテムの回復量（割合：0.20 = 20%）
+
+# マグネットアイテム設定
+MAGNET_EFFECT_DURATION_MS = 3000 # マグネット効果の持続時間（ミリ秒）
+MAGNET_FORCE_MULTIPLIER = 3.0    # マグネット効果時のジェム引き寄せ倍率
 
 # レベルアップ時の自動回復量
 LEVELUP_HEAL_AMOUNT = 20         # レベルアップ時の回復量
