@@ -119,7 +119,6 @@ class Player:
 
         # レベルアップ時の自動回復をオン/オフするフラグ（デフォルトは False: 自動回復しない）
         self.auto_heal_on_level_up = False
-
         # サブアイテムの初期化
         try:
             # テンプレート群（全候補）と、プレイヤーの所持サブアイテムを分ける
@@ -128,18 +127,19 @@ class Player:
             self.subitem_templates = {}
         # 実際にプレイヤーが所持しているサブアイテム（キー -> SubItem インスタンス）
         self.subitems = {}
-
-        # レベルアップ時の武器選択用（UI表示のための候補と状態）
+        # レベルアップ選択 UI 状態
         self.last_level_choices = []
-        self.awaiting_weapon_choice = False
-        # レベルアップ時のサブアイテム選択用状態
+        # サブアイテム選択 UI 状態
         self.last_subitem_choices = []
         self.awaiting_subitem_choice = False
+        # キーボード選択用の選択インデックス
+        self.selected_weapon_choice_index = 0
+        self.selected_subitem_choice_index = 0
 
-        # ゲーム開始時に武器選択の3択UIを表示する
         try:
             self.upgrade_weapons()
         except Exception:
+            pass
             pass
 
     def move(self, camera_x=0, camera_y=0):
@@ -471,8 +471,6 @@ class Player:
             self.hp = min(self.get_max_hp(), self.hp + 20)
 
         # 互換性のため、既存コードで武器アップグレードを行っていた場合の処理は
-        # upgrade_weapons() 内で候補作成のみを行っていてここでは追加処理を行わない
-
     def prepare_subitem_choices(self, count=1):
         """レベルアップ時にサブアイテム選択UI用の候補を準備する。
         count: 表示する候補数（通常は1だが拡張可能）
@@ -491,10 +489,12 @@ class Player:
             pool = list(dict.fromkeys(tmpl_keys + list(self.subitems.keys())))
 
         num = min(count, len(pool))
-        choices = random.sample(pool, num)
+        choices = random.sample(pool, num) if num > 0 else []
         self.last_subitem_choices = choices
         self.awaiting_subitem_choice = True
+        # キーボード選択インデックス初期化
         if DEBUG:
+            print(f"[DEBUG] Subitem choices prepared: {choices}")
             print(f"[DEBUG] Subitem choices prepared: {choices}")
 
     def apply_subitem_choice(self, chosen_key):
@@ -585,7 +585,6 @@ class Player:
 
         self.awaiting_subitem_choice = False
         self.last_subitem_choices = []
-
     def apply_level_choice(self, chosen):
         """UI から選択された候補を適用する。
         支持する形式:
@@ -602,10 +601,10 @@ class Player:
                     typ, key = parts[0], parts[1]
 
             if typ == 'weapon':
-                # 新規武器を取得する場合
+                # 新規武器を取得
                 if key in getattr(self, 'available_weapons', {}):
                     if len(self.weapons) >= MAX_WEAPONS:
-                        # 上限の場合はランダムな既存武器を強化
+                        # 上限なら既存武器をランダム強化
                         if self.weapons:
                             upgrade_target = random.choice(list(self.weapons.keys()))
                             weapon = self.weapons.get(upgrade_target)
@@ -618,6 +617,7 @@ class Player:
                         try:
                             self.weapons[key] = weapon_class()
                         except Exception:
+                            # 旧スタイルでクラスではなくインスタンスを持っている場合にも対応
                             try:
                                 self.weapons[key] = weapon_class
                             except Exception:
@@ -634,13 +634,12 @@ class Player:
                                 print(f"[DEBUG] Player upgraded weapon: {key}")
                         except Exception:
                             pass
-
             elif typ == 'sub':
-                # サブアイテムの取得/強化処理に委譲
+                # サブアイテムの取得/強化
                 try:
                     self.apply_subitem_choice(key)
                 except Exception:
-                    # フォールバックとして直接操作
+                    # フォールバック: 直接追加（新規のみ）
                     if key in getattr(self, 'subitem_templates', {}) and key not in self.subitems:
                         try:
                             tmpl = self.subitem_templates[key]
@@ -648,9 +647,7 @@ class Player:
                             self.subitems[key] = inst
                         except Exception:
                             pass
-
             else:
-                # 不明なタイプは無視
                 if DEBUG:
                     print(f"[DEBUG] Unknown choice type: {typ}")
         except Exception:
@@ -658,67 +655,43 @@ class Player:
         # UI 状態をクリア
         self.awaiting_weapon_choice = False
         self.last_level_choices = []
-
+        self.last_level_choices = []
     def upgrade_weapons(self, count=3):
-        """Prepare mixed choices (weapons and subitems) for level-up UI.
-        Choices are strings with a prefix to indicate type:
-          - 'weapon:<key>' for weapons
-          - 'sub:<key>' for subitems
-        This keeps UI and apply_level_choice compatible while allowing mixed pools.
+        """武器/サブアイテム混合のレベルアップ候補を用意して返す。
+        戻り値は 'weapon:<key>' / 'sub:<key>' 形式の文字列リスト。
+        UI はこのリストをそのまま描画し、apply_level_choice で解釈する。
         """
         try:
             pool = []
-            # If player can still acquire new weapons, include available ones
+            # 新規取得可能な武器
             if len(self.weapons) < MAX_WEAPONS and getattr(self, 'available_weapons', None):
                 for k in list(self.available_weapons.keys()):
-                    # 新規取得候補として available_weapons を出す。既に所持しているがレベル上限に達している武器は除外
-                    if k in self.weapons:
-                        try:
-                            if getattr(self.weapons[k], 'level', 1) >= MAX_WEAPON_LEVEL:
-                                continue
-                        except Exception:
-                            pass
                     pool.append(f"weapon:{k}")
-            # Include existing weapons as possible upgrade targets
-            for k in list(self.weapons.keys()):
-                # 所持武器がレベル上限に達している場合は候補から外す
+            # 所持武器の強化候補（上限に達しているものは除外）
+            for k, w in list(self.weapons.items()):
                 try:
-                    if getattr(self.weapons[k], 'level', 1) >= MAX_WEAPON_LEVEL:
+                    if int(getattr(w, 'level', 1)) >= MAX_WEAPON_LEVEL:
                         continue
                 except Exception:
                     pass
                 pool.append(f"weapon:{k}")
-            # Include subitem templates (new possible subitems)
+            # サブアイテム（新規）: 所持上限に達している場合は追加しない
             for k in list(getattr(self, 'subitem_templates', {}).keys()):
-                # 新規取得として追加するか判定:
-                # - 既に所持している場合は、レベル上限をチェックして候補にするか決定
-                # - 所持していない場合は、所持数が上限に達していれば新規候補としては追加しない
                 if k in self.subitems:
+                    # 既存のサブアイテムは上限に達していない場合のみ候補
                     try:
-                        if getattr(self.subitems[k], 'level', 0) >= MAX_SUBITEM_LEVEL:
-                            continue
+                        if int(getattr(self.subitems[k], 'level', 0)) < MAX_SUBITEM_LEVEL:
+                            pool.append(f"sub:{k}")
                     except Exception:
-                        pass
-                    pool.append(f"sub:{k}")
+                        pool.append(f"sub:{k}")
                 else:
                     try:
-                        if len(self.subitems) >= MAX_SUBITEMS:
-                            # 既にサブアイテム所持数が上限なら新規は追加しない
-                            continue
+                        if len(self.subitems) < MAX_SUBITEMS:
+                            pool.append(f"sub:{k}")
                     except Exception:
-                        pass
-                    pool.append(f"sub:{k}")
-            # Also include existing owned subitems as upgrade targets
-            for k in list(self.subitems.keys()):
-                # 所持サブアイテムがレベル上限に達している場合は候補から除外
-                try:
-                    if getattr(self.subitems[k], 'level', 0) >= MAX_SUBITEM_LEVEL:
-                        continue
-                except Exception:
-                    pass
-                pool.append(f"sub:{k}")
+                        pool.append(f"sub:{k}")
 
-            # Deduplicate while preserving order
+            # 重複を除去（順序維持）
             seen = set()
             uniq = []
             for k in pool:
@@ -733,15 +706,17 @@ class Player:
                 return []
 
             num = min(count, len(pool))
-            choices = random.sample(pool, num)
+            choices = random.sample(pool, num) if num > 0 else []
             self.last_level_choices = choices
             self.awaiting_weapon_choice = True
+            self.selected_weapon_choice_index = 0
             if DEBUG:
                 print(f"[DEBUG] Mixed level choices prepared: {choices}")
             return choices
         except Exception:
             self.last_level_choices = []
             self.awaiting_weapon_choice = False
+            return []
             return []
 
     # --- Subitem helpers ---

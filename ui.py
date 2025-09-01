@@ -602,15 +602,13 @@ def draw_background(screen, camera_x=0, camera_y=0):
     # ビネットなどの余計な効果はここでは付けない（シンプルに）
 
 def draw_level_choice(screen, player, icons):
-    """レベルアップ（または開始時）の3択オーバーレイを描画する関数。
-    main.py の描画ブロックをここに移動して再利用性を高めます。
-    icons: dict mapping weapon name -> Surface
-    """
+    """レベルアップ（または開始時）の3択オーバーレイを描画する。"""
     try:
-        if not getattr(player, 'last_level_choices', None):
+        choices = getattr(player, 'last_level_choices', None)
+        if not choices:
             return
 
-        # 説明文データを読み込む（存在しなければ空辞書）
+        # 説明データの読み込み
         try:
             data_path = os.path.join(os.path.dirname(__file__), 'data', 'descriptions.json')
             with open(data_path, 'r', encoding='utf-8') as f:
@@ -618,157 +616,110 @@ def draw_level_choice(screen, player, icons):
         except Exception:
             desc_data = {'weapons': {}, 'subitems': {}}
 
-        # 半透明の暗いオーバーレイ
+        # 背景オーバーレイ
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 140))
         screen.blit(overlay, (0, 0))
 
-        choices = player.last_level_choices
+        # パネル
         cw = min(880, SCREEN_WIDTH - 160)
         ch = 220
         cx = SCREEN_WIDTH // 2
         cy = SCREEN_HEIGHT // 2
-        panel_rect = pygame.Rect(cx - cw//2, cy - ch//2, cw, ch)
-
-        # ベースパネル
+        panel_rect = pygame.Rect(cx - cw // 2, cy - ch // 2, cw, ch)
         panel_surf = pygame.Surface((panel_rect.width, panel_rect.height), pygame.SRCALPHA)
         panel_surf.fill((18, 18, 20, 230))
-        # アクセントバー
         accent_h = 54
-        accent_color = (36, 200, 185, 230)
-        pygame.draw.rect(panel_surf, accent_color, (0, 0, panel_rect.width, accent_h), border_radius=12)
-        # 枠線
+        pygame.draw.rect(panel_surf, (36, 200, 185, 230), (0, 0, panel_rect.width, accent_h), border_radius=12)
         pygame.draw.rect(panel_surf, (10, 10, 10), (0, 0, panel_rect.width, panel_rect.height), 3, border_radius=12)
-
-        # 光彩（簡易）
-        pygame.draw.line(panel_surf, (255,255,255,28), (12, accent_h-8), (panel_rect.width-12, accent_h-8), 2)
+        pygame.draw.line(panel_surf, (255, 255, 255, 28), (12, accent_h - 8), (panel_rect.width - 12, accent_h - 8), 2)
         screen.blit(panel_surf, panel_rect.topleft)
 
-        # タイトル
         title_font = get_font(24)
         middle_font = get_font(18)
         small_font = get_font(14)
-        title_bg = title_font.render('Choose Your Reward', True, WHITE)
-        screen.blit(title_bg, (panel_rect.x + 24, panel_rect.y + 10))
+        screen.blit(title_font.render('Choose Your Reward', True, WHITE), (panel_rect.x + 24, panel_rect.y + 10))
 
-        # 各選択肢を描画
         option_w = (cw - 40) // max(1, len(choices))
         option_h = ch - 78
         mouse_x, mouse_y = pygame.mouse.get_pos()
-        for i, choice in enumerate(choices):
-            # choice may be prefixed like 'weapon:magic_wand' or 'sub:hp'
-            typ = 'weapon'
-            key = choice
-            if isinstance(choice, str) and ':' in choice:
-                parts = choice.split(':', 1)
+
+        for i, raw in enumerate(choices):
+            typ, key = ('weapon', raw)
+            if isinstance(raw, str) and ':' in raw:
+                parts = raw.split(':', 1)
                 if len(parts) == 2:
                     typ, key = parts[0], parts[1]
 
-            ox = panel_rect.x + 20 + i * option_w
-            oy = panel_rect.y + accent_h + 12
-            rect = pygame.Rect(ox, oy, option_w - 8, option_h)
+            rect = pygame.Rect(panel_rect.x + 20 + i * option_w, panel_rect.y + accent_h + 12, option_w - 8, option_h)
+            pygame.draw.rect(screen, (28, 28, 30), rect, border_radius=10)
 
-            # 背景
-            pygame.draw.rect(screen, (28,28,30), rect, border_radius=10)
-
-            # ホバー時の強調
-            if rect.collidepoint((mouse_x, mouse_y)):
+            # 強調
+            is_selected = (i == getattr(player, 'selected_weapon_choice_index', -1))
+            if is_selected or rect.collidepoint((mouse_x, mouse_y)):
                 hl = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-                hl.fill((50, 230, 200, 28))
+                hl.fill((50, 230, 200, 48) if is_selected else (50, 230, 200, 28))
                 screen.blit(hl, rect.topleft)
-                pygame.draw.rect(screen, (36,200,185), rect, 3, border_radius=10)
+                pygame.draw.rect(screen, (36, 200, 185), rect, 4 if is_selected else 3, border_radius=10)
             else:
-                pygame.draw.rect(screen, (60,60,60), rect, 2, border_radius=10)
+                pygame.draw.rect(screen, (60, 60, 60), rect, 2, border_radius=10)
 
-            # タイプバッジを左下に表示（武器 / サブ）
+            # バッジ
             try:
-                if typ == 'weapon':
-                    badge_label = 'WEAPON'
-                    badge_bg = (255,160,60)
-                else:
-                    badge_label = 'SUB'
-                    badge_bg = (80,200,140)
-                text_color = (0,0,0)
-                try:
-                    badge_surf = small_font.render(badge_label, True, text_color)
-                except Exception:
-                    badge_surf = get_font(12).render(badge_label, True, text_color)
-                padding_x = 10
-                padding_y = 6
-                bw = badge_surf.get_width() + padding_x
-                bh = badge_surf.get_height() + padding_y
-                max_bw = max(44, rect.width - 16)
-                if bw > max_bw:
-                    bw = max_bw
-                bh = max(bh, 16)
+                badge_label = 'WEAPON' if typ == 'weapon' else 'SUB'
+                badge_bg = (255, 160, 60) if typ == 'weapon' else (80, 200, 140)
+                badge_surf = small_font.render(badge_label, True, (0, 0, 0))
+                bw = badge_surf.get_width() + 10
+                bh = badge_surf.get_height() + 6
                 bx = rect.x + 8
                 by = rect.bottom - bh - 8
                 pygame.draw.rect(screen, badge_bg, (bx, by, bw, bh), border_radius=6)
-                tx = bx + max(4, (bw - badge_surf.get_width()) // 2)
-                ty = by + max(1, (bh - badge_surf.get_height()) // 2)
-                screen.blit(badge_surf, (tx, ty))
+                screen.blit(badge_surf, (bx + (bw - badge_surf.get_width()) // 2, by + (bh - badge_surf.get_height()) // 2))
             except Exception:
                 pass
 
-            # アイコン表示
-            icon_x = rect.x + 12
-            icon_y = rect.y + 12
-            icon_size = 32
+            # アイコン
+            icon_x, icon_y, icon_size = rect.x + 12, rect.y + 12, 32
             icon_surf = None
             try:
                 if icons and isinstance(icons, dict):
                     icon_surf = icons.get(key)
             except Exception:
                 icon_surf = None
-
             if icon_surf:
                 try:
-                    icon_draw = pygame.transform.scale(icon_surf, (icon_size, icon_size))
-                    screen.blit(icon_draw, (icon_x, icon_y))
+                    screen.blit(pygame.transform.scale(icon_surf, (icon_size, icon_size)), (icon_x, icon_y))
                 except Exception:
-                    pygame.draw.circle(screen, (120,120,120), (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2)
-                    pygame.draw.circle(screen, BLACK, (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2, 2)
+                    pygame.draw.rect(screen, (120, 120, 120), (icon_x, icon_y, icon_size, icon_size))
             else:
                 if typ == 'sub':
-                    pygame.draw.circle(screen, (120,200,140), (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2)
-                    pygame.draw.circle(screen, BLACK, (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2, 2)
+                    pygame.draw.circle(screen, (120, 200, 140), (icon_x + icon_size // 2, icon_y + icon_size // 2), icon_size // 2)
+                    pygame.draw.circle(screen, BLACK, (icon_x + icon_size // 2, icon_y + icon_size // 2), icon_size // 2, 2)
                 else:
-                    pygame.draw.rect(screen, (120,120,120), (icon_x, icon_y, icon_size, icon_size))
+                    pygame.draw.rect(screen, (120, 120, 120), (icon_x, icon_y, icon_size, icon_size))
 
-            # 名前と説明
+            # テキスト
             name = key.replace('_', ' ').title()
-            lbl = title_font.render(name, True, WHITE)
-            screen.blit(lbl, (rect.x + 16 + 32, rect.y + 8))
-            long_desc = ''
+            screen.blit(title_font.render(name, True, WHITE), (rect.x + 16 + 32, rect.y + 8))
             try:
-                if typ == 'weapon':
-                    long_desc = desc_data.get('weapons', {}).get(key, '')
-                else:
-                    long_desc = desc_data.get('subitems', {}).get(key, '')
+                long_desc = (desc_data['weapons' if typ == 'weapon' else 'subitems']).get(key, '')
             except Exception:
                 long_desc = ''
-
-            desc_x = rect.x + 16 + 32
-            desc_y = rect.y + 44
-            desc_w = rect.width - (16 + 32 + 24)
+            desc_x, desc_y, desc_w = rect.x + 16 + 32, rect.y + 44, rect.width - (16 + 32 + 24)
             if long_desc:
-                lines = render_wrapped_jp(long_desc, small_font, (200,200,200), desc_w, max_lines=4)
-                for li, surf in enumerate(lines):
-                    screen.blit(surf, (desc_x, desc_y + li * (small_font.get_height()-3)))
+                for li, surf in enumerate(render_wrapped_jp(long_desc, small_font, (200, 200, 200), desc_w, max_lines=4)):
+                    screen.blit(surf, (desc_x, desc_y + li * (small_font.get_height() - 3)))
             else:
                 if typ == 'weapon':
                     desc = 'New Weapon' if key in getattr(player, 'available_weapons', {}) else 'Upgrade'
                 else:
-                    tmpl = player.subitem_templates.get(key)
-                    if tmpl is not None:
-                        desc = f"+{tmpl.per_level}{('%' if getattr(tmpl, 'is_percent', False) else '')} per level"
-                    else:
-                        desc = 'Subitem'
-                dsurf = small_font.render(desc, True, (200,200,200))
-                screen.blit(dsurf, (desc_x, desc_y))
+                    tmpl = getattr(player, 'subitem_templates', {}).get(key)
+                    desc = f"+{tmpl.per_level}{('%' if getattr(tmpl, 'is_percent', False) else '')} per level" if tmpl else 'Subitem'
+                screen.blit(small_font.render(desc, True, (200, 200, 200)), (desc_x, desc_y))
 
+            # 右上のレベル/NEW表示
             if typ == 'weapon':
-                # トップ右に統一表示: 未取得→NEW、取得済み→Lv または MAX
+                w = None
                 try:
                     w = player.weapons.get(key)
                 except Exception:
@@ -779,50 +730,32 @@ def draw_level_choice(screen, player, icons):
                     except Exception:
                         lvl_val = 1
                     if lvl_val >= MAX_WEAPON_LEVEL:
-                        # MAX バッジ（赤）
                         try:
-                            b_surf = small_font.render('MAX', True, WHITE)
-                            bw = b_surf.get_width() + 8
-                            bh = b_surf.get_height() + 4
-                            bx = rect.x + rect.width - bw - 12
-                            by = rect.y + 10
-                            pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
-                            screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
+                            b = small_font.render('MAX', True, WHITE)
+                            bw, bh = b.get_width() + 8, b.get_height() + 4
+                            bx, by = rect.x + rect.width - bw - 12, rect.y + 10
+                            pygame.draw.rect(screen, (200, 60, 60), (bx, by, bw, bh), border_radius=4)
+                            screen.blit(b, (bx + (bw - b.get_width()) // 2, by + (bh - b.get_height()) // 2))
                         except Exception:
                             pass
                     else:
-                        # 次レベルを表示（シアン）
                         try:
-                            level_s = middle_font.render(f"Lv.{lvl_val + 1}", True, (50,220,220))
-                            tx = rect.x + rect.width - level_s.get_width() - 12
-                            ty = rect.y + 12
-                            screen.blit(level_s, (tx, ty))
+                            level_s = middle_font.render(f"Lv.{lvl_val + 1}", True, (50, 220, 220))
+                            screen.blit(level_s, (rect.x + rect.width - level_s.get_width() - 12, rect.y + 12))
                         except Exception:
                             pass
                 else:
-                    # 未取得 → NEW バッジ（黄）
                     try:
                         if key in getattr(player, 'available_weapons', {}):
-                            b_surf = small_font.render('NEW', True, (8,8,8))
-                            padding_x = 10
-                            padding_y = 6
-                            bw = b_surf.get_width() + padding_x
-                            bh = b_surf.get_height() + padding_y
-                            max_bw = max(44, rect.width - 24)
-                            if bw > max_bw:
-                                bw = max_bw
-                            bh = max(bh, 18)
-                            bx = rect.x + rect.width - bw - 12
-                            bx = max(rect.x + 8, bx)
+                            b = small_font.render('NEW', True, (8, 8, 8))
+                            bw, bh = b.get_width() + 10, b.get_height() + 6
+                            bx = max(rect.x + 8, rect.x + rect.width - bw - 12)
                             by = rect.y + 10
-                            pygame.draw.rect(screen, (255,200,60), (bx, by, bw, bh), border_radius=6)
-                            tx = bx + max(4, (bw - b_surf.get_width()) // 2)
-                            ty = by + max(1, (bh - b_surf.get_height()) // 2)
-                            screen.blit(b_surf, (tx, ty))
+                            pygame.draw.rect(screen, (255, 200, 60), (bx, by, bw, bh), border_radius=6)
+                            screen.blit(b, (bx + (bw - b.get_width()) // 2, by + (bh - b.get_height()) // 2))
                     except Exception:
                         pass
             else:
-                # サブアイテムも同様にトップ右に統一表示
                 owned = key in getattr(player, 'subitems', {})
                 if owned:
                     try:
@@ -831,46 +764,30 @@ def draw_level_choice(screen, player, icons):
                         lvl = 1
                     if lvl >= MAX_SUBITEM_LEVEL:
                         try:
-                            b_surf = small_font.render('MAX', True, WHITE)
-                            bw = b_surf.get_width() + 8
-                            bh = b_surf.get_height() + 4
-                            bx = rect.x + rect.width - bw - 12
-                            by = rect.y + 10
-                            pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
-                            screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
+                            b = small_font.render('MAX', True, WHITE)
+                            bw, bh = b.get_width() + 8, b.get_height() + 4
+                            bx, by = rect.x + rect.width - bw - 12, rect.y + 10
+                            pygame.draw.rect(screen, (200, 60, 60), (bx, by, bw, bh), border_radius=4)
+                            screen.blit(b, (bx + (bw - b.get_width()) // 2, by + (bh - b.get_height()) // 2))
                         except Exception:
                             pass
                     else:
                         try:
-                            level_s = middle_font.render(f"Lv {lvl + 1}", True, (50,220,220))
-                            tx = rect.x + rect.width - level_s.get_width() - 12
-                            ty = rect.y + 12
-                            screen.blit(level_s, (tx, ty))
+                            level_s = middle_font.render(f"Lv {lvl + 1}", True, (50, 220, 220))
+                            screen.blit(level_s, (rect.x + rect.width - level_s.get_width() - 12, rect.y + 12))
                         except Exception:
                             pass
                 else:
-                    # 未取得 → NEW バッジ
                     try:
-                        b_surf = small_font.render('NEW', True, (8,8,8))
-                        padding_x = 10
-                        padding_y = 6
-                        bw = b_surf.get_width() + padding_x
-                        bh = b_surf.get_height() + padding_y
-                        max_bw = max(44, rect.width - 24)
-                        if bw > max_bw:
-                            bw = max_bw
-                        bh = max(bh, 18)
-                        bx = rect.x + rect.width - bw - 12
-                        bx = max(rect.x + 8, bx)
+                        b = small_font.render('NEW', True, (8, 8, 8))
+                        bw, bh = b.get_width() + 10, b.get_height() + 6
+                        bx = max(rect.x + 8, rect.x + rect.width - bw - 12)
                         by = rect.y + 10
-                        pygame.draw.rect(screen, (255,200,60), (bx, by, bw, bh), border_radius=6)
-                        tx = bx + max(4, (bw - b_surf.get_width()) // 2)
-                        ty = by + max(1, (bh - b_surf.get_height()) // 2)
-                        screen.blit(b_surf, (tx, ty))
+                        pygame.draw.rect(screen, (255, 200, 60), (bx, by, bw, bh), border_radius=6)
+                        screen.blit(b, (bx + (bw - b.get_width()) // 2, by + (bh - b.get_height()) // 2))
                     except Exception:
                         pass
     except Exception:
-        # レンダリング中の例外は無視して描画を中断
         pass
 
 def get_end_button_rects():
@@ -929,27 +846,25 @@ def draw_end_buttons(screen, is_game_over, is_game_clear):
     return rects
 
 def draw_subitem_choice(screen, player, icons=None):
-    """サブアイテム選択 UI を描画する。player.last_subitem_choices を参照する。
-    icons はオプションで渡すとサブアイテムアイコンが表示される。
-    """
+    """サブアイテム選択 UI を描画する。player.last_subitem_choices を参照。"""
     try:
-        if not getattr(player, 'last_subitem_choices', None):
+        choices = getattr(player, 'last_subitem_choices', None)
+        if not choices:
             return
 
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0,0,0,200))
-        screen.blit(overlay, (0,0))
+        overlay.fill((0, 0, 0, 200))
+        screen.blit(overlay, (0, 0))
 
-        choices = player.last_subitem_choices
         cw = min(700, SCREEN_WIDTH - 200)
         ch = 180
         cx = SCREEN_WIDTH // 2
         cy = SCREEN_HEIGHT // 2
-        panel_rect = pygame.Rect(cx - cw//2, cy - ch//2, cw, ch)
+        panel_rect = pygame.Rect(cx - cw // 2, cy - ch // 2, cw, ch)
 
         panel = pygame.Surface((panel_rect.width, panel_rect.height), pygame.SRCALPHA)
-        panel.fill((22,22,26,230))
-        pygame.draw.rect(panel, (12,12,12), (0,0,panel_rect.width, panel_rect.height), 3, border_radius=10)
+        panel.fill((22, 22, 26, 230))
+        pygame.draw.rect(panel, (12, 12, 12), (0, 0, panel_rect.width, panel_rect.height), 3, border_radius=10)
         screen.blit(panel, panel_rect.topleft)
 
         title_font = get_font(22)
@@ -959,63 +874,51 @@ def draw_subitem_choice(screen, player, icons=None):
         option_w = (cw - 40) // max(1, len(choices))
         option_h = ch - 60
         mx, my = pygame.mouse.get_pos()
+
         for i, key in enumerate(choices):
-            ox = panel_rect.x + 20 + i * option_w
-            oy = panel_rect.y + 48
-            rect = pygame.Rect(ox, oy, option_w - 8, option_h)
-            pygame.draw.rect(screen, (30,30,34), rect, border_radius=8)
+            rect = pygame.Rect(panel_rect.x + 20 + i * option_w, panel_rect.y + 48, option_w - 8, option_h)
+            pygame.draw.rect(screen, (30, 30, 34), rect, border_radius=8)
 
-            if rect.collidepoint((mx,my)):
+            is_selected = (i == getattr(player, 'selected_subitem_choice_index', -1))
+            if is_selected or rect.collidepoint((mx, my)):
                 hl = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-                hl.fill((80,200,120,28))
+                hl.fill((80, 200, 120, 48) if is_selected else (80, 200, 120, 28))
                 screen.blit(hl, rect.topleft)
-                pygame.draw.rect(screen, (80,200,120), rect, 3, border_radius=8)
+                pygame.draw.rect(screen, (80, 200, 120), rect, 4 if is_selected else 3, border_radius=8)
             else:
-                pygame.draw.rect(screen, (60,60,60), rect, 2, border_radius=8)
+                pygame.draw.rect(screen, (60, 60, 60), rect, 2, border_radius=8)
 
-            # タイプバッジを左下に表示
+            # バッジ
             try:
                 badge_w, badge_h = 56, 18
                 badge_x = rect.x + 8
                 badge_y = rect.bottom - badge_h - 8
-                badge_color = (80,200,140)
-                badge_label = 'SUB'
-                text_color = (0,0,0)
-                pygame.draw.rect(screen, badge_color, (badge_x, badge_y, badge_w, badge_h), border_radius=6)
-                try:
-                    blt = small.render(badge_label, True, text_color)
-                    bx = badge_x + (badge_w - blt.get_width()) // 2
-                    by = badge_y + (badge_h - blt.get_height()) // 2
-                    screen.blit(blt, (bx, by))
-                except Exception:
-                    pass
+                pygame.draw.rect(screen, (80, 200, 140), (badge_x, badge_y, badge_w, badge_h), border_radius=6)
+                blt = small.render('SUB', True, (0, 0, 0))
+                screen.blit(blt, (badge_x + (badge_w - blt.get_width()) // 2, badge_y + (badge_h - blt.get_height()) // 2))
             except Exception:
                 pass
 
-            # アイコン表示
+            # アイコン
             try:
                 icon_size = 28
                 icon_x = rect.x + 12
                 icon_y = rect.y + 12
-                icon_surf = None
-                if icons and isinstance(icons, dict):
-                    icon_surf = icons.get(key)
+                icon_surf = icons.get(key) if (icons and isinstance(icons, dict)) else None
                 if icon_surf:
                     try:
-                        icon_draw = pygame.transform.scale(icon_surf, (icon_size, icon_size))
-                        screen.blit(icon_draw, (icon_x, icon_y))
+                        screen.blit(pygame.transform.scale(icon_surf, (icon_size, icon_size)), (icon_x, icon_y))
                     except Exception:
-                        pygame.draw.circle(screen, (120,120,120), (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2)
-                        pygame.draw.circle(screen, BLACK, (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2, 2)
+                        pygame.draw.circle(screen, (120, 120, 120), (icon_x + icon_size // 2, icon_y + icon_size // 2), icon_size // 2)
+                        pygame.draw.circle(screen, BLACK, (icon_x + icon_size // 2, icon_y + icon_size // 2), icon_size // 2, 2)
                 else:
-                    pygame.draw.circle(screen, (120,200,140), (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2)
-                    pygame.draw.circle(screen, BLACK, (icon_x + icon_size//2, icon_y + icon_size//2), icon_size//2, 2)
+                    pygame.draw.circle(screen, (120, 200, 140), (icon_x + icon_size // 2, icon_y + icon_size // 2), icon_size // 2)
+                    pygame.draw.circle(screen, BLACK, (icon_x + icon_size // 2, icon_y + icon_size // 2), icon_size // 2, 2)
             except Exception:
                 pass
 
-            name = key.replace('_',' ').title()
-            screen.blit(title_font.render(name, True, WHITE), (rect.x + 12 + 36, rect.y + 8))
-
+            # テキスト
+            screen.blit(title_font.render(key.replace('_', ' ').title(), True, WHITE), (rect.x + 12 + 36, rect.y + 8))
             try:
                 data_path = os.path.join(os.path.dirname(__file__), 'data', 'descriptions.json')
                 with open(data_path, 'r', encoding='utf-8') as f:
@@ -1024,33 +927,25 @@ def draw_subitem_choice(screen, player, icons=None):
                 sub_desc_data = {}
             long_desc = sub_desc_data.get(key, None)
             if long_desc:
-                desc_x = rect.x + 12 + 36
-                desc_y = rect.y + 40
-                desc_w = rect.width - (12 + 36 + 20)
-                lines = render_wrapped_jp(long_desc, small, (200,200,200), desc_w, max_lines=3)
+                desc_x, desc_y, desc_w = rect.x + 12 + 36, rect.y + 40, rect.width - (12 + 36 + 20)
+                lines = render_wrapped_jp(long_desc, small, (200, 200, 200), desc_w, max_lines=3)
                 for li, surf in enumerate(lines):
                     screen.blit(surf, (desc_x, desc_y + li * (small.get_height() - 3)))
             else:
-                tmpl = player.subitem_templates.get(key)
-                if tmpl is not None:
-                    desc = f"+{tmpl.per_level}{('%' if tmpl.is_percent else '')} per level"
-                else:
-                    desc = ''
-                screen.blit(small.render(desc, True, (200,200,200)), (rect.x + 12 + 36, rect.y + 40))
+                tmpl = getattr(player, 'subitem_templates', {}).get(key)
+                desc = f"+{tmpl.per_level}{('%' if getattr(tmpl, 'is_percent', False) else '')} per level" if tmpl else ''
+                screen.blit(small.render(desc, True, (200, 200, 200)), (rect.x + 12 + 36, rect.y + 40))
 
-            if key in player.subitems:
-                lvl = player.subitems[key].level
-                screen.blit(small.render(f"Lv {lvl}", True, (220,220,220)), (rect.x + 12 + 36, rect.y + 64))
+            if key in getattr(player, 'subitems', {}):
+                lvl = getattr(player.subitems.get(key), 'level', 1)
+                screen.blit(small.render(f"Lv {lvl}", True, (220, 220, 220)), (rect.x + 12 + 36, rect.y + 64))
                 try:
                     if lvl >= MAX_SUBITEM_LEVEL:
-                        badge_text = 'MAX'
-                        b_surf = small.render(badge_text, True, WHITE)
-                        bw = b_surf.get_width() + 8
-                        bh = b_surf.get_height() + 4
-                        bx = rect.x + 12 + 36
-                        by = rect.y + 64
-                        pygame.draw.rect(screen, (200,60,60), (bx, by, bw, bh), border_radius=4)
-                        screen.blit(b_surf, (bx + (bw - b_surf.get_width())//2, by + (bh - b_surf.get_height())//2))
+                        b_surf = small.render('MAX', True, WHITE)
+                        bw, bh = b_surf.get_width() + 8, b_surf.get_height() + 4
+                        bx, by = rect.x + 12 + 36, rect.y + 64
+                        pygame.draw.rect(screen, (200, 60, 60), (bx, by, bw, bh), border_radius=4)
+                        screen.blit(b_surf, (bx + (bw - b_surf.get_width()) // 2, by + (bh - b_surf.get_height()) // 2))
                 except Exception:
                     pass
     except Exception:

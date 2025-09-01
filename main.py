@@ -35,6 +35,10 @@ def init_game(screen):
             sampled = random.sample(pool, num)
             player.last_level_choices = [f"weapon:{k}" for k in sampled]
             player.awaiting_weapon_choice = True
+            try:
+                player.selected_weapon_choice_index = 0
+            except Exception:
+                pass
         else:
             # 万が一 available_weapons が空なら従来の混合候補生成を試みる
             try:
@@ -177,7 +181,64 @@ def main():
                         continue
 
                     # 武器/サブアイテム選択のキー処理は下側の統合ブロックで処理する
-                    # （ここでは何もしない）
+                    # （ここで処理: 1押下=1移動に変更）
+                    try:
+                        if getattr(player, 'awaiting_weapon_choice', False) and getattr(player, 'last_level_choices', None):
+                            n = len(player.last_level_choices)
+                            if n > 0:
+                                if event.key in (pygame.K_LEFT, pygame.K_a):
+                                    player.selected_weapon_choice_index = (player.selected_weapon_choice_index - 1) % n
+                                    try:
+                                        particles.append(DeathParticle(player.x, player.y, CYAN))
+                                    except Exception:
+                                        pass
+                                    continue
+                                elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                    player.selected_weapon_choice_index = (player.selected_weapon_choice_index + 1) % n
+                                    try:
+                                        particles.append(DeathParticle(player.x, player.y, CYAN))
+                                    except Exception:
+                                        pass
+                                    continue
+                                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                    idx = max(0, min(player.selected_weapon_choice_index, n - 1))
+                                    choice = player.last_level_choices[idx]
+                                    player.apply_level_choice(choice)
+                                    try:
+                                        for _ in range(8):
+                                            particles.append(DeathParticle(player.x, player.y, CYAN))
+                                    except Exception:
+                                        pass
+                                    continue
+                        elif getattr(player, 'awaiting_subitem_choice', False) and getattr(player, 'last_subitem_choices', None):
+                            n = len(player.last_subitem_choices)
+                            if n > 0:
+                                if event.key in (pygame.K_LEFT, pygame.K_a):
+                                    player.selected_subitem_choice_index = (player.selected_subitem_choice_index - 1) % n
+                                    try:
+                                        particles.append(DeathParticle(player.x, player.y, CYAN))
+                                    except Exception:
+                                        pass
+                                    continue
+                                elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                    player.selected_subitem_choice_index = (player.selected_subitem_choice_index + 1) % n
+                                    try:
+                                        particles.append(DeathParticle(player.x, player.y, CYAN))
+                                    except Exception:
+                                        pass
+                                    continue
+                                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                    idx = max(0, min(player.selected_subitem_choice_index, n - 1))
+                                    key = player.last_subitem_choices[idx]
+                                    player.apply_subitem_choice(key)
+                                    try:
+                                        for _ in range(8):
+                                            particles.append(DeathParticle(player.x, player.y, CYAN))
+                                    except Exception:
+                                        pass
+                                    continue
+                    except Exception:
+                        pass
 
                     if event.key == pygame.K_RETURN and (game_over or game_clear):
                         # ゲームクリア後は（規定時間生存）プレイヤー状態を保持して続行する
@@ -288,6 +349,8 @@ def main():
                                 continue
                         except Exception:
                             pass
+
+            # キーボードでのレベルアップ選択処理は KEYDOWN イベントで単発処理に変更済み
 
             # ループ冒頭でプレイヤー位置からターゲットカメラを算出（まだスムーズは適用しない）
             target_cam_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, int(player.x - SCREEN_WIDTH // 2)))
