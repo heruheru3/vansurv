@@ -144,6 +144,12 @@ class Enemy:
         # 生存時間管理
         self.spawn_time = pygame.time.get_ticks()  # 生成時刻
         
+        # 歩行アニメーション用変数
+        self.animation_time = 0.0  # アニメーション用タイマー
+        self.is_moving = False     # 移動しているかどうか
+        self.last_x = self.x if hasattr(self, 'x') else 0
+        self.last_y = self.y if hasattr(self, 'y') else 0
+        
         # 敵のタイプに応じてステータスを設定
         self.setup_enemy_stats()
         
@@ -400,6 +406,19 @@ class Enemy:
         # 前回の位置を記録
         self._prev_x = self.x
         self._prev_y = self.y
+        
+        # 歩行アニメーション更新
+        # 移動しているかどうかを判定
+        movement_distance = math.hypot(self.x - self.last_x, self.y - self.last_y)
+        self.is_moving = movement_distance > 0.1  # 微小な移動は無視
+        
+        # アニメーション時間の更新
+        if self.is_moving:
+            self.animation_time += 1.0 / 60.0  # 60FPS想定でタイマー更新
+        
+        # 現在位置を記録（次フレームの比較用）
+        self.last_x = self.x
+        self.last_y = self.y
 
         # ヒットフラッシュのタイマを減算（フレーム毎に呼ばれることを想定、60FPS基準）
         if self.hit_flash_timer > 0.0:
@@ -420,9 +439,82 @@ class Enemy:
                 # 画像のサイズを取得（レベルに応じて変化）
                 image_size = self.images.get('size', 32)
                 
-                # 画像の中心位置を計算
-                image_x = sx - image_size // 2
-                image_y = sy - image_size // 2
+                # 歩行アニメーション効果を計算
+                foot_offset_y = 0
+                
+                if (self.is_moving and ENABLE_ENEMY_WALK_ANIMATION and 
+                    ENEMY_WALK_BOB_AMPLITUDE > 0):  # アニメーションが有効な場合のみ
+                    # 足部分の上下振動（1ピクセル上下）
+                    foot_raw = math.sin(self.animation_time * ENEMY_WALK_BOB_SPEED)
+                    foot_offset_y = 1 if foot_raw > 0 else -1
+                
+                # 画像の基本位置を計算（スウェイなし、固定位置）
+                base_x = sx - image_size // 2
+                base_y = sy - image_size // 2
+                
+                # 使用する画像を決定
+                current_image = image
+                
+                # アニメーションが無効または足が動かない場合は通常描画
+                if (not ENABLE_ENEMY_WALK_ANIMATION or not self.is_moving or 
+                    ENEMY_WALK_BOB_AMPLITUDE <= 0 or foot_offset_y == 0):
+                    # 通常の1回描画（最適化）
+                    if self.hit_flash_timer > 0.0:
+                        # フラッシュ効果
+                        elapsed = self.hit_flash_duration - self.hit_flash_timer
+                        half = self.hit_flash_duration / 2.0
+                        if elapsed < half:
+                            alpha = int(255 * (elapsed / half))
+                        else:
+                            alpha = int(255 * ((self.hit_flash_duration - elapsed) / half))
+                        
+                        flashed_image = current_image.copy()
+                        white_surface = pygame.Surface((image_size, image_size), pygame.SRCALPHA)
+                        white_surface.fill((255, 255, 255, alpha))
+                        flashed_image.blit(white_surface, (0, 0), special_flags=pygame.BLEND_ADD)
+                        screen.blit(flashed_image, (base_x, base_y))
+                    else:
+                        # 通常描画
+                        screen.blit(current_image, (base_x, base_y))
+                    return  # 早期リターンで以下の処理をスキップ
+                
+                # 以下はアニメーション有効時のみ実行
+                # 元画像のサイズ（32, 36, 40, 44, 48のいずれか）
+                original_size = 32  # 基準サイズ
+                scale_factor = image_size / original_size
+                
+                # 足部分の領域を計算（向きに応じて左右反転）
+                if self.facing_right:
+                    # 右向き時：左下部分を動かす（反転画像では右足に見える）
+                    foot_start_x = int(0 * scale_factor)   # 画像の左端から
+                    foot_end_x = int(16 * scale_factor)    # 画像の左半分まで
+                else:
+                    # 左向き時：右下部分を動かす（反転画像では左足に見える）
+                    foot_start_x = int(16 * scale_factor)  # 画像の右半分から
+                    foot_end_x = int(32 * scale_factor)    # 画像の右端まで
+                
+                foot_start_y = int(16 * scale_factor)  # 画像の下半分から  
+                foot_end_y = int(32 * scale_factor)    # 画像の下端まで
+                foot_width = foot_end_x - foot_start_x
+                foot_height = foot_end_y - foot_start_y
+                
+                # 足部分以外の領域（メイン画像）
+                main_surface = current_image.copy()
+                
+                # 足部分を抜き出し
+                foot_rect = pygame.Rect(foot_start_x, foot_start_y, foot_width, foot_height)
+                foot_surface = current_image.subsurface(foot_rect)
+                
+                # 足部分をメイン画像から透明にする（足が二重に描画されないように）
+                transparent_rect = pygame.Surface((foot_width, foot_height), pygame.SRCALPHA)
+                transparent_rect.fill((0, 0, 0, 0))  # 完全透明
+                main_surface.blit(transparent_rect, (foot_start_x, foot_start_y))
+                
+                # 描画位置を計算
+                main_x = base_x
+                main_y = base_y
+                foot_x = base_x + foot_start_x
+                foot_y = base_y + foot_start_y + int(foot_offset_y)
                 
                 # ヒット時のフラッシュ効果
                 if self.hit_flash_timer > 0.0:
@@ -435,19 +527,23 @@ class Enemy:
                         # フェードアウト
                         alpha = int(255 * ((self.hit_flash_duration - elapsed) / half))
                     
-                    # 画像をコピーしてフラッシュエフェクトを作成
-                    flashed_image = image.copy()
+                    # メイン画像のフラッシュ効果
+                    flashed_main = main_surface.copy()
+                    white_surface_main = pygame.Surface((image_size, image_size), pygame.SRCALPHA)
+                    white_surface_main.fill((255, 255, 255, alpha))
+                    flashed_main.blit(white_surface_main, (0, 0), special_flags=pygame.BLEND_ADD)
+                    screen.blit(flashed_main, (main_x, main_y))
                     
-                    # 画像全体を白く光らせる（透明部分はそのまま）
-                    white_surface = pygame.Surface((image_size, image_size), pygame.SRCALPHA)
-                    white_surface.fill((255, 255, 255, alpha))
-                    flashed_image.blit(white_surface, (0, 0), special_flags=pygame.BLEND_ADD)
-                    
-                    # フラッシュした画像を描画
-                    screen.blit(flashed_image, (image_x, image_y))
+                    # 足部分のフラッシュ効果
+                    flashed_foot = foot_surface.copy()
+                    white_surface_foot = pygame.Surface((foot_width, foot_height), pygame.SRCALPHA)
+                    white_surface_foot.fill((255, 255, 255, alpha))
+                    flashed_foot.blit(white_surface_foot, (0, 0), special_flags=pygame.BLEND_ADD)
+                    screen.blit(flashed_foot, (foot_x, foot_y))
                 else:
-                    # 通常描画
-                    screen.blit(image, (image_x, image_y))
+                    # 通常描画（メイン画像 + 足部分）
+                    screen.blit(main_surface, (main_x, main_y))
+                    screen.blit(foot_surface, (foot_x, foot_y))
         else:
             # 画像がない場合は従来の円描画
             self._draw_circle(screen, sx, sy)

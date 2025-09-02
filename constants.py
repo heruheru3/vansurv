@@ -87,3 +87,15 @@ LEVELUP_HEAL_AMOUNT = 0        # レベルアップ時の回復量
 ENEMY_IMAGE_HUE_SHIFT = 0.0      # エネミー画像の色相シフト（-1.0～1.0、0.0 = 変更なし）
 ENEMY_IMAGE_SATURATION = 0.6     # エネミー画像の彩度（1.0 = 通常、0.8 = 80%）
 ENEMY_IMAGE_VALUE = 0.8          # エネミー画像の明度（1.0 = 通常、0.8 = 80%）
+
+# エネミー歩行アニメーション設定
+ENEMY_WALK_BOB_AMPLITUDE = 0.5   # 上下振動の振幅（ピクセル、0で無効化）
+ENEMY_WALK_BOB_SPEED = 4       # 上下振動の速度（値が大きいほど早い）
+ENEMY_WALK_CYCLE_TIME = 1.6      # 1回の歩行サイクル時間（秒）※参考値：2π/BOB_SPEED
+ENEMY_WALK_SWAY_AMPLITUDE = 0.8  # 左右振動の振幅（ピクセル）
+ENEMY_WALK_SWAY_SPEED = 6.0      # 左右振動の速度
+ENEMY_WALK_ROTATION_AMPLITUDE = 2.0  # 回転振動の振幅（度）
+ENEMY_WALK_ROTATION_SPEED = 5.0  # 回転振動の速度
+
+# パフォーマンス設定
+ENABLE_ENEMY_WALK_ANIMATION = True  # エネミー歩行アニメーションの有効/無効
