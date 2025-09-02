@@ -1,9 +1,48 @@
 import pygame
 import random
 import math
+import os
 from constants import *
 
 class Enemy:
+    # 画像キャッシュ（クラス変数）
+    _image_cache = {}
+    
+    @classmethod
+    def _load_enemy_image(cls, enemy_type, enemy_level):
+        """敵の画像を読み込む（キャッシュ機能付き）"""
+        # キャッシュキーを作成
+        cache_key = f"{enemy_type:02d}-{enemy_level:02d}"
+        
+        # キャッシュから画像を取得
+        if cache_key in cls._image_cache:
+            return cls._image_cache[cache_key]
+        
+        # 画像ファイルパスを構築
+        image_path = os.path.join("assets", "character", "enemy", f"{cache_key}.png")
+        
+        try:
+            # 画像を読み込み
+            image = pygame.image.load(image_path).convert_alpha()
+            # 32x32ピクセルにスケール（念のため）
+            image = pygame.transform.scale(image, (32, 32))
+            
+            # 左右反転用の画像も作成
+            flipped_image = pygame.transform.flip(image, True, False)
+            
+            # キャッシュに保存（通常版と反転版）
+            cls._image_cache[cache_key] = {
+                'left': image,      # 左向き（元画像）
+                'right': flipped_image  # 右向き（反転）
+            }
+            
+            return cls._image_cache[cache_key]
+            
+        except (pygame.error, FileNotFoundError):
+            # 画像が見つからない場合はNoneを返す
+            cls._image_cache[cache_key] = None
+            return None
+    
     def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None):
         self.screen = screen
         self.size = 15
@@ -163,6 +202,11 @@ class Enemy:
             self.hp = int(self.hp * 1.5)  # HP増加
         
         self.speed = self.base_speed
+        
+        # 画像の読み込み
+        self.images = self._load_enemy_image(self.behavior_type, self.enemy_type)
+        self.facing_right = True  # 向いている方向（True: 右, False: 左）
+        self.last_movement_x = 0  # 最後の移動方向を記録
 
     def move(self, player):
         """行動パターンに応じた移動処理"""
@@ -273,6 +317,15 @@ class Enemy:
             # マップが無効な場合は障害物判定なしで移動
             self.x = new_x
             self.y = new_y
+        
+        # 移動方向に基づいて向きを更新
+        movement_x = new_x - getattr(self, '_prev_x', self.x)
+        if abs(movement_x) > 0.1:  # 小さな移動は無視
+            self.facing_right = movement_x > 0
+        
+        # 前回の位置を記録
+        self._prev_x = self.x
+        self._prev_y = self.y
 
         # ヒットフラッシュのタイマを減算（フレーム毎に呼ばれることを想定、60FPS基準）
         if self.hit_flash_timer > 0.0:
@@ -283,6 +336,47 @@ class Enemy:
         sx = int(self.x - camera_x)
         sy = int(self.y - camera_y)
 
+        # 画像がある場合は画像を描画、ない場合は従来の円を描画
+        if self.images and isinstance(self.images, dict) and 'right' in self.images and 'left' in self.images:
+            # 向きに応じて画像を選択
+            image = self.images['right'] if self.facing_right else self.images['left']
+            
+            # 画像が正常に取得できた場合のみ描画
+            if image is not None:
+                # 画像の中心位置を計算（32x32ピクセル）
+                image_x = sx - 16
+                image_y = sy - 16
+                
+                # ヒット時のフラッシュ効果
+                if self.hit_flash_timer > 0.0:
+                    elapsed = self.hit_flash_duration - self.hit_flash_timer
+                    half = self.hit_flash_duration / 2.0
+                    if elapsed < half:
+                        # フェードイン
+                        alpha = int(255 * (elapsed / half))
+                    else:
+                        # フェードアウト
+                        alpha = int(255 * ((self.hit_flash_duration - elapsed) / half))
+                    
+                    # 画像をコピーしてフラッシュエフェクトを作成
+                    flashed_image = image.copy()
+                    
+                    # 画像全体を白く光らせる（透明部分はそのまま）
+                    white_surface = pygame.Surface((32, 32), pygame.SRCALPHA)
+                    white_surface.fill((255, 255, 255, alpha))
+                    flashed_image.blit(white_surface, (0, 0), special_flags=pygame.BLEND_ADD)
+                    
+                    # フラッシュした画像を描画
+                    screen.blit(flashed_image, (image_x, image_y))
+                else:
+                    # 通常描画
+                    screen.blit(image, (image_x, image_y))
+        else:
+            # 画像がない場合は従来の円描画
+            self._draw_circle(screen, sx, sy)
+    
+    def _draw_circle(self, screen, sx, sy):
+        """従来の円描画（画像がない場合のフォールバック）"""
         # 陰影付きの円で描画（色は self.color をベースに調整）
         r = self.size
         surf = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
@@ -315,10 +409,14 @@ class Enemy:
             surf.blit(flash_s, (0,0), special_flags=0)
 
         screen.blit(surf, (int(sx - r), int(sy - r)))
-
+        
         # 行動パターン識別用の小さなアイコンを描画
+        self._draw_behavior_icon(screen, sx, sy)
+    
+    def _draw_behavior_icon(self, screen, sx, sy):
+        """行動パターン識別用のアイコンを描画"""
         icon_size = 4
-        icon_y_offset = -r - 8
+        icon_y_offset = -self.size - 8
         
         if self.behavior_type == 1:  # 追跡 - 矢印
             # 小さな矢印を描画
