@@ -9,7 +9,13 @@ echo "Building VanSurv for macOS..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # PyInstallerでアプリケーションをビルド
-pyinstaller --noconfirm --onefile --windowed \
+pyinstaller --noconfirm --onefile --windowed --clean --name heruheru3_vansurv \
+--hidden-import=colorsys \
+--hidden-import=math \
+--hidden-import=random \
+--hidden-import=json \
+--hidden-import=os \
+--hidden-import=sys \
 --icon "${SCRIPT_DIR}/assets/favicon.ico" \
 --add-data "${SCRIPT_DIR}/__init__.py:." \
 --add-data "${SCRIPT_DIR}/constants.py:." \
@@ -29,16 +35,18 @@ pyinstaller --noconfirm --onefile --windowed \
 "${SCRIPT_DIR}/main.py"
 
 # ビルド結果の確認
-if [ -f "${SCRIPT_DIR}/dist/main" ]; then
+if [ -f "${SCRIPT_DIR}/dist/heruheru3_vansurv" ]; then
     echo ""
     echo "✅ Build successful!"
-    echo "Executable created at: ${SCRIPT_DIR}/dist/main"
+    echo "Executable created at: ${SCRIPT_DIR}/dist/heruheru3_vansurv"
+    
+    # 実行権限を自動設定
+    chmod +x "${SCRIPT_DIR}/dist/heruheru3_vansurv"
+    echo "🔧 Executable permissions set automatically"
+    
     echo ""
     echo "To run the game:"
-    echo "  ./dist/main"
-    echo ""
-    echo "To make it executable (if needed):"
-    echo "  chmod +x dist/main"
+    echo "  ./dist/heruheru3_vansurv"
 else
     echo ""
     echo "❌ Build failed!"
