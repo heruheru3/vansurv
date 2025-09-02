@@ -287,6 +287,12 @@ class Attack:
         if getattr(self, '_pending', False) and getattr(self, 'spawn_delay', 0) > 0:
             return
 
+        # 画面外の攻撃は描画をスキップ（軽量化）
+        margin = 100  # 少しマージンを持たせる
+        if (sx < -margin or sx > SCREEN_WIDTH + margin or 
+            sy < -margin or sy > SCREEN_HEIGHT + margin):
+            return
+
         if self.type == "whip":
             # ムチは follow_player と whip_points を使ってシュッと伸び縮みする直線で描画
             pts = getattr(self, 'whip_points', None)
@@ -470,23 +476,41 @@ class Attack:
             except Exception:
                 pygame.draw.circle(screen, MAGENTA, (int(sx), int(sy)), self.size)
         elif self.type == "axe":
-            # 画像がある場合は画像を描画、ない場合は従来の四角形を描画
+            # 画像がある場合は画像を描画、ない場合は従来の四角形を描画（軽量化版）
             if self.weapon_image is not None:
-                # 画像を回転して描画
                 try:
-                    # 画像のサイズを攻撃エフェクトのサイズに合わせる
-                    scaled_image = pygame.transform.scale(self.weapon_image, (int(self.size_x), int(self.size_y)))
-                    
-                    # 回転角度を度数に変換してから回転
+                    w, h = int(self.size_x), int(self.size_y)
                     angle_degrees = math.degrees(self.angle)
-                    rotated_image = pygame.transform.rotate(scaled_image, -angle_degrees)  # 反時計回りに回転
                     
-                    # 回転後の画像の中心をエフェクトの中心に合わせる
-                    rotated_rect = rotated_image.get_rect()
+                    # 回転角度を30度刻みに丸めてキャッシュ効率をさらに改善
+                    angle_rounded = round(angle_degrees / 30) * 30
+                    
+                    # 統合キャッシュを使用
+                    if not hasattr(Attack, '_axe_unified_cache'):
+                        Attack._axe_unified_cache = {}
+                    
+                    cache_key = f"axe_{w}x{h}_r{angle_rounded}"
+                    
+                    if cache_key not in Attack._axe_unified_cache:
+                        # 一度に全ての変換を適用
+                        scaled_image = pygame.transform.scale(self.weapon_image, (w, h))
+                        if angle_rounded != 0:
+                            rotated_image = pygame.transform.rotate(scaled_image, -angle_rounded)
+                        else:
+                            rotated_image = scaled_image
+                        Attack._axe_unified_cache[cache_key] = rotated_image
+                        
+                        # キャッシュサイズ制限を強化
+                        if len(Attack._axe_unified_cache) > 48:  # 360/30 = 12方向 × 4サイズ程度
+                            keys = list(Attack._axe_unified_cache.keys())
+                            for old_key in keys[:12]:
+                                del Attack._axe_unified_cache[old_key]
+                    
+                    cached_image = Attack._axe_unified_cache[cache_key]
+                    rotated_rect = cached_image.get_rect()
                     rotated_rect.center = (sx, sy)
+                    screen.blit(cached_image, rotated_rect.topleft)
                     
-                    # 描画
-                    screen.blit(rotated_image, rotated_rect.topleft)
                 except Exception as e:
                     print(f"[WARNING] Failed to draw axe image: {e}")
                     # フォールバック：従来の四角形描画
@@ -538,66 +562,88 @@ class Attack:
             except Exception:
                 pygame.draw.circle(screen, WHITE, (int(sx), int(sy)), self.size)
         elif self.type == "book":
-            # 回転する本は小さな矩形を回転させて描画
+            # 回転する本のテクスチャを描画（プレイヤーを中心に外向き）- 軽量化版
             try:
+                # フレームスキップによる軽量化（2フレームに1回だけ角度更新）
+                current_frame = pygame.time.get_ticks() // 16  # 約60FPS基準
+                if not hasattr(self, '_last_rotation_frame'):
+                    self._last_rotation_frame = -1
+                    self._cached_rotation = 0
+                
                 # 表示サイズは Attack に渡された size_x/size_y を使う
                 w = int(getattr(self, 'size_x', 18))
-                h = int(getattr(self, 'size_y', 12))
-                # 回転角は orbit_angle
-                ang = getattr(self, 'orbit_angle', 0.0)
-
-                # フェードイン・フェードアウトの計算（ms）
+                h = int(getattr(self, 'size_y', 18))
+                
+                # 角度計算を2フレームに1回に削減
+                if current_frame != self._last_rotation_frame:
+                    if self.follow_player:
+                        dx = self.x - self.follow_player.x
+                        dy = self.y - self.follow_player.y
+                        outward_angle = math.atan2(dy, dx)
+                        self._cached_rotation = math.degrees(outward_angle + math.pi/2)
+                    else:
+                        self._cached_rotation = 0
+                    self._last_rotation_frame = current_frame
+                
+                # 回転角度を30度刻みに丸めてキャッシュ効率をさらに改善
+                book_rotation_rounded = round(self._cached_rotation / 30) * 30
+                
+                # フェード計算を簡略化
                 elapsed = pygame.time.get_ticks() - getattr(self, 'creation_time', 0)
                 dur = max(1, int(getattr(self, 'duration', 1000)))
-                remaining = max(0, dur - elapsed)
-                fade_in = min(300, max(1, dur // 6))
-                fade_out = min(300, max(1, dur // 6))
-                alpha_ratio = 1.0
-                if elapsed < fade_in:
-                    alpha_ratio = float(elapsed) / float(fade_in)
-                if remaining < fade_out:
-                    alpha_ratio *= float(remaining) / float(fade_out)
+                
+                # 簡単なフェード計算（計算量削減）
+                if elapsed < 200:  # フェードイン期間短縮
+                    alpha_ratio = elapsed / 200.0
+                elif elapsed > dur - 200:  # フェードアウト期間短縮
+                    alpha_ratio = (dur - elapsed) / 200.0
+                else:
+                    alpha_ratio = 1.0
+                
                 alpha_ratio = max(0.0, min(1.0, alpha_ratio))
-                alpha = int(255 * alpha_ratio)
-
-                # 矩形の4頂点を回転させる（ワールド座標）
-                hw = w / 2
-                hh = h / 2
-                pts_local = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
-                rot_world = []
-                for px, py in pts_local:
-                    rx = px * math.cos(ang) - py * math.sin(ang)
-                    ry = px * math.sin(ang) + py * math.cos(ang)
-                    rot_world.append((self.x + rx, self.y + ry))
-
-                # スクリーン座標に変換して最小矩形を作る
-                screen_pts = [(int(x - camera_x), int(y - camera_y)) for x, y in rot_world]
-                xs = [p[0] for p in screen_pts]
-                ys = [p[1] for p in screen_pts]
-                minx = min(xs)
-                miny = min(ys)
-                maxx = max(xs)
-                maxy = max(ys)
-                surf_w = max(1, maxx - minx + 4)
-                surf_h = max(1, maxy - miny + 4)
-
-                # 一時サーフェスに描画（透過を保持）
-                s = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
-                trans_pts = [(px - minx + 2, py - miny + 2) for px, py in screen_pts]
-                base_col = (200, 180, 80, alpha)
-                border_col = (0, 0, 0, alpha)
-                try:
-                    pygame.draw.polygon(s, base_col, trans_pts)
-                    pygame.draw.polygon(s, border_col, trans_pts, 1)
-                    screen.blit(s, (minx - 2, miny - 2))
-                except Exception:
-                    # フォールバック: 単純な矩形でアルファを反映
+                alpha_level = int(alpha_ratio * 4) * 25  # 5段階に削減: 0, 25, 50, 75, 100
+                alpha = int(255 * alpha_level / 100)
+                
+                # キャッシュキーを簡略化
+                cache_key = f"book_{w}x{h}_r{book_rotation_rounded}_a{alpha_level}"
+                
+                # 統合キャッシュ（1段階キャッシュに簡略化）
+                if not hasattr(Attack, '_book_unified_cache'):
+                    Attack._book_unified_cache = {}
+                
+                if cache_key not in Attack._book_unified_cache:
                     try:
-                        fs = pygame.Surface((w, h), pygame.SRCALPHA)
-                        fs.fill((200,180,80,alpha))
-                        screen.blit(fs, (sx - w//2, sy - h//2))
+                        book_image = Attack._load_weapon_image("rotating_book")
+                        if book_image:
+                            # 一度に全ての変換を適用
+                            book_scaled = pygame.transform.scale(book_image, (w, h))
+                            if book_rotation_rounded != 0:
+                                book_scaled = pygame.transform.rotate(book_scaled, -book_rotation_rounded)
+                            if alpha < 255:
+                                book_scaled = book_scaled.copy()
+                                book_scaled.set_alpha(alpha)
+                            Attack._book_unified_cache[cache_key] = book_scaled
+                        else:
+                            Attack._book_unified_cache[cache_key] = None
                     except Exception:
-                        pygame.draw.rect(screen, (200,180,80), (sx - 9, sy - 6, 18, 12))
+                        Attack._book_unified_cache[cache_key] = None
+                    
+                    # キャッシュサイズ制限を強化
+                    if len(Attack._book_unified_cache) > 60:  # 制限をより厳しく
+                        keys = list(Attack._book_unified_cache.keys())
+                        for old_key in keys[:15]:
+                            del Attack._book_unified_cache[old_key]
+                
+                final_texture = Attack._book_unified_cache[cache_key]
+                if final_texture:
+                    tw, th = final_texture.get_size()
+                    screen.blit(final_texture, (sx - tw//2, sy - th//2))
+                else:
+                    # 最軽量フォールバック
+                    pygame.draw.rect(screen, (200,180,80), (sx - w//2, sy - h//2, w, h))
+            except Exception:
+                # 最終フォールバック
+                pygame.draw.rect(screen, (200,180,80), (sx - 9, sy - 6, 18, 12))
             except Exception:
                 pygame.draw.rect(screen, (200,180,80), (sx - 9, sy - 6, 18, 12))
         elif self.type == "knife":

@@ -156,7 +156,7 @@ class Axe(Weapon):
         self.damage = 25
         self.size = 50  # 攻撃範囲
         self.throw_speed = 6  # 投げる速度
-        self.rotation_speed = 0.3  # 回転速度
+        self.rotation_speed = 0.2  # 回転速度（遅く調整）
 
     def attack(self, player):
         if not self.can_attack():
@@ -298,8 +298,8 @@ class RotatingBook(Weapon):
         self.num_books = 1
         self.duration = 5000
         # 本の描画サイズ（幅・高さ）をプロパティ化してレベルアップで拡大可能にする
-        self.book_w = 24
-        self.book_h = 16
+        self.book_w = 36
+        self.book_h = 36
 
     def attack(self, player):
         if not self.can_attack():
@@ -359,7 +359,7 @@ class RotatingBook(Weapon):
         # 本のサイズと回転速度も強化して、視覚的に派手にする
         try:
             self.book_w = min(60, int(self.book_w * 1.2))
-            self.book_h = min(40, int(self.book_h * 1.2))
+            self.book_h = min(60, int(self.book_h * 1.2))
             # 回転速度は積算的に高める（一定の上限を設ける）
             self.rotation_speed = min(1.5, self.rotation_speed * 1.15)
         except Exception:
