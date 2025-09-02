@@ -151,7 +151,7 @@ class MagicWand(Weapon):
 class Axe(Weapon):
     def __init__(self):
         super().__init__()
-        self.cooldown = 1000
+        self.cooldown = 1500
         # 投擲武器: 中程度のダメージ
         self.damage = 25
         self.size = 50  # 攻撃範囲
@@ -188,7 +188,7 @@ class Axe(Weapon):
         effective_size = max(1, int(self.size * range_mult))
         effective_duration = max(100, int(3000 * time_mult))
         effective_damage = self.damage * base_mult
-        effective_num = max(1, int(1 + extra))
+        effective_num = min(5, int(1 + extra))
         
         attacks = []
         for i in range(effective_num):
@@ -219,7 +219,7 @@ class Axe(Weapon):
         self.size = int(self.size * 1.3)  # 範囲20%増加
         self.throw_speed += 1  # 投げる速度増加
         self.damage *= 1.2  # ダメージ15%増加
-        self.cooldown = max(self.cooldown * 0.95, 800)  # クールダウン減少（最小800ms）
+        self.cooldown = max(self.cooldown * 0.95, 1000)  # クールダウン減少（最小1000ms）
 
 class Stone(Weapon):
     def __init__(self):

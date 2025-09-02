@@ -626,7 +626,8 @@ def main():
                         # 矩形当たり判定（高速化：円形より計算が軽い）
                         dx = abs(enemy.x - attack.x)
                         dy = abs(enemy.y - attack.y)
-                        r = (getattr(attack, 'size', 0) + getattr(enemy, 'size', 0)) / 2
+                        # 攻撃の半径 + 敵の半径で判定（従来は誤って/2していた）
+                        r = getattr(attack, 'size', 0) + getattr(enemy, 'size', 0)
                         if dx < r and dy < r:
                             # 持続系攻撃は0.2秒ごとにダメージ再発生
                             persistent_types = {"garlic", "holy_water"}

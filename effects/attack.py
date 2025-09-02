@@ -479,7 +479,8 @@ class Attack:
             # 画像がある場合は画像を描画、ない場合は従来の四角形を描画（軽量化版）
             if self.weapon_image is not None:
                 try:
-                    w, h = int(self.size_x), int(self.size_y)
+                    # 画像サイズを90%に縮小（当たり判定とのバランス調整）
+                    w, h = int(self.size_x * 0.8), int(self.size_y * 0.8)
                     angle_degrees = math.degrees(self.angle)
                     
                     # 回転角度を30度刻みに丸めてキャッシュ効率をさらに改善
