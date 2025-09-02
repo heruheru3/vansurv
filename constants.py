@@ -34,7 +34,7 @@ MAX_WEAPON_LEVEL = 5
 MAX_SUBITEM_LEVEL = 3
 
 # デバッグ・表示設定
-DEBUG = False
+DEBUG = False   # デバッグ用ログ出力のON/OFF
 SHOW_FPS = True  # FPS表示のON/OFF
 
 # マップ・ステージ設定

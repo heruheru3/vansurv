@@ -632,9 +632,6 @@ def main():
                             dmg = max(0.0, dmg * (1.0 + variance))
                             hp_before = enemy.hp
                             enemy.hp -= dmg
-                            # デバッグ出力（DEBUG フラグが有効な場合）
-                            if DEBUG_MODE:
-                                print(f"[DEBUG] attack_type={getattr(attack,'type','?')} damage={dmg} enemy_type={getattr(enemy,'enemy_type','?')} hp: {hp_before} -> {enemy.hp}")
 
                             # ヒット時の記録: 非持続系は hit_targets に追加、持続系は last_hit_times を更新
                             if is_persistent:
@@ -779,8 +776,88 @@ def main():
                         particles.append(SpawnParticle(enemy.x, enemy.y, enemy.color))
                     spawn_timer = 0
 
+                # 敵の数を制限（パフォーマンス向上）
+                # プレイヤーレベルに応じて制限を調整（より緩和）
+                BASE_MAX_ENEMIES = 80  # 基本最大数を維持
+                LEVEL_SCALING = min(20, player.level * 2)  # レベルスケーリングを調整
+                MAX_ENEMIES = BASE_MAX_ENEMIES + LEVEL_SCALING
+                
+                if len(enemies) > MAX_ENEMIES:
+                    # 画面外の敵を優先的に削除（画面内の敵は絶対に保護）
+                    enemies_to_remove = len(enemies) - MAX_ENEMIES
+                    if DEBUG and enemies_to_remove > 0:
+                        print(f"[DEBUG] Removing {enemies_to_remove} enemies due to limit (current: {len(enemies)}, max: {MAX_ENEMIES})")
+                    
+                    # 画面外の敵を特定して優先的に削除（より大きなマージンで確実に保護）
+                    off_screen_enemies = []
+                    on_screen_enemies = []
+                    
+                    for enemy in enemies:
+                        # 適切なマージンで視界内の敵を保護
+                        if enemy.is_in_screen_bounds(player, screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT, margin=200):
+                            on_screen_enemies.append(enemy)
+                        else:
+                            off_screen_enemies.append(enemy)
+                    
+                    # 画面外の敵から削除
+                    removed = 0
+                    while removed < enemies_to_remove and off_screen_enemies:
+                        off_screen_enemies.pop(0)
+                        removed += 1
+                    
+                    # まだ削除が必要な場合のみ画面内の敵から削除（古い順）
+                    # ただし、視界内の敵は絶対に削除しない
+                    if removed < enemies_to_remove:
+                        if DEBUG:
+                            print(f"[DEBUG] WARNING: Could not remove enough enemies without affecting visible enemies ({removed}/{enemies_to_remove})")
+                    
+                    # リストを再構築
+                    enemies[:] = on_screen_enemies + off_screen_enemies
+
                 for enemy in enemies[:]:
                     enemy.move(player)
+                    
+                    # 敵の攻撃処理（射撃タイプのみ）
+                    enemy.update_attack(player)
+                    enemy.update_projectiles(player)
+                    
+                    # 直進タイプが画面外に出た場合は削除
+                    if enemy.behavior_type == 2 and enemy.is_off_screen():
+                        enemies.remove(enemy)
+                        continue
+                    
+                    # 生存時間による削除チェック（固定砲台・距離保持射撃用）
+                    if enemy.should_be_removed_by_time():
+                        enemies.remove(enemy)
+                        continue
+                    
+                    # プレイヤーの視界外に十分離れた敵を削除（パフォーマンス向上）
+                    # 画面範囲内の敵は絶対に削除しない（適切なマージンで保護）
+                    if not enemy.is_in_screen_bounds(player, screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT, margin=300):
+                        # 画面外の敵のみ距離による削除を適用
+                        # 行動パターン別削除条件:
+                        # 1.追跡: 8000px（通常マージン）
+                        # 2.直進: 9000px（画面外削除と併用）
+                        # 3.距離保持: 15000px（45秒時間制限と併用）
+                        # 4.固定砲台: 18000px（30秒時間制限と併用）
+                        if enemy.behavior_type == 1:  # 追跡タイプ
+                            delete_margin = 8000
+                        elif enemy.behavior_type == 2:  # 直進タイプ
+                            delete_margin = 9000
+                        elif enemy.behavior_type == 3:  # 距離保持射撃
+                            delete_margin = 15000
+                        elif enemy.behavior_type == 4:  # 固定砲台
+                            delete_margin = 18000
+                        else:
+                            delete_margin = 8000  # デフォルト
+                        
+                        if enemy.is_far_from_player(player, margin=delete_margin):
+                            enemies.remove(enemy)
+                            continue
+                    else:
+                        # 視界内の敵は削除しない
+                        pass
+                    
                     # プレイヤーとの当たり判定も二乗距離で比較
                     dx = player.x - enemy.x
                     dy = player.y - enemy.y
@@ -823,6 +900,71 @@ def main():
                                     enemies.remove(enemy)
                                 except Exception:
                                     pass
+
+                # 敵の弾丸とプレイヤーの衝突判定
+                for enemy in enemies:
+                    for projectile in enemy.get_projectiles()[:]:
+                        # プレイヤーとの衝突判定
+                        dx = player.x - projectile.x
+                        dy = player.y - projectile.y
+                        r = (getattr(player, 'size', 0) + projectile.size)
+                        if dx*dx + dy*dy < (r * r):
+                            if random.random() < player.get_avoidance():
+                                # 攻撃を回避
+                                particles.append(AvoidanceParticle(player.x, player.y))
+                                try:
+                                    from effects.particles import LuckyText
+                                    particles.append(LuckyText(player.x, player.y - getattr(player, 'size', 32) - 6, "Dodge!", color=CYAN))
+                                except Exception:
+                                    pass
+                            else:
+                                # 無敵時間チェック
+                                now_ms = pygame.time.get_ticks()
+                                last_hit = getattr(player, 'last_hit_time', -999999)
+                                if now_ms - last_hit >= INVINCIBLE_MS:
+                                    particles.append(HurtFlash(player.x, player.y, size=player.size))
+
+                                    # ダメージを適用
+                                    try:
+                                        player.hp -= max(1, int(projectile.damage - player.get_defense()))
+                                    except Exception:
+                                        player.hp -= projectile.damage
+
+                                    # 被弾時刻を更新
+                                    try:
+                                        player.last_hit_time = now_ms
+                                    except Exception:
+                                        pass
+
+                                    if player.hp <= 0:
+                                        game_over = True
+                            
+                            # 弾丸を削除
+                            enemy.projectiles.remove(projectile)
+                            continue  # 弾丸が削除されたので次の弾丸へ
+                        
+                        # 弾丸とプレイヤーの武器の衝突判定
+                        projectile_hit = False
+                        for attack in player.active_attacks:
+                            if projectile_hit:
+                                break
+                                
+                            # 武器と弾丸の距離を計算
+                            dx = attack.x - projectile.x
+                            dy = attack.y - projectile.y
+                            r = (getattr(attack, 'size', 0) + projectile.size)
+                            
+                            if dx*dx + dy*dy < (r * r):
+                                # 武器が弾丸を迎撃
+                                projectile_hit = True
+                                break
+                        
+                        if projectile_hit:
+                            # 弾丸迎撃エフェクトを追加
+                            particles.append(DeathParticle(projectile.x, projectile.y, (255, 255, 100)))  # 黄色いエフェクト
+                            
+                            # 弾丸を削除
+                            enemy.projectiles.remove(projectile)
 
                 for gem in experience_gems[:]:
                     gem.move_to_player(player)
@@ -920,6 +1062,8 @@ def main():
             # 敵の描画（プレイヤーより背後に表示）
             for enemy in enemies:
                 enemy.draw(world_surf, int_cam_x, int_cam_y)
+                # 敵の弾丸も描画
+                enemy.draw_projectiles(world_surf, int_cam_x, int_cam_y)
 
             # パーティクル（ワールド座標）の描画（エネミーの後、攻撃エフェクトの前に追加）
             # HurtFlash, LevelUpEffect は画面オーバーレイなので別途画面に描画する
@@ -1083,16 +1227,55 @@ def main():
             if SHOW_FPS and fps_font and len(fps_values) > 0:
                 # 過去のFPS値の平均を計算
                 avg_fps = sum(fps_values[-30:]) / len(fps_values[-30:])  # 直近30フレーム
-                fps_text = fps_font.render(f"FPS: {avg_fps:.1f}", True, (255, 255, 255))
+                fps_text = fps_font.render(f"FPS: {avg_fps:.1f} | Enemies: {len(enemies)}", True, (255, 255, 255))
                 fps_rect = fps_text.get_rect()
                 fps_rect.bottomleft = (10, screen.get_height() - 10)
                 
-                # 背景を暗くして読みやすくする
+                # 敵の統計情報を集計
+                enemy_stats = {}
+                for enemy in enemies:
+                    behavior_type = enemy.behavior_type
+                    enemy_level = enemy.enemy_type
+                    key = f"{behavior_type}-{enemy_level}"
+                    enemy_stats[key] = enemy_stats.get(key, 0) + 1
+                
+                # 統計情報のテキストを作成
+                stat_lines = []
+                behavior_names = {1: "赤追跡", 2: "青直進", 3: "緑射撃", 4: "橙砲台"}
+                for behavior_type in [1, 2, 3, 4]:
+                    type_counts = []
+                    for level in [1, 2, 3, 4, 5]:
+                        key = f"{behavior_type}-{level}"
+                        count = enemy_stats.get(key, 0)
+                        if count > 0:
+                            type_counts.append(f"Lv{level}:{count}")
+                    if type_counts:
+                        type_name = behavior_names.get(behavior_type, f"Type{behavior_type}")
+                        stat_lines.append(f"{type_name} {' '.join(type_counts)}")
+                
+                # FPS表示
                 bg_rect = fps_rect.inflate(8, 4)
                 pygame.draw.rect(screen, (0, 0, 0, 128), bg_rect)
                 screen.blit(fps_text, fps_rect)
                 
-                pygame.display.update(bg_rect)
+                # 敵統計表示
+                y_offset = fps_rect.top - 5
+                for line in stat_lines:
+                    if y_offset < 20:  # 画面上部に近づいたら表示を停止
+                        break
+                    stat_text = fps_font.render(line, True, (255, 255, 255))
+                    stat_rect = stat_text.get_rect()
+                    stat_rect.bottomleft = (10, y_offset)
+                    
+                    stat_bg_rect = stat_rect.inflate(8, 4)
+                    pygame.draw.rect(screen, (0, 0, 0, 128), stat_bg_rect)
+                    screen.blit(stat_text, stat_rect)
+                    
+                    y_offset = stat_rect.top - 5
+                
+                # 全体を一度に更新
+                update_rect = pygame.Rect(0, 0, 300, screen.get_height() - y_offset + 20)
+                pygame.display.update(update_rect)
             
             # パフォーマンス最適化：大きなスケーリング時はFPSを調整
             target_fps = FULLSCREEN_FPS if scale_factor > FULLSCREEN_FPS_THRESHOLD else NORMAL_FPS
