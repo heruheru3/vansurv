@@ -97,8 +97,13 @@ def main():
         debug_font = pygame.font.SysFont(None, 14)
         fps_font = pygame.font.SysFont(None, 20)  # FPS表示用フォント
     except Exception:
-        debug_font = None
-        fps_font = None
+        try:
+            # システムフォントが使えない場合はデフォルトフォントを使用
+            debug_font = pygame.font.Font(None, 14)
+            fps_font = pygame.font.Font(None, 20)
+        except Exception:
+            debug_font = None
+            fps_font = None
 
     # カメラ初期値とスムージング係数（0.0: 固定、1.0: 即時追従）
     camera_x = 0.0
@@ -128,6 +133,7 @@ def main():
 
     # メインゲームループ
     running = True
+    frame_count = 0  # フレームカウンターを初期化
     print("[INFO] Entering main loop")
     while running:
         try:
@@ -196,6 +202,13 @@ def main():
                     if event.key == pygame.K_F5:
                         show_debug_visuals = not show_debug_visuals
                         print(f"[INFO] show_debug_visuals set to {show_debug_visuals}")
+                        continue
+
+                    # FPS表示のトグル（F6）
+                    if event.key == pygame.K_F6:
+                        global SHOW_FPS
+                        SHOW_FPS = not SHOW_FPS
+                        print(f"[INFO] SHOW_FPS set to {SHOW_FPS}")
                         continue
 
                     # フルスクリーン切替（F11）
@@ -596,11 +609,11 @@ def main():
                     if getattr(attack, '_pending', False):
                         continue
                     for enemy in enemies[:]:
-                        # sqrt を避けて二乗距離で比較（高速化）
-                        dx = enemy.x - attack.x
-                        dy = enemy.y - attack.y
-                        r = (getattr(attack, 'size', 0) + getattr(enemy, 'size', 0))
-                        if dx*dx + dy*dy < (r * r):
+                        # 矩形当たり判定（高速化：円形より計算が軽い）
+                        dx = abs(enemy.x - attack.x)
+                        dy = abs(enemy.y - attack.y)
+                        r = (getattr(attack, 'size', 0) + getattr(enemy, 'size', 0)) / 2
+                        if dx < r and dy < r:
                             # 持続系攻撃は0.2秒ごとにダメージ再発生
                             persistent_types = {"garlic", "holy_water"}
                             is_persistent = getattr(attack, 'type', '') in persistent_types
@@ -676,7 +689,7 @@ def main():
                             except Exception:
                                 pass
 
-                            for _ in range(4):
+                            for _ in range(2):  # 4から2に削減
                                 particles.append(DeathParticle(enemy.x, enemy.y, enemy.color))
 
                             # ダメージ数表示を追加（敵の上部に素早くフェードイン・アウト）
@@ -696,7 +709,7 @@ def main():
 
                             # 敵のHPが0以下なら死亡処理
                             if enemy.hp <= 0:
-                                for _ in range(8):
+                                for _ in range(4):  # 8から4に削減
                                     particles.append(DeathParticle(enemy.x, enemy.y, enemy.color))
 
                                 rand = random.random()
@@ -746,9 +759,9 @@ def main():
                         num_enemies = base_enemies + int((game_time ** 1.2) / 15)
 
                     if game_time > SURVIVAL_TIME * 0.7:
-                        num_enemies = int(num_enemies * 1.3)
+                        num_enemies = int(num_enemies * 1.2)  # 1.3から1.2に削減
 
-                    num_enemies = min(num_enemies, 12)
+                    num_enemies = min(num_enemies, 8)  # 12から8に削減
 
                     for _ in range(num_enemies):
                         cam_vx = int(camera_x)
@@ -776,10 +789,10 @@ def main():
                         particles.append(SpawnParticle(enemy.x, enemy.y, enemy.color))
                     spawn_timer = 0
 
-                # 敵の数を制限（パフォーマンス向上）
-                # プレイヤーレベルに応じて制限を調整（より緩和）
-                BASE_MAX_ENEMIES = 80  # 基本最大数を維持
-                LEVEL_SCALING = min(20, player.level * 2)  # レベルスケーリングを調整
+                # 敵の数を制限（バランス調整）
+                # プレイヤーレベルに応じて制限を調整
+                BASE_MAX_ENEMIES = 100  # 元の数に戻す
+                LEVEL_SCALING = min(20, player.level * 2)  # レベルスケーリングも元に戻す
                 MAX_ENEMIES = BASE_MAX_ENEMIES + LEVEL_SCALING
                 
                 if len(enemies) > MAX_ENEMIES:
@@ -817,9 +830,10 @@ def main():
                 for enemy in enemies[:]:
                     enemy.move(player)
                     
-                    # 敵の攻撃処理（射撃タイプのみ）
-                    enemy.update_attack(player)
-                    enemy.update_projectiles(player)
+                    # 敵の攻撃処理（射撃タイプのみ、画面外は頻度制限）
+                    if not enemy.is_off_screen() or frame_count % 3 == 0:
+                        enemy.update_attack(player)
+                        enemy.update_projectiles(player)
                     
                     # 直進タイプが画面外に出た場合は削除
                     if enemy.behavior_type == 2 and enemy.is_off_screen():
@@ -858,11 +872,12 @@ def main():
                         # 視界内の敵は削除しない
                         pass
                     
-                    # プレイヤーとの当たり判定も二乗距離で比較
-                    dx = player.x - enemy.x
-                    dy = player.y - enemy.y
-                    r = (getattr(player, 'size', 0) + getattr(enemy, 'size', 0))
-                    if dx*dx + dy*dy < (r * r):
+                    # プレイヤーとの正方形当たり判定（最高速化）
+                    # プレイヤーと敵の境界ボックスが重なるかチェック
+                    player_half = getattr(player, 'size', 0) // 2
+                    enemy_half = getattr(enemy, 'size', 0) // 2
+                    if (abs(player.x - enemy.x) < player_half + enemy_half and 
+                        abs(player.y - enemy.y) < player_half + enemy_half):
                         if random.random() < player.get_avoidance():
                             # サブアイテムスピードアップ効果で攻撃を回避
                             particles.append(AvoidanceParticle(player.x, player.y))
@@ -901,60 +916,60 @@ def main():
                                 except Exception:
                                     pass
 
-                # 敵の弾丸とプレイヤーの衝突判定
-                for enemy in enemies:
+                # 敵の弾丸とプレイヤーの衝突判定（敵数制限で負荷軽減）
+                for enemy in enemies[:max(1, len(enemies) * 2 // 3)]:  # 敵の2/3だけ処理して負荷軽減
                     for projectile in enemy.get_projectiles()[:]:
-                        # プレイヤーとの衝突判定
-                        dx = player.x - projectile.x
-                        dy = player.y - projectile.y
-                        r = (getattr(player, 'size', 0) + projectile.size)
-                        if dx*dx + dy*dy < (r * r):
-                            if random.random() < player.get_avoidance():
-                                # 攻撃を回避
-                                particles.append(AvoidanceParticle(player.x, player.y))
-                                try:
-                                    from effects.particles import LuckyText
-                                    particles.append(LuckyText(player.x, player.y - getattr(player, 'size', 32) - 6, "Dodge!", color=CYAN))
-                                except Exception:
-                                    pass
-                            else:
-                                # 無敵時間チェック
-                                now_ms = pygame.time.get_ticks()
-                                last_hit = getattr(player, 'last_hit_time', -999999)
-                                if now_ms - last_hit >= INVINCIBLE_MS:
-                                    particles.append(HurtFlash(player.x, player.y, size=player.size))
-
-                                    # ダメージを適用
+                        # プレイヤーとの正方形衝突判定（最高速化）
+                        player_half = getattr(player, 'size', 0) // 2
+                        proj_half = projectile.size // 2
+                        if (abs(player.x - projectile.x) < player_half + proj_half and 
+                            abs(player.y - projectile.y) < player_half + proj_half):
+                                if random.random() < player.get_avoidance():
+                                    # 攻撃を回避
+                                    particles.append(AvoidanceParticle(player.x, player.y))
                                     try:
-                                        player.hp -= max(1, int(projectile.damage - player.get_defense()))
-                                    except Exception:
-                                        player.hp -= projectile.damage
-
-                                    # 被弾時刻を更新
-                                    try:
-                                        player.last_hit_time = now_ms
+                                        from effects.particles import LuckyText
+                                        particles.append(LuckyText(player.x, player.y - getattr(player, 'size', 32) - 6, "Dodge!", color=CYAN))
                                     except Exception:
                                         pass
+                                else:
+                                    # 無敵時間チェック
+                                    now_ms = pygame.time.get_ticks()
+                                    last_hit = getattr(player, 'last_hit_time', -999999)
+                                    if now_ms - last_hit >= INVINCIBLE_MS:
+                                        particles.append(HurtFlash(player.x, player.y, size=player.size))
 
-                                    if player.hp <= 0:
-                                        game_over = True
+                                        # ダメージを適用
+                                        try:
+                                            player.hp -= max(1, int(projectile.damage - player.get_defense()))
+                                        except Exception:
+                                            player.hp -= projectile.damage
+
+                                        # 被弾時刻を更新
+                                        try:
+                                            player.last_hit_time = now_ms
+                                        except Exception:
+                                            pass
+
+                                        if player.hp <= 0:
+                                            game_over = True
+                                
+                                # 弾丸を削除
+                                enemy.projectiles.remove(projectile)
+                                continue  # 弾丸が削除されたので次の弾丸へ
                             
-                            # 弾丸を削除
-                            enemy.projectiles.remove(projectile)
-                            continue  # 弾丸が削除されたので次の弾丸へ
-                        
                         # 弾丸とプレイヤーの武器の衝突判定
                         projectile_hit = False
                         for attack in player.active_attacks:
                             if projectile_hit:
                                 break
-                                
-                            # 武器と弾丸の距離を計算
-                            dx = attack.x - projectile.x
-                            dy = attack.y - projectile.y
-                            r = (getattr(attack, 'size', 0) + projectile.size)
                             
-                            if dx*dx + dy*dy < (r * r):
+                            # 武器と弾丸の正方形衝突判定（最高速化）
+                            attack_half = getattr(attack, 'size', 0) // 2
+                            proj_half = projectile.size // 2
+                            
+                            if (abs(attack.x - projectile.x) < attack_half + proj_half and 
+                                abs(attack.y - projectile.y) < attack_half + proj_half):
                                 # 武器が弾丸を迎撃
                                 projectile_hit = True
                                 break
@@ -966,20 +981,20 @@ def main():
                             # 弾丸を削除
                             enemy.projectiles.remove(projectile)
 
+                # 経験値ジェム処理（レスポンス重視で毎フレーム処理）
                 for gem in experience_gems[:]:
                     gem.move_to_player(player)
-                    # 経験値ジェムの取得判定も二乗距離で比較
-                    dx = player.x - gem.x
-                    dy = player.y - gem.y
-                    # プレイヤーの基準取得半径は player.size + gem.size
-                    base_r = (getattr(player, 'size', 0) + getattr(gem, 'size', 0))
-                    # サブアイテムから追加されるピクセル半径を取得
+                    # 経験値ジェム取得の正方形判定（最高速化）
+                    player_half = getattr(player, 'size', 0) // 2
+                    gem_half = getattr(gem, 'size', 0) // 2
+                    # サブアイテムから追加される取得範囲を取得
                     try:
-                        extra = float(getattr(player, 'get_gem_pickup_range', lambda: 0.0)())
+                        extra_range = int(getattr(player, 'get_gem_pickup_range', lambda: 0.0)())
                     except Exception:
-                        extra = 0.0
-                    r = base_r + extra
-                    if dx*dx + dy*dy < (r * r):
+                        extra_range = 0
+                    total_range = player_half + gem_half + extra_range
+                    if (abs(player.x - gem.x) < total_range and 
+                        abs(player.y - gem.y) < total_range):
                         prev_level = player.level
                         # ジェムごとの価値を付与
                         player.add_exp(getattr(gem, 'value', 1))
@@ -991,11 +1006,11 @@ def main():
 
                 for item in items[:]:
                     item.move_to_player(player)
-                    # アイテム取得判定も二乗距離比較に変更
-                    dx = player.x - item.x
-                    dy = player.y - item.y
-                    r = (getattr(player, 'size', 0) + getattr(item, 'size', 0))
-                    if dx*dx + dy*dy < (r * r):
+                    # アイテム取得の正方形判定（最高速化）
+                    player_half = getattr(player, 'size', 0) // 2
+                    item_half = getattr(item, 'size', 0) // 2
+                    if (abs(player.x - item.x) < player_half + item_half and 
+                        abs(player.y - item.y) < player_half + item_half):
                         if item.type == "heal":
                             # 体力回復（割合回復）
                             player.heal(HEAL_ITEM_AMOUNT, "item")
@@ -1019,16 +1034,18 @@ def main():
                 # 最も新しいものを残す（古いものは削除）
                 particles = particles[-PARTICLE_TRIM_TO:]
 
-            # 安全に順次更新して生存するものだけ残す
-            new_particles = []
-            for p in particles:
-                try:
-                    if p.update():
-                        new_particles.append(p)
-                except Exception:
-                    # エフェクトの update で例外が出てもゲームを継続する
-                    pass
-            particles = new_particles
+            # パーティクル更新処理（2フレームに1回で負荷軽減）
+            if frame_count % 2 == 0:
+                # 安全に順次更新して生存するものだけ残す
+                new_particles = []
+                for p in particles:
+                    try:
+                        if p.update():
+                            new_particles.append(p)
+                    except Exception:
+                        # エフェクトの update で例外が出てもゲームを継続する
+                        pass
+                particles = new_particles
 
             # カメラ目標を現在のプレイヤー位置から再計算（プレイヤー移動後）
             # 仮想画面サイズ（常に1280x720）を基準にカメラ計算
@@ -1172,7 +1189,7 @@ def main():
                 except TypeError:
                     particle.draw(virtual_screen)
 
-            # 右上にミニマップを描画
+            # 右上にミニマップを描画（毎フレーム描画でちらつき防止）
             try:
                 draw_minimap(virtual_screen, player, enemies, experience_gems, items, int_cam_x, int_cam_y)
             except Exception:
@@ -1187,7 +1204,7 @@ def main():
                         print(f"[DEBUG] damage_stats keys={list(damage_stats.items())[:8]}")
             except Exception:
                 pass
-            # UI描画を仮想画面に（スケーリングパラメーターは不要）
+            # UI描画を仮想画面に（毎フレーム描画でちらつき防止）
             draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status)
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
             if game_over or game_clear:
@@ -1221,27 +1238,36 @@ def main():
                 # 等倍で描画（キャッシュ不要）
                 screen.blit(virtual_screen, (offset_x, offset_y))
 
-            pygame.display.flip()
-            
             # FPS表示（実画面の左下に直接描画）
             if SHOW_FPS and fps_font and len(fps_values) > 0:
                 # 過去のFPS値の平均を計算
                 avg_fps = sum(fps_values[-30:]) / len(fps_values[-30:])  # 直近30フレーム
-                fps_text = fps_font.render(f"FPS: {avg_fps:.1f} | Enemies: {len(enemies)}", True, (255, 255, 255))
+                
+                # 弾丸数をカウント
+                total_projectiles = sum(len(enemy.get_projectiles()) for enemy in enemies)
+                
+                # 統計情報をまとめて表示
+                fps_text = fps_font.render(f"FPS: {avg_fps:.1f} | Enemies: {len(enemies)} | Bullets: {total_projectiles} | Gems: {len(experience_gems)} | Particles: {len(particles)}", True, (255, 255, 255))
                 fps_rect = fps_text.get_rect()
                 fps_rect.bottomleft = (10, screen.get_height() - 10)
                 
                 # 敵の統計情報を集計
                 enemy_stats = {}
+                projectile_stats = {}
                 for enemy in enemies:
                     behavior_type = enemy.behavior_type
                     enemy_level = enemy.enemy_type
                     key = f"{behavior_type}-{enemy_level}"
                     enemy_stats[key] = enemy_stats.get(key, 0) + 1
+                    
+                    # 弾丸の統計も集計
+                    projectiles = enemy.get_projectiles()
+                    if projectiles:
+                        projectile_stats[behavior_type] = projectile_stats.get(behavior_type, 0) + len(projectiles)
                 
                 # 統計情報のテキストを作成
                 stat_lines = []
-                behavior_names = {1: "赤追跡", 2: "青直進", 3: "緑射撃", 4: "橙砲台"}
+                behavior_names = {1: "Chase", 2: "Direct", 3: "Shoot", 4: "Turret"}
                 for behavior_type in [1, 2, 3, 4]:
                     type_counts = []
                     for level in [1, 2, 3, 4, 5]:
@@ -1249,13 +1275,29 @@ def main():
                         count = enemy_stats.get(key, 0)
                         if count > 0:
                             type_counts.append(f"Lv{level}:{count}")
+                    
                     if type_counts:
                         type_name = behavior_names.get(behavior_type, f"Type{behavior_type}")
-                        stat_lines.append(f"{type_name} {' '.join(type_counts)}")
+                        bullets_info = ""
+                        if behavior_type in projectile_stats:
+                            bullets_info = f" (Bullets:{projectile_stats[behavior_type]})"
+                        stat_lines.append(f"{type_name} {' '.join(type_counts)}{bullets_info}")
+                
+                # アイテム統計も追加
+                if len(items) > 0:
+                    item_counts = {}
+                    for item in items:
+                        item_counts[item.type] = item_counts.get(item.type, 0) + 1
+                    item_info = " | ".join([f"{k}:{v}" for k, v in item_counts.items()])
+                    stat_lines.append(f"Items: {item_info}")
                 
                 # FPS表示
                 bg_rect = fps_rect.inflate(8, 4)
-                pygame.draw.rect(screen, (0, 0, 0, 128), bg_rect)
+                # 半透明背景用のサーフェス作成
+                bg_surf = pygame.Surface((bg_rect.width, bg_rect.height))
+                bg_surf.set_alpha(128)
+                bg_surf.fill((0, 0, 0))
+                screen.blit(bg_surf, bg_rect.topleft)
                 screen.blit(fps_text, fps_rect)
                 
                 # 敵統計表示
@@ -1268,18 +1310,28 @@ def main():
                     stat_rect.bottomleft = (10, y_offset)
                     
                     stat_bg_rect = stat_rect.inflate(8, 4)
-                    pygame.draw.rect(screen, (0, 0, 0, 128), stat_bg_rect)
+                    # 半透明背景用のサーフェス作成
+                    stat_bg_surf = pygame.Surface((stat_bg_rect.width, stat_bg_rect.height))
+                    stat_bg_surf.set_alpha(128)
+                    stat_bg_surf.fill((0, 0, 0))
+                    screen.blit(stat_bg_surf, stat_bg_rect.topleft)
                     screen.blit(stat_text, stat_rect)
                     
                     y_offset = stat_rect.top - 5
                 
                 # 全体を一度に更新
                 update_rect = pygame.Rect(0, 0, 300, screen.get_height() - y_offset + 20)
-                pygame.display.update(update_rect)
+
+            pygame.display.flip()
             
             # パフォーマンス最適化：大きなスケーリング時はFPSを調整
             target_fps = FULLSCREEN_FPS if scale_factor > FULLSCREEN_FPS_THRESHOLD else NORMAL_FPS
             clock.tick(target_fps)
+            
+            # フレームカウンターをインクリメント（最適化処理で使用）
+            frame_count += 1
+            if frame_count > 1000000:  # オーバーフロー防止
+                frame_count = 0
             
             # FPS計算と表示の更新（0.5秒ごと）
             if SHOW_FPS:

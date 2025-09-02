@@ -50,16 +50,16 @@ BOMB_ITEM_DROP_RATE = 0.002   # 0.2%の確率でボムアイテム（0.01 + 0.00
 MAGNET_ITEM_DROP_RATE = 0.001  # 0.1%の確率でマグネットアイテム
 
 # パーティクル関連の制限（パフォーマンス改善用）
-PARTICLE_LIMIT = 200        # これ以上は古いパーティクルから切る
+PARTICLE_LIMIT = 120        # これ以上は古いパーティクルから切る（200から120に削減）
 
 # パフォーマンス最適化設定
 FULLSCREEN_FPS_THRESHOLD = 2.5  # この倍率以上でFPS調整
 FULLSCREEN_FPS = 60  # フルスクリーン時の目標FPS（大画面時）
 NORMAL_FPS = 60  # 通常時のFPS
-PARTICLE_TRIM_TO = 150      # 切るときに残す数
+PARTICLE_TRIM_TO = 80       # 切るときに残す数（150から80に削減）
 
 # 画面上に存在可能な経験値ジェムの上限
-MAX_GEMS_ON_SCREEN = 150
+MAX_GEMS_ON_SCREEN = 100  # 150から100に削減
 
 # HP自然回復設定
 NATURAL_HEAL_INTERVAL_MS = 2000  # 自然回復の間隔（ミリ秒）
