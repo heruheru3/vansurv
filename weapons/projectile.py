@@ -385,35 +385,70 @@ class Knife(Weapon):
             return []
         self.update_cooldown()
 
-        # 角度はマウス位置優先、なければ移動方向
+        # 角度決定：移動中は移動方向、マウスクリック中はマウス方向、それ以外はlast_direction
         angle = None
-        try:
-            if get_virtual_mouse_pos:
-                # 仮想マウス座標を使用
-                mx, my = get_virtual_mouse_pos()
-            else:
-                # 従来の方法（後方互換性のため）
-                mx, my = pygame.mouse.get_pos()
-            world_mx = mx + camera_x
-            world_my = my + camera_y
-            dx = world_mx - player.x
-            dy = world_my - player.y
-            if dx == 0 and dy == 0:
-                angle = None
-            else:
-                angle = math.atan2(dy, dx)
-        except Exception:
-            angle = None
-
-        if angle is None:
-            # プレイヤーの向きが取れるならそれを使う
-            angle = 0
+        
+        # 現在キーボード入力があるかチェック
+        keys = pygame.key.get_pressed()
+        has_keyboard_input = (keys[pygame.K_LEFT] or keys[pygame.K_RIGHT] or 
+                             keys[pygame.K_UP] or keys[pygame.K_DOWN] or
+                             keys[pygame.K_a] or keys[pygame.K_d] or
+                             keys[pygame.K_w] or keys[pygame.K_s])
+        
+        # プレイヤーが実際に移動しているかも確認
+        movement_dx = getattr(player, 'movement_dx', 0.0)
+        movement_dy = getattr(player, 'movement_dy', 0.0)
+        is_actually_moving = (movement_dx != 0 or movement_dy != 0)
+        
+        # マウスがクリックされているかチェック
+        mouse_pressed = pygame.mouse.get_pressed()[0]
+        
+        if has_keyboard_input and is_actually_moving:
+            # キーボード操作で実際に移動中：移動方向ベクトルを使用
             try:
+                angle = math.atan2(movement_dy, movement_dx)
+            except Exception:
+                # フォールバック：last_directionを使用
                 ld = getattr(player, 'last_direction', 'right')
                 lookup = {'right': 0.0, 'left': math.pi, 'up': -math.pi/2, 'down': math.pi/2}
                 angle = lookup.get(ld, 0.0)
+        elif mouse_pressed:
+            # マウスクリック中：マウス位置を使用
+            try:
+                if get_virtual_mouse_pos:
+                    # 仮想マウス座標を使用
+                    mx, my = get_virtual_mouse_pos()
+                else:
+                    # 従来の方法（後方互換性のため）
+                    mx, my = pygame.mouse.get_pos()
+                world_mx = mx + camera_x
+                world_my = my + camera_y
+                dx = world_mx - player.x
+                dy = world_my - player.y
+                if dx == 0 and dy == 0:
+                    # マウス位置がプレイヤーと同じ場合はlast_directionを使用
+                    ld = getattr(player, 'last_direction', 'right')
+                    lookup = {'right': 0.0, 'left': math.pi, 'up': -math.pi/2, 'down': math.pi/2}
+                    angle = lookup.get(ld, 0.0)
+                else:
+                    angle = math.atan2(dy, dx)
+            except Exception:
+                # マウス位置取得に失敗した場合はlast_directionを使用
+                ld = getattr(player, 'last_direction', 'right')
+                lookup = {'right': 0.0, 'left': math.pi, 'up': -math.pi/2, 'down': math.pi/2}
+                angle = lookup.get(ld, 0.0)
+        else:
+            # 静止状態（キーボード入力なし、マウスクリックなし）：最後の発射角度を使用
+            try:
+                angle = getattr(player, 'last_attack_angle', 0.0)
             except Exception:
                 angle = 0
+
+        # 発射角度をプレイヤーに記録（次回の静止状態で使用）
+        try:
+            player.last_attack_angle = angle
+        except Exception:
+            pass
 
         # apply projectile speed multiplier
         try:

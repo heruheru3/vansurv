@@ -56,6 +56,12 @@ class Player:
         self.vx = 0.0
         self.vy = 0.0
 
+        # 移動方向の記録（武器の発射方向に使用）
+        self.last_direction = 'right'
+        self.movement_dx = 0.0
+        self.movement_dy = 0.0
+        self.last_attack_angle = 0.0  # 最後の発射角度を記録
+
         # マグネット効果
         self.magnet_active = False
         self.magnet_end_time = 0
@@ -140,14 +146,46 @@ class Player:
         dx = 0.0
         dy = 0.0
         keys = pygame.key.get_pressed()
+        
+        # キーボード入力の記録
+        keyboard_input = False
         if keys[pygame.K_LEFT]:
             dx -= 1.0
+            keyboard_input = True
         if keys[pygame.K_RIGHT]:
             dx += 1.0
+            keyboard_input = True
         if keys[pygame.K_UP]:
             dy -= 1.0
+            keyboard_input = True
         if keys[pygame.K_DOWN]:
             dy += 1.0
+            keyboard_input = True
+
+        # キーボード入力がある場合は移動方向を記録
+        if keyboard_input:
+            if dx != 0 or dy != 0:
+                # 移動方向を正規化して記録
+                length = math.hypot(dx, dy)
+                if length > 0:
+                    self.movement_dx = dx / length
+                    self.movement_dy = dy / length
+                    
+                    # 主要な方向を決定
+                    if abs(dx) > abs(dy):
+                        if dx > 0:
+                            self.last_direction = 'right'
+                        else:
+                            self.last_direction = 'left'
+                    else:
+                        if dy > 0:
+                            self.last_direction = 'down'
+                        else:
+                            self.last_direction = 'up'
+        else:
+            # キーボード入力がない場合（静止状態）は移動ベクトルをクリア
+            self.movement_dx = 0.0
+            self.movement_dy = 0.0
 
         if pygame.mouse.get_pressed()[0]:
             if get_virtual_mouse_pos:
