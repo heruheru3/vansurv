@@ -39,7 +39,13 @@ SHOW_FPS = True  # FPS表示のON/OFF
 
 # マップ・ステージ設定
 USE_STAGE_MAP = False  # True: レトロマップチップ使用, False: 市松模様背景（テスト用）
+USE_CSV_MAP = True    # True: CSVマップ使用, False: ランダム生成背景
 TEST_TILE_SIZE = 64    # テスト用背景の市松模様のタイルサイズ
+
+# CSVマップ設定
+CSV_MAP_FILE = "map/stage_map.csv"  # CSVマップファイル名
+MAP_TILES_WIDTH = 80   # マップの横幅（タイル数）= WORLD_WIDTH / TEST_TILE_SIZE
+MAP_TILES_HEIGHT = 45  # マップの縦幅（タイル数）= WORLD_HEIGHT / TEST_TILE_SIZE
 
 # プレイヤーが被弾後に一時的に無敵となる時間（ミリ秒）
 INVINCIBLE_MS = 200

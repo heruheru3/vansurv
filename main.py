@@ -41,6 +41,7 @@ from game_utils import init_game_state, limit_particles, enforce_experience_gems
 from game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item_effect, 
                        update_difficulty, handle_player_level_up, collect_experience_gems, collect_items)
 from collision import check_player_enemy_collision, check_attack_enemy_collision
+from map import MapLoader
 
 # ランタイムで切り替え可能なデバッグフラグ（F3でトグル）
 DEBUG_MODE = DEBUG
@@ -112,6 +113,19 @@ def main():
 
     # ゲーム状態の初期化
     player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+
+    # マップローダーの初期化
+    map_loader = MapLoader()
+    if USE_CSV_MAP:
+        # CSVマップファイルを読み込み（存在しない場合はサンプルを作成）
+        csv_path = CSV_MAP_FILE
+        if not os.path.exists(csv_path):
+            print(f"[INFO] Creating sample CSV map: {csv_path}")
+            map_loader.create_sample_csv(csv_path)
+        map_loader.load_csv_map(csv_path)
+    else:
+        # デフォルトマップ（市松模様）を生成
+        map_loader.generate_default_map()
 
     # カメラをプレイヤーの初期位置に設定
     camera_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, player.x - SCREEN_WIDTH // 2))
@@ -1072,6 +1086,9 @@ def main():
             if USE_STAGE_MAP:
                 # レトロマップチップ背景
                 draw_stage_background(world_surf, int_cam_x, int_cam_y)
+            elif USE_CSV_MAP:
+                # CSVマップ背景
+                map_loader.draw_map(world_surf, int_cam_x, int_cam_y)
             else:
                 # テスト用市松模様背景
                 draw_test_checkerboard(world_surf, int_cam_x, int_cam_y)
