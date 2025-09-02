@@ -38,6 +38,7 @@ from stage import draw_stage_background
 import stage
 import resources
 from territory import TerritoryManager  # 陣取りシステム
+from ai_lord import AIManager  # AI勢力システム
 from game_utils import init_game_state, limit_particles, enforce_experience_gems_limit
 from game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item_effect, 
                        update_difficulty, handle_player_level_up, collect_experience_gems, collect_items)
@@ -111,8 +112,12 @@ def main():
 
     # 陣取りシステムの初期化
     territory_manager = TerritoryManager()
-    territory_manager.generate_territories(15)  # 15の拠点を生成
+    territory_manager.generate_territories(18)  # 18の拠点を生成
     print(f"[INFO] Generated {territory_manager.get_total_territories()} territories")
+
+    # AI勢力システムの初期化
+    ai_manager = AIManager()
+    print(f"[INFO] Initialized {len(ai_manager.ai_lords)} AI factions")
 
     # カメラをプレイヤーの初期位置に設定
     camera_x = max(0, min(WORLD_WIDTH - SCREEN_WIDTH, player.x - SCREEN_WIDTH // 2))
@@ -599,6 +604,9 @@ def main():
                 # 陣取りシステムの更新
                 territory_manager.update(dt, player)
                 
+                # AI勢力の更新
+                ai_manager.update(dt, territory_manager)
+                
                 # 勝利条件のチェック（全拠点制圧）
                 if not game_clear and territory_manager.get_player_territories() == territory_manager.get_total_territories():
                     game_clear = True
@@ -1069,6 +1077,9 @@ def main():
             # 陣取り情報の表示
             from ui import draw_territory_info
             draw_territory_info(virtual_screen, territory_manager)
+            
+            # AI勢力情報の表示
+            ai_manager.draw_ai_info(virtual_screen, territory_manager)
             
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
             if game_over or game_clear:

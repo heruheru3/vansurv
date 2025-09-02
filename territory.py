@@ -91,6 +91,8 @@ class Territory:
             base_color = (150, 50, 50)  # 赤
         elif self.owner == 'ai_blue':
             base_color = (50, 50, 150)  # 青
+        elif self.owner == 'ai_green':
+            base_color = (50, 150, 50)  # 緑
         else:
             base_color = self.color  # 中立
             
@@ -144,6 +146,7 @@ class TerritoryManager:
     def __init__(self):
         self.territories = []
         self.player_resources = {'gold': 100, 'income': 0}
+        self.battle_effects = []  # 戦闘エフェクトのリスト
         
     def generate_territories(self, count=12):
         """ランダムに拠点を生成"""
@@ -162,12 +165,14 @@ class TerritoryManager:
             )[0]
             
             # AI勢力をランダムに割り当て（一部は中立）
-            if i < count // 3:
+            if i < count // 4:
                 owner = None  # 中立
-            elif i < count * 2 // 3:
+            elif i < count // 2:
                 owner = 'ai_red'
+            elif i < count * 3 // 4:
+                owner = 'ai_blue' 
             else:
-                owner = 'ai_blue'
+                owner = 'ai_green'  # 3つ目のAI勢力を追加
                 
             territory = Territory(x, y, territory_type, owner)
             self.territories.append(territory)
@@ -196,10 +201,17 @@ class TerritoryManager:
         self.player_resources['gold'] += total_income
         self.player_resources['income'] = sum(t.income for t in self.territories if t.owner == 'player')
         
+        # 戦闘エフェクトの更新
+        self.battle_effects = [effect for effect in self.battle_effects if effect.update()]
+        
     def draw(self, screen, camera_x=0, camera_y=0):
         """全拠点の描画"""
         for territory in self.territories:
             territory.draw(screen, camera_x, camera_y)
+            
+        # 戦闘エフェクトの描画
+        for effect in self.battle_effects:
+            effect.draw(screen, camera_x, camera_y)
             
     def get_player_territories(self):
         """プレイヤーが所有する拠点数を取得"""

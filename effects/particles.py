@@ -28,27 +28,31 @@ class DeathParticle:
                          (int(self.x - camera_x), int(self.y - camera_y)), 
                          int(self.size))
 
+
 class PlayerHurtParticle:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.speed = random.uniform(2, 5)
+        self.speed = random.uniform(1, 3)
         self.angle = math.radians(random.uniform(0, 360))
         self.lifetime = 20
-        self.size = random.randint(2, 4)
+        self.size = random.randint(3, 6)
+        self.color = (255, random.randint(50, 100), random.randint(50, 100))
         self.dx = math.cos(self.angle) * self.speed
         self.dy = math.sin(self.angle) * self.speed
-        self.color = (255, 100, 100)
 
     def update(self):
         self.x += self.dx
         self.y += self.dy
         self.lifetime -= 1
-        self.size = max(0, self.size - 0.12)
+        self.size = max(0, self.size - 0.1)
         return self.lifetime > 0
 
     def draw(self, screen, camera_x=0, camera_y=0):
-        pygame.draw.circle(screen, self.color, (int(self.x - camera_x), int(self.y - camera_y)), int(self.size))
+        pygame.draw.circle(screen, self.color, 
+                         (int(self.x - camera_x), int(self.y - camera_y)), 
+                         int(self.size))
+
 
 class HurtFlash:
     def __init__(self, x=0, y=0, size=20, duration=12):
