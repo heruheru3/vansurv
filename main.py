@@ -92,7 +92,7 @@ def main():
     
     # 画面右下に小さなプレイヤーステータスを表示するかどうかのフラグ（F4でトグル）
     show_status = True
-    # デバッグ表示フラグ（F5でトグル：攻撃範囲+障害物）
+    # デバッグ表示フラグ（F5でトグル：攻撃範囲＋敵の当たり判定）
     show_debug_visuals = False
     try:
         debug_font = pygame.font.SysFont(None, 14)
@@ -212,7 +212,7 @@ def main():
                         print(f"[INFO] show_status set to {show_status}")
                         continue
 
-                    # デバッグ表示のトグル（F5：攻撃範囲+障害物）
+                    # デバッグ表示のトグル（F5：攻撃範囲＋敵の当たり判定）
                     if event.key == pygame.K_F5:
                         show_debug_visuals = not show_debug_visuals
                         print(f"[INFO] show_debug_visuals set to {show_debug_visuals}")
@@ -1126,36 +1126,9 @@ def main():
             # プレイヤー本体は武器エフェクトより手前に表示する
             player.draw(world_surf, int_cam_x, int_cam_y)
 
-            # デバッグ表示: 攻撃範囲と障害物の可視化（world_surf に描画）
+            # デバッグ表示: 攻撃範囲と敵の当たり判定の可視化（world_surf に描画）
             if show_debug_visuals:
                 try:
-                    # 障害物を赤い半透明で表示
-                    stage_map = stage.get_stage_map()
-                    
-                    # 画面内の障害物のみチェック（パフォーマンス向上）
-                    start_tile_x = max(0, int(int_cam_x // stage.TILE_SIZE))
-                    end_tile_x = min(stage.WORLD_WIDTH // stage.TILE_SIZE, 
-                                   int((int_cam_x + SCREEN_WIDTH) // stage.TILE_SIZE) + 1)
-                    start_tile_y = max(0, int(int_cam_y // stage.TILE_SIZE))
-                    end_tile_y = min(stage.WORLD_HEIGHT // stage.TILE_SIZE, 
-                                   int((int_cam_y + SCREEN_HEIGHT) // stage.TILE_SIZE) + 1)
-                    
-                    obstacle_surface = pygame.Surface((stage.TILE_SIZE, stage.TILE_SIZE))
-                    obstacle_surface.set_alpha(120)  # 少し濃い半透明
-                    obstacle_surface.fill((255, 100, 100))  # 赤っぽいピンク
-                    pygame.draw.rect(obstacle_surface, (255, 0, 0), 
-                                   (0, 0, stage.TILE_SIZE, stage.TILE_SIZE), 2)  # 赤い境界線
-                    
-                    for tile_y in range(start_tile_y, end_tile_y):
-                        for tile_x in range(start_tile_x, end_tile_x):
-                            world_x = tile_x * stage.TILE_SIZE
-                            world_y = tile_y * stage.TILE_SIZE
-                            if stage_map.is_obstacle_at_world_pos(world_x + stage.TILE_SIZE//2, 
-                                                                world_y + stage.TILE_SIZE//2):
-                                screen_x = world_x - int_cam_x
-                                screen_y = world_y - int_cam_y
-                                world_surf.blit(obstacle_surface, (screen_x, screen_y))
-                    
                     # 攻撃エフェクトの範囲を例示（黄色い円）
                     for atk in player.active_attacks:
                         try:
