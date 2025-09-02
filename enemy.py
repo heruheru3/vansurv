@@ -235,9 +235,9 @@ class Enemy:
         base_stats = {
             1: {'hp': 10, 'speed': 1.125, 'damage': 2},
             2: {'hp': 20, 'speed': 1.5, 'damage': 4},
-            3: {'hp': 30, 'speed': 1.875, 'damage': 5},
-            4: {'hp': 40, 'speed': 2.0, 'damage': 6},
-            5: {'hp': 50, 'speed': 2.25, 'damage': 8}
+            3: {'hp': 30, 'speed': 1.875, 'damage': 6},
+            4: {'hp': 40, 'speed': 2.0, 'damage': 8},
+            5: {'hp': 50, 'speed': 2.25, 'damage': 10}
         }
         
         stats = base_stats.get(self.enemy_type, base_stats[1])
@@ -265,12 +265,12 @@ class Enemy:
         
         # 行動パターンに応じた調整
         if self.behavior_type == 2:  # 直進タイプ
-            self.base_speed *= 1.5  # 速度アップ
+            self.base_speed *= 2.0  # 速度アップ
         elif self.behavior_type == 3:  # 距離保持射撃
             self.base_speed *= 0.35  # 速度ダウン（半分に減速）
             self.attack_cooldown = 8000  # 8秒間隔で攻撃（2秒から4倍に延長）
         elif self.behavior_type == 4:  # 遅速追跡（旧固定砲台）
-            self.base_speed *= 0.5  # 通常の半分の速度で移動
+            self.base_speed *= 0.25  # 通常の5分の1の速度で移動
             self.attack_cooldown = 6000  # 6秒間隔で攻撃
             # HP調整なし（デフォルト値のまま）
         

@@ -20,8 +20,8 @@ YELLOW = (255, 255, 0)
 PINK = (255, 192, 203)
 GRAY = (128, 128, 128)
 LIGHT_GRAY = (192, 192, 192)  # テスト用背景の薄いグレー
-DARK_GRAY = (36, 36, 36)  # テスト用背景の濃いグレー
-MOREDARK_GRAY = (24, 24, 24)  # テスト用背景のさらに濃いグレー
+DARK_GRAY = (48, 48, 48)  # テスト用背景の濃いグレー
+MOREDARK_GRAY = (36, 36, 36)  # テスト用背景のさらに濃いグレー
 
 # 所持できる武器の最大数（レベルアップで新規武器を取得できる上限）
 MAX_WEAPONS = 4
@@ -70,7 +70,7 @@ GARLIC_HEAL_INTERVAL_MS = 500    # ガーリック回復の間隔（ミリ秒）
 GARLIC_HEAL_AMOUNT = 1           # ガーリック回復時の基本回復量（HPサブアイテムレベル分が追加される）
 
 # 回復アイテム設定
-HEAL_ITEM_AMOUNT = 0.20          # 回復アイテムの回復量（割合：0.20 = 20%）
+HEAL_ITEM_AMOUNT = 0.25          # 回復アイテムの回復量（割合：0.25 = 25%）
 
 # マグネットアイテム設定
 MAGNET_EFFECT_DURATION_MS = 3000 # マグネット効果の持続時間（ミリ秒）
@@ -81,7 +81,7 @@ SCREEN_SHAKE_DURATION_MS = 500   # 画面揺れの持続時間（ミリ秒）
 SCREEN_SHAKE_INTENSITY = 10      # 画面揺れの強度（ピクセル）
 
 # レベルアップ時の自動回復量
-LEVELUP_HEAL_AMOUNT = 20         # レベルアップ時の回復量
+LEVELUP_HEAL_AMOUNT = 0        # レベルアップ時の回復量
 
 # エネミー画像のHSV調整
 ENEMY_IMAGE_HUE_SHIFT = 0.0      # エネミー画像の色相シフト（-1.0～1.0、0.0 = 変更なし）
