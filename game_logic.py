@@ -64,7 +64,7 @@ def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval,
 
 
 def handle_enemy_death(enemy, enemies, experience_gems, items, particles, damage_stats, 
-                      player_x, player_y):
+                      player_x, player_y, player=None):
     """敵死亡時の処理"""
     if enemy.hp <= 0:
         # 死亡エフェクト
@@ -77,7 +77,7 @@ def handle_enemy_death(enemy, enemies, experience_gems, items, particles, damage
             items.append(GameItem(enemy.x, enemy.y, "heal"))
         elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE:
             items.append(GameItem(enemy.x, enemy.y, "bomb"))
-        elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE + MAGNET_ITEM_DROP_RATE:
+        elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE + (player.get_magnet_drop_rate() if player else MAGNET_ITEM_DROP_RATE):
             items.append(GameItem(enemy.x, enemy.y, "magnet"))
         else:
             experience_gems.append(ExperienceGem(enemy.x, enemy.y))
