@@ -1,8 +1,23 @@
 import pygame
 import math
+import os
+import sys
 from constants import *
 
+def resource_path(relative_path):
+    """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
+    try:
+        # PyInstallerで実行されている場合
+        base_path = sys._MEIPASS
+    except Exception:
+        # 通常のPythonで実行されている場合
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 class Attack:
+    # 武器画像のキャッシュ
+    _weapon_image_cache = {}
+    
     def __init__(self, x, y, size_x, size_y, type_, duration=1000, target=None, 
                  speed=0, bounces=0, follow_player=None, direction=None, 
                  velocity_x=None, velocity_y=None, rotation_speed=None, damage=0):
@@ -24,6 +39,9 @@ class Attack:
         self.velocity_y = velocity_y
         self.rotation_speed = rotation_speed if rotation_speed is not None else 0
         self.damage = damage  # 攻撃のダメージ量
+
+        # 武器画像を読み込み（存在すれば）
+        self.weapon_image = self._load_weapon_image(type_)
 
         # spawn_delay を外部から設定できるようにする（ms）。設定されると開始を遅らせる。
         self.spawn_delay = 0
@@ -48,6 +66,31 @@ class Attack:
         if self.type == "holy_water":
             self.holy_surf = None
             self.holy_surf_size = 0
+
+    @classmethod
+    def _load_weapon_image(cls, weapon_type):
+        """武器の画像を読み込む（キャッシュ機能付き）"""
+        if weapon_type in cls._weapon_image_cache:
+            return cls._weapon_image_cache[weapon_type]
+        
+        # 画像ファイルパスを構築
+        image_path = resource_path(os.path.join("assets", "weapons", f"{weapon_type}.png"))
+        
+        try:
+            if os.path.exists(image_path):
+                print(f"[DEBUG] Loading weapon image: {image_path}")
+                image = pygame.image.load(image_path).convert_alpha()
+                cls._weapon_image_cache[weapon_type] = image
+                print(f"[DEBUG] Successfully loaded weapon image: {weapon_type}")
+                return image
+            else:
+                print(f"[DEBUG] Weapon image not found: {image_path}")
+                cls._weapon_image_cache[weapon_type] = None
+                return None
+        except Exception as e:
+            print(f"[WARNING] Failed to load weapon image {weapon_type}: {e}")
+            cls._weapon_image_cache[weapon_type] = None
+            return None
 
     def update(self, camera_x=None, camera_y=None):
         # spawn_delay が設定されている場合は開始まで待機する
@@ -427,24 +470,30 @@ class Attack:
             except Exception:
                 pygame.draw.circle(screen, MAGENTA, (int(sx), int(sy)), self.size)
         elif self.type == "axe":
-            # 回転する斧のエフェクトを描画
-            center = (int(sx), int(sy))
-            points = [
-                (self.x - self.size_x/2, self.y),
-                (self.x, self.y - self.size_y/2),
-                (self.x + self.size_x/2, self.y),
-                (self.x, self.y + self.size_y/2)
-            ]
-            # 点を回転
-            rotated_points = []
-            for px, py in points:
-                dx = px - self.x
-                dy = py - self.y
-                rx = dx * math.cos(self.angle) - dy * math.sin(self.angle)
-                ry = dx * math.sin(self.angle) + dy * math.cos(self.angle)
-                rotated_points.append((int(self.x + rx - camera_x), int(self.y + ry - camera_y)))
-            
-            pygame.draw.polygon(screen, GRAY, rotated_points)
+            # 画像がある場合は画像を描画、ない場合は従来の四角形を描画
+            if self.weapon_image is not None:
+                # 画像を回転して描画
+                try:
+                    # 画像のサイズを攻撃エフェクトのサイズに合わせる
+                    scaled_image = pygame.transform.scale(self.weapon_image, (int(self.size_x), int(self.size_y)))
+                    
+                    # 回転角度を度数に変換してから回転
+                    angle_degrees = math.degrees(self.angle)
+                    rotated_image = pygame.transform.rotate(scaled_image, -angle_degrees)  # 反時計回りに回転
+                    
+                    # 回転後の画像の中心をエフェクトの中心に合わせる
+                    rotated_rect = rotated_image.get_rect()
+                    rotated_rect.center = (sx, sy)
+                    
+                    # 描画
+                    screen.blit(rotated_image, rotated_rect.topleft)
+                except Exception as e:
+                    print(f"[WARNING] Failed to draw axe image: {e}")
+                    # フォールバック：従来の四角形描画
+                    self._draw_axe_fallback(screen, sx, sy, camera_x, camera_y)
+            else:
+                # 画像がない場合は従来の四角形を描画
+                self._draw_axe_fallback(screen, sx, sy, camera_x, camera_y)
         elif self.type == "stone":
             try:
                 r = max(2, int(self.size))
@@ -601,3 +650,22 @@ class Attack:
                     pygame.draw.circle(screen, (255, 230, 120), (cx, cy), r, 2)
             except Exception:
                 pygame.draw.circle(screen, (255, 230, 120), (int(sx), int(sy)), max(2, int(self.size)))
+
+    def _draw_axe_fallback(self, screen, sx, sy, camera_x, camera_y):
+        """斧の画像がない場合のフォールバック描画（従来の四角形）"""
+        points = [
+            (self.x - self.size_x/2, self.y),
+            (self.x, self.y - self.size_y/2),
+            (self.x + self.size_x/2, self.y),
+            (self.x, self.y + self.size_y/2)
+        ]
+        # 点を回転
+        rotated_points = []
+        for px, py in points:
+            dx = px - self.x
+            dy = py - self.y
+            rx = dx * math.cos(self.angle) - dy * math.sin(self.angle)
+            ry = dx * math.sin(self.angle) + dy * math.cos(self.angle)
+            rotated_points.append((int(self.x + rx - camera_x), int(self.y + ry - camera_y)))
+        
+        pygame.draw.polygon(screen, GRAY, rotated_points)
