@@ -47,10 +47,15 @@ class HolyWater(Weapon):
         
         # レベルに応じた攻撃数で生成
         # 複数発生する場合は短い遅延を挟んで順次発生させる
-        delay_step = 120  # ms の単位で短い遅延
+        delay_step = 100  # ms の単位で短い遅延
+        
+        # 重ならないように配置するための位置生成
+        positions = self._generate_non_overlapping_positions(
+            player.x, player.y, effective_count, effective_radius
+        )
+        
         for i in range(effective_count):
-            x = player.x + random.randint(-150, 150)  # 散布範囲を広げる
-            y = player.y + random.randint(-150, 150)
+            x, y = positions[i]
             atk = Attack(x=x,
                          y=y,
                          size_x=effective_radius * 2,  # 直径を指定
@@ -69,6 +74,68 @@ class HolyWater(Weapon):
         
         return attacks
 
+    def _generate_non_overlapping_positions(self, center_x, center_y, count, radius):
+        """重ならないように聖水の投擲位置を生成する"""
+        positions = []
+        
+        if count == 1:
+            # 1個だけならプレイヤー前方に投擲
+            positions.append((center_x + random.randint(-50, 50), center_y + random.randint(-50, 50)))
+            return positions
+        
+        # 複数個の場合は円形配置を基本に、重複を避けながら配置
+        base_distance = radius * 2  # 効果範囲の2倍の距離を基準にする
+        max_attempts = 3  # 最大試行回数
+        
+        for i in range(count):
+            attempts = 0
+            while attempts < max_attempts:
+                if i == 0:
+                    # 最初の1個はプレイヤー近辺のランダム位置
+                    x = center_x + random.randint(-80, 80)
+                    y = center_y + random.randint(-80, 80)
+                else:
+                    # 2個目以降は既存の位置から適切な距離を保って配置
+                    if count <= 6:
+                        # 6個以下なら円形配置
+                        angle = (2 * math.pi * i) / count + random.uniform(-0.3, 0.3)  # 少しランダム性を加える
+                        distance = base_distance + random.uniform(-20, 40)
+                        x = center_x + math.cos(angle) * distance
+                        y = center_y + math.sin(angle) * distance
+                    else:
+                        # 7個以上なら螺旋配置
+                        angle = (i * 2.4) + random.uniform(-0.2, 0.2)  # 螺旋角度
+                        distance = base_distance * 0.7 + (i * 15) + random.uniform(-15, 15)
+                        x = center_x + math.cos(angle) * distance
+                        y = center_y + math.sin(angle) * distance
+                
+                # 既存の位置と重複しないかチェック
+                valid = True
+                min_distance = radius * 2.2  # 最小距離（効果範囲の2.2倍）
+                
+                for existing_x, existing_y in positions:
+                    distance = math.sqrt((x - existing_x)**2 + (y - existing_y)**2)
+                    if distance < min_distance:
+                        valid = False
+                        break
+                
+                if valid:
+                    positions.append((x, y))
+                    break
+                
+                attempts += 1
+            
+            # 最大試行回数を超えた場合は強制的に位置を決定
+            if len(positions) <= i:
+                # フォールバック：より遠くにランダム配置
+                angle = random.uniform(0, 2 * math.pi)
+                distance = base_distance + (i * 30) + random.randint(-20, 40)
+                x = center_x + math.cos(angle) * distance
+                y = center_y + math.sin(angle) * distance
+                positions.append((x, y))
+        
+        return positions
+
     def level_up(self):
         """レベルアップ時の強化"""
         super().level_up()
@@ -76,7 +143,7 @@ class HolyWater(Weapon):
             self.radius = int(self.radius * 1.2)  # 範囲20%増加
         else:  # 奇数レベルで攻撃個数増加
             self.num_attacks += 1  # 攻撃個数+1
-        self.damage *= 1.1  # ダメージ10%増加
+        self.damage *= 1.2  # ダメージ20%増加
 
 class MagicWand(Weapon):
     def __init__(self):
