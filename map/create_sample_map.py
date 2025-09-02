@@ -6,9 +6,34 @@
 import sys
 import os
 
-# constants.pyから設定をインポート
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from map.map_loader import MapLoader
+# パス設定を追加（実行場所に関係なく動作させるため）
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+
+# 親ディレクトリ（ルートディレクトリ）をパスに追加
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# mapディレクトリもパスに追加（map内からの実行時に必要）
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# インポート（実行場所に応じて調整）
+try:
+    # mapディレクトリ内から実行する場合
+    from map_loader import MapLoader
+    print(f"[INFO] MapLoaderをmap_loaderからインポートしました")
+except ImportError:
+    try:
+        # ルートディレクトリから実行する場合
+        from map.map_loader import MapLoader
+        print(f"[INFO] MapLoaderをmap.map_loaderからインポートしました")
+    except ImportError as e:
+        print(f"❌ MapLoaderのインポートに失敗しました: {e}")
+        print(f"現在のディレクトリ: {current_dir}")
+        print(f"親ディレクトリ: {parent_dir}")
+        print(f"Pythonパス: {sys.path[:3]}...")  # 最初の3つだけ表示
+        sys.exit(1)
 
 def main():
     print("サンプルCSVマップを作成します...")
@@ -16,8 +41,21 @@ def main():
     # MapLoaderインスタンスを作成
     loader = MapLoader()
     
-    # サンプルCSVを作成（mapディレクトリ内に）
-    csv_filename = "map/stage_map.csv"
+    # 実行場所に応じてCSVファイルのパスを決定
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.basename(current_dir) == 'map':
+        # mapディレクトリ内から実行する場合は同じディレクトリに出力
+        csv_filename = os.path.join(current_dir, "stage_map.csv")
+        print(f"[INFO] 出力先: {csv_filename}")
+    else:
+        # ルートディレクトリから実行する場合はmapディレクトリに出力
+        map_dir = os.path.join(current_dir, "map")
+        csv_filename = os.path.join(map_dir, "stage_map.csv")
+        print(f"[INFO] 出力先: {csv_filename}")
+        # mapディレクトリが存在しない場合は作成
+        if not os.path.exists(map_dir):
+            os.makedirs(map_dir)
+    
     if loader.create_sample_csv(csv_filename):
         print(f"✓ サンプルCSVファイル '{csv_filename}' を作成しました")
         print(f"  マップサイズ: 80×45 マス")
