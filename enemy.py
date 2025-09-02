@@ -24,16 +24,26 @@ class Enemy:
         try:
             # 画像を読み込み
             image = pygame.image.load(image_path).convert_alpha()
-            # 32x32ピクセルにスケール（念のため）
-            image = pygame.transform.scale(image, (32, 32))
+            
+            # レベルに応じたサイズを計算（レベル1: 32px, レベル5: 48px）
+            base_size = 32
+            max_size = 48
+            size = base_size + int((max_size - base_size) * (enemy_level - 1) / 4)
+            
+            # レベルに応じたサイズにスケール
+            image = pygame.transform.scale(image, (size, size))
+            
+            # HSVを調整
+            image = cls._adjust_hsv(image, ENEMY_IMAGE_HUE_SHIFT, ENEMY_IMAGE_SATURATION, ENEMY_IMAGE_VALUE)
             
             # 左右反転用の画像も作成
             flipped_image = pygame.transform.flip(image, True, False)
             
-            # キャッシュに保存（通常版と反転版）
+            # キャッシュに保存（通常版と反転版、サイズ情報も含む）
             cls._image_cache[cache_key] = {
                 'left': image,      # 左向き（元画像）
-                'right': flipped_image  # 右向き（反転）
+                'right': flipped_image,  # 右向き（反転）
+                'size': size        # 実際のサイズ
             }
             
             return cls._image_cache[cache_key]
@@ -43,9 +53,66 @@ class Enemy:
             cls._image_cache[cache_key] = None
             return None
     
+    @classmethod
+    def _adjust_hsv(cls, surface, hue_shift=0.0, saturation_factor=1.0, value_factor=1.0):
+        """画像のHSV値を調整する
+        Args:
+            surface: 調整対象のサーフェス
+            hue_shift: 色相シフト（-1.0～1.0）
+            saturation_factor: 彩度倍率（0.0～2.0）
+            value_factor: 明度倍率（0.0～2.0）
+        """
+        if hue_shift == 0.0 and saturation_factor == 1.0 and value_factor == 1.0:
+            return surface  # 調整不要
+        
+        # 新しいサーフェスを作成
+        adjusted_surface = surface.copy()
+        
+        # ピクセル配列にアクセス
+        width, height = surface.get_size()
+        
+        # ピクセルごとにHSVを調整
+        for x in range(width):
+            for y in range(height):
+                color = surface.get_at((x, y))
+                r, g, b, a = color
+                
+                # アルファが0の場合（透明）は処理をスキップ
+                if a == 0:
+                    continue
+                
+                # RGBをHSVに変換
+                import colorsys
+                h, s, v = colorsys.rgb_to_hsv(r/255.0, g/255.0, b/255.0)
+                
+                # HSV値を調整
+                # 色相シフト（0-1の範囲で循環）
+                h = (h + hue_shift) % 1.0
+                
+                # 彩度調整
+                s = s * saturation_factor
+                s = max(0.0, min(1.0, s))  # 0-1の範囲にクランプ
+                
+                # 明度調整
+                v = v * value_factor
+                v = max(0.0, min(1.0, v))  # 0-1の範囲にクランプ
+                
+                # HSVをRGBに戻す
+                r_new, g_new, b_new = colorsys.hsv_to_rgb(h, s, v)
+                
+                # 0-255の範囲に変換
+                r_new = int(r_new * 255)
+                g_new = int(g_new * 255)
+                b_new = int(b_new * 255)
+                
+                # 新しい色を設定
+                adjusted_surface.set_at((x, y), (r_new, g_new, b_new, a))
+        
+        return adjusted_surface
+    
     def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None):
         self.screen = screen
-        self.size = 15
+        
         # ヒット時のフラッシュ用タイマ（秒）
         self.hit_flash_timer = 0.0
         self.hit_flash_duration = 0.25  # フェードイン+フェードアウトの合計時間
@@ -57,6 +124,12 @@ class Enemy:
         
         # 敵の種類をランダムに決定（game_timeに応じて変化）
         self.enemy_type = self.get_random_enemy_type(game_time)
+        
+        # レベルに応じたサイズを設定（レベル1: 15px, レベル5: 24px の半径）
+        # 画像サイズが32-48pxなので、当たり判定は少し小さめに設定
+        base_radius = 15
+        max_radius = 24
+        self.size = base_radius + int((max_radius - base_radius) * (self.enemy_type - 1) / 4)
         
         # 行動パターンをランダムに決定
         self.behavior_type = self.get_random_behavior_type(game_time)
@@ -128,7 +201,7 @@ class Enemy:
         1: プレイヤーに寄ってくる（追跡）
         2: プレイヤーに向かうがそのまま直進して画面端に消える
         3: プレイヤーから一定の距離を保ち、魔法の杖のような弾を発射する
-        4: その場で動かず、遠距離攻撃を行う、魔法の杖のような弾を発射する
+        4: 遅い速度でプレイヤーに近づき、遠距離攻撃も行う
         """
         if game_time <= 30:  # 序盤は単純な行動のみ
             rand = random.random()
@@ -196,10 +269,10 @@ class Enemy:
         elif self.behavior_type == 3:  # 距離保持射撃
             self.base_speed *= 0.35  # 速度ダウン（半分に減速）
             self.attack_cooldown = 8000  # 8秒間隔で攻撃（2秒から4倍に延長）
-        elif self.behavior_type == 4:  # 固定砲台
-            self.base_speed = 0  # 移動しない
-            self.attack_cooldown = 12000  # 12秒間隔で攻撃（3秒から4倍に延長）
-            self.hp = int(self.hp * 1.5)  # HP増加
+        elif self.behavior_type == 4:  # 遅速追跡（旧固定砲台）
+            self.base_speed *= 0.5  # 通常の半分の速度で移動
+            self.attack_cooldown = 6000  # 6秒間隔で攻撃
+            # HP調整なし（デフォルト値のまま）
         
         self.speed = self.base_speed
         
@@ -245,9 +318,10 @@ class Enemy:
             # 適切な距離の場合は移動しない
             
         elif self.behavior_type == 4:
-            # 4. その場で動かず、遠距離攻撃を行う
-            # 移動しない（new_x, new_yは現在位置のまま）
-            pass
+            # 4. 遅い速度でプレイヤーに近づく
+            angle = math.atan2(player.y - self.y, player.x - self.x)
+            new_x = self.x + math.cos(angle) * self.base_speed
+            new_y = self.y + math.sin(angle) * self.base_speed
         
         # 障害物との衝突判定（マップが有効な場合のみ）
         if USE_STAGE_MAP and (new_x != self.x or new_y != self.y):
@@ -343,9 +417,12 @@ class Enemy:
             
             # 画像が正常に取得できた場合のみ描画
             if image is not None:
-                # 画像の中心位置を計算（32x32ピクセル）
-                image_x = sx - 16
-                image_y = sy - 16
+                # 画像のサイズを取得（レベルに応じて変化）
+                image_size = self.images.get('size', 32)
+                
+                # 画像の中心位置を計算
+                image_x = sx - image_size // 2
+                image_y = sy - image_size // 2
                 
                 # ヒット時のフラッシュ効果
                 if self.hit_flash_timer > 0.0:
@@ -362,7 +439,7 @@ class Enemy:
                     flashed_image = image.copy()
                     
                     # 画像全体を白く光らせる（透明部分はそのまま）
-                    white_surface = pygame.Surface((32, 32), pygame.SRCALPHA)
+                    white_surface = pygame.Surface((image_size, image_size), pygame.SRCALPHA)
                     white_surface.fill((255, 255, 255, alpha))
                     flashed_image.blit(white_surface, (0, 0), special_flags=pygame.BLEND_ADD)
                     
@@ -433,13 +510,18 @@ class Enemy:
         elif self.behavior_type == 3:  # 距離保持射撃 - 円
             pygame.draw.circle(screen, (255, 255, 255), 
                              (sx, sy + icon_y_offset), icon_size, 1)
-        elif self.behavior_type == 4:  # 固定砲台 - 十字
-            pygame.draw.line(screen, (255, 255, 255),
-                           (sx - icon_size, sy + icon_y_offset),
-                           (sx + icon_size, sy + icon_y_offset), 2)
-            pygame.draw.line(screen, (255, 255, 255),
-                           (sx, sy + icon_y_offset - icon_size),
-                           (sx, sy + icon_y_offset + icon_size), 2)
+        elif self.behavior_type == 4:  # 遅速追跡 - 太矢印
+            # 遅い移動を表す太めの矢印を描画
+            points = [
+                (sx, sy + icon_y_offset - icon_size),
+                (sx - icon_size//2, sy + icon_y_offset),
+                (sx - icon_size//4, sy + icon_y_offset),
+                (sx - icon_size//4, sy + icon_y_offset + icon_size//2),
+                (sx + icon_size//4, sy + icon_y_offset + icon_size//2),
+                (sx + icon_size//4, sy + icon_y_offset),
+                (sx + icon_size//2, sy + icon_y_offset)
+            ]
+            pygame.draw.polygon(screen, (255, 255, 255), points)
 
     def on_hit(self):
         """敵が被弾したときに呼ぶ。白フラッシュをトリガーする."""
@@ -528,11 +610,8 @@ class Enemy:
         return is_in_bounds
 
     def should_be_removed_by_time(self):
-        """生存時間に基づく削除判定（固定砲台用）"""
-        if self.behavior_type == 4:  # 固定砲台
-            # 固定砲台は30秒で削除
-            return pygame.time.get_ticks() - self.spawn_time > 30000
-        elif self.behavior_type == 3:  # 距離保持射撃
+        """生存時間に基づく削除判定（距離保持射撃用のみ）"""
+        if self.behavior_type == 3:  # 距離保持射撃
             # 距離保持射撃は45秒で削除
             return pygame.time.get_ticks() - self.spawn_time > 45000
         else:
@@ -545,7 +624,7 @@ class Enemy:
             1: "追跡",
             2: "直進", 
             3: "距離保持",
-            4: "固定砲台"
+            4: "遅速追跡"
         }
         
         color_names = {

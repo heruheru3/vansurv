@@ -82,3 +82,8 @@ SCREEN_SHAKE_INTENSITY = 10      # 画面揺れの強度（ピクセル）
 
 # レベルアップ時の自動回復量
 LEVELUP_HEAL_AMOUNT = 20         # レベルアップ時の回復量
+
+# エネミー画像のHSV調整
+ENEMY_IMAGE_HUE_SHIFT = 0.0      # エネミー画像の色相シフト（-1.0～1.0、0.0 = 変更なし）
+ENEMY_IMAGE_SATURATION = 0.6     # エネミー画像の彩度（1.0 = 通常、0.8 = 80%）
+ENEMY_IMAGE_VALUE = 0.8          # エネミー画像の明度（1.0 = 通常、0.8 = 80%）
