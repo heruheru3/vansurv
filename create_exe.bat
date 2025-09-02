@@ -9,7 +9,13 @@ REM 現在のディレクトリを取得
 set SCRIPT_DIR=%~dp0
 
 REM PyInstallerでアプリケーションをビルド
-pyinstaller --noconfirm --onefile --windowed ^
+pyinstaller --noconfirm --onefile --windowed --clean -n dist/heruheru3_vansurv.exe ^
+--hidden-import=colorsys ^
+--hidden-import=math ^
+--hidden-import=random ^
+--hidden-import=json ^
+--hidden-import=os ^
+--hidden-import=sys ^
 --icon "%SCRIPT_DIR%assets\favicon.ico" ^
 --add-data "%SCRIPT_DIR%__init__.py;." ^
 --add-data "%SCRIPT_DIR%constants.py;." ^
@@ -28,14 +34,15 @@ pyinstaller --noconfirm --onefile --windowed ^
 --add-data "%SCRIPT_DIR%data;data/" ^
 "%SCRIPT_DIR%main.py"
 
+
 REM ビルド結果の確認
-if exist "%SCRIPT_DIR%dist\main.exe" (
+if exist "%SCRIPT_DIR%dist\heruheru3_vansurv.exe" (
     echo.
     echo ✅ Build successful!
-    echo Executable created at: %SCRIPT_DIR%dist\main.exe
+    echo Executable created at: %SCRIPT_DIR%dist\heruheru3_vansurv.exe
     echo.
     echo To run the game:
-    echo   dist\main.exe
+    echo   dist\heruheru3_vansurv.exe
     echo.
     echo Or double-click the executable file in the dist folder.
 ) else (

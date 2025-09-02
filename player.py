@@ -2,10 +2,21 @@ import pygame
 import math
 import random
 import os
+import sys
 from constants import *
 from weapons.melee import Whip, Garlic
 from weapons.projectile import HolyWater, MagicWand, Axe, Stone, RotatingBook, Knife, Thunder
 from subitems import get_default_subitems, random_upgrade
+
+def resource_path(relative_path):
+    """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
+    try:
+        # PyInstallerで実行されている場合
+        base_path = sys._MEIPASS
+    except Exception:
+        # 通常のPythonで実行されている場合
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 
 class Player:
@@ -100,7 +111,7 @@ class Player:
 
         # スプライト
         try:
-            chip_path = os.path.join(os.path.dirname(__file__), 'assets', 'character', 'player_chip.png')
+            chip_path = resource_path(os.path.join('assets', 'character', 'player_chip.png'))
             sheet = pygame.image.load(chip_path).convert_alpha()
             sheet_w = sheet.get_width()
             sheet_h = sheet.get_height()

@@ -2,7 +2,19 @@ import pygame
 import random
 import math
 import os
+import sys
+import colorsys
 from constants import *
+
+def resource_path(relative_path):
+    """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
+    try:
+        # PyInstallerで実行されている場合
+        base_path = sys._MEIPASS
+    except Exception:
+        # 通常のPythonで実行されている場合
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 class Enemy:
     # 画像キャッシュ（クラス変数）
@@ -18,12 +30,20 @@ class Enemy:
         if cache_key in cls._image_cache:
             return cls._image_cache[cache_key]
         
-        # 画像ファイルパスを構築
-        image_path = os.path.join("assets", "character", "enemy", f"{cache_key}.png")
+        # 画像ファイルパスを構築（PyInstaller対応）
+        image_path = resource_path(os.path.join("assets", "character", "enemy", f"{cache_key}.png"))
         
         try:
+            print(f"[DEBUG] Attempting to load enemy image: {image_path}")
+            # ファイルの存在確認
+            if not os.path.exists(image_path):
+                print(f"[WARNING] Enemy image file not found: {image_path}")
+                cls._image_cache[cache_key] = None
+                return None
+                
             # 画像を読み込み
             image = pygame.image.load(image_path).convert_alpha()
+            print(f"[DEBUG] Successfully loaded enemy image: {cache_key}")
             
             # レベルに応じたサイズを計算（レベル1: 32px, レベル5: 48px）
             base_size = 32
@@ -48,9 +68,15 @@ class Enemy:
             
             return cls._image_cache[cache_key]
             
-        except (pygame.error, FileNotFoundError):
+        except (pygame.error, FileNotFoundError) as e:
             # 画像が見つからない場合はNoneを返す
+            print(f"[WARNING] Failed to load enemy image {cache_key}: {e}")
             cls._image_cache[cache_key] = None
+            return None
+        except Exception as e:
+            print(f"[ERROR] Unexpected error loading enemy image {cache_key}: {e}")
+            cls._image_cache[cache_key] = None
+            return None
             return None
     
     @classmethod
@@ -82,7 +108,6 @@ class Enemy:
                     continue
                 
                 # RGBをHSVに変換
-                import colorsys
                 h, s, v = colorsys.rgb_to_hsv(r/255.0, g/255.0, b/255.0)
                 
                 # HSV値を調整
@@ -282,8 +307,17 @@ class Enemy:
         
         self.speed = self.base_speed
         
-        # 画像の読み込み
-        self.images = self._load_enemy_image(self.behavior_type, self.enemy_type)
+        # 画像の読み込み（エラーハンドリング強化）
+        try:
+            self.images = self._load_enemy_image(self.behavior_type, self.enemy_type)
+            # 画像読み込みに失敗した場合のフォールバック
+            if self.images is None:
+                print(f"[WARNING] Failed to load enemy image for type {self.behavior_type}-{self.enemy_type}, using fallback")
+                self.images = None
+        except Exception as e:
+            print(f"[ERROR] Exception while loading enemy image: {e}")
+            self.images = None
+            
         self.facing_right = True  # 向いている方向（True: 右, False: 左）
         self.last_movement_x = 0  # 最後の移動方向を記録
 
@@ -430,7 +464,10 @@ class Enemy:
         sy = int(self.y - camera_y)
 
         # 画像がある場合は画像を描画、ない場合は従来の円を描画
-        if self.images and isinstance(self.images, dict) and 'right' in self.images and 'left' in self.images:
+        if (self.images and isinstance(self.images, dict) and 
+            'right' in self.images and 'left' in self.images and
+            self.images['right'] is not None and self.images['left'] is not None):
+            
             # 向きに応じて画像を選択
             image = self.images['right'] if self.facing_right else self.images['left']
             
@@ -748,8 +785,6 @@ class Enemy:
         Returns:
             (r, g, b) タプル（0-255の値）
         """
-        import colorsys
-        
         # HSVをRGBに変換（colorsysは0-1の範囲で動作）
         h = hue / 360.0
         s = saturation
@@ -804,9 +839,7 @@ class EnemyProjectile:
             self.base_color = self._hsv_to_rgb(240.0, saturation, base_value)
 
     def _hsv_to_rgb(self, hue, saturation, value):
-        """HSV色空間からRGB色空間に変換"""
-        import colorsys
-        
+        """HSV色空間からRGB色空間に変換"""        
         # HSVをRGBに変換（colorsysは0-1の範囲で動作）
         h = hue / 360.0
         s = saturation
