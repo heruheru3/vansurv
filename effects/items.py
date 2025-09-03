@@ -106,6 +106,11 @@ class GameItem:
         self.type = item_type
         self.collected = False
         
+        # 出現アニメーション用
+        self.spawn_time = pygame.time.get_ticks()
+        self.spawn_scale = 0.0  # 開始時はサイズ0
+        self.spawn_duration = 300  # 出現アニメーション時間（ミリ秒）
+        
         # アイテム画像を読み込む
         try:
             icons = load_icons(size=48, icon_names=[item_type])  # サイズを48に倍増
@@ -130,54 +135,75 @@ class GameItem:
             self.y += (dy / distance) * self.speed
 
     def draw(self, screen, camera_x=0, camera_y=0):
+        # 出現アニメーションのスケール計算
+        current_time = pygame.time.get_ticks()
+        time_since_spawn = current_time - self.spawn_time
+        
+        if time_since_spawn < self.spawn_duration:
+            # 出現アニメーション中：0から1にスケール
+            progress = time_since_spawn / self.spawn_duration
+            self.spawn_scale = min(1.0, progress * 1.2)  # 少しオーバーシュート
+        else:
+            self.spawn_scale = 1.0
+        
+        # スケールが0の場合は描画しない
+        if self.spawn_scale <= 0:
+            return
+            
         # 画像が読み込まれている場合は画像を使用
         if self.image:
-            # 画像のサイズに基づいて描画位置を調整
+            # 画像のサイズに基づいて描画位置を調整（スケール適用）
             img_w, img_h = self.image.get_size()
-            draw_x = int(self.x - img_w // 2 - camera_x)
-            draw_y = int(self.y - img_h // 2 - camera_y)
+            scaled_w = int(img_w * self.spawn_scale)
+            scaled_h = int(img_h * self.spawn_scale)
             
-            # 画像の中心座標
-            center_x = int(self.x - camera_x)
-            center_y = int(self.y - camera_y)
-            
-            # ピンクの円の半径（画像サイズの約70%）
-            circle_radius = int(max(img_w, img_h) * 0.35)
-            
-            # グロー効果（複数の円を重ねて描画）
-            glow_color = (255, 20, 147, 30)  # DeepPink with low alpha
-            for i in range(5):
-                glow_radius = circle_radius + (i + 1) * 3
-                glow_alpha = max(10, 40 - i * 8)
-                glow_surf = pygame.Surface((glow_radius * 2 + 10, glow_radius * 2 + 10), pygame.SRCALPHA)
-                pygame.draw.circle(glow_surf, (255, 20, 147, glow_alpha), 
-                                 (glow_radius + 5, glow_radius + 5), glow_radius)
-                screen.blit(glow_surf, (center_x - glow_radius - 5, center_y - glow_radius - 5))
-            
-            # メインのピンクの円（背景）
-            pygame.draw.circle(screen, (255, 20, 147, 180), (center_x, center_y), circle_radius)
-            
-            # 元の画像を上に描画
-            screen.blit(self.image, (draw_x, draw_y))
+            # スケールされた画像を作成
+            if scaled_w > 0 and scaled_h > 0:
+                scaled_image = pygame.transform.scale(self.image, (scaled_w, scaled_h))
+                draw_x = int(self.x - scaled_w // 2 - camera_x)
+                draw_y = int(self.y - scaled_h // 2 - camera_y)
+                
+                # 画像の中心座標
+                center_x = int(self.x - camera_x)
+                center_y = int(self.y - camera_y)
+                
+                # ピンクの円の半径（スケール適用）
+                circle_radius = int(max(scaled_w, scaled_h) * 0.35)
+                
+                # グロー効果（複数の円を重ねて描画）
+                glow_color = (255, 20, 147, 30)  # DeepPink with low alpha
+                for i in range(5):
+                    glow_radius = circle_radius + (i + 1) * 3
+                    glow_alpha = max(10, int((40 - i * 8) * self.spawn_scale))
+                    glow_surf = pygame.Surface((glow_radius * 2 + 10, glow_radius * 2 + 10), pygame.SRCALPHA)
+                    pygame.draw.circle(glow_surf, (255, 20, 147, glow_alpha), 
+                                     (glow_radius + 5, glow_radius + 5), glow_radius)
+                    screen.blit(glow_surf, (center_x - glow_radius - 5, center_y - glow_radius - 5))
+                
+                # メインのピンクの円（背景、スケール適用）
+                pygame.draw.circle(screen, (255, 20, 147, int(180 * self.spawn_scale)), (center_x, center_y), circle_radius)
+                
+                # 元の画像を上に描画
+                screen.blit(scaled_image, (draw_x, draw_y))
         else:
-            # フォールバック: 従来の図形描画
+            # フォールバック: 従来の図形描画（スケール適用）
             if self.type == "heal":
-                r = self.size
+                r = int(self.size * self.spawn_scale)
                 cx, cy = r*2, r*2
 
                 # 十字をやや立体的に描画
                 surf = pygame.Surface((r*4, r*4), pygame.SRCALPHA)
                 # 背景小円
-                pygame.draw.circle(surf, (0, 100, 0, 60), (cx, cy), r+6)
+                pygame.draw.circle(surf, (0, 100, 0, int(60 * self.spawn_scale)), (cx, cy), r+6)
                 # 十字本体（影）
-                pygame.draw.line(surf, (0, 120, 0), (cx - 8, cy + 1), (cx + 8, cy + 1), 6)
-                pygame.draw.line(surf, (0, 120, 0), (cx + 1, cy - 8), (cx + 1, cy + 8), 6)
+                pygame.draw.line(surf, (0, 120, 0), (cx - 8, cy + 1), (cx + 8, cy + 1), max(1, int(6 * self.spawn_scale)))
+                pygame.draw.line(surf, (0, 120, 0), (cx + 1, cy - 8), (cx + 1, cy + 8), max(1, int(6 * self.spawn_scale)))
                 # 十字ハイライト
-                pygame.draw.line(surf, GREEN, (cx - 8, cy - 1), (cx + 8, cy - 1), 4)
-                pygame.draw.line(surf, GREEN, (cx - 1, cy - 8), (cx - 1, cy + 8), 4)
+                pygame.draw.line(surf, GREEN, (cx - 8, cy - 1), (cx + 8, cy - 1), max(1, int(4 * self.spawn_scale)))
+                pygame.draw.line(surf, GREEN, (cx - 1, cy - 8), (cx - 1, cy + 8), max(1, int(4 * self.spawn_scale)))
                 screen.blit(surf, (int(self.x - cx - camera_x), int(self.y - cy - camera_y)))
             elif self.type == "bomb":
-                r = self.size
+                r = int(self.size * self.spawn_scale)
                 surf = pygame.Surface((r*4, r*4), pygame.SRCALPHA)
                 cx, cy = r*2, r*2
                 base = RED
@@ -221,6 +247,11 @@ class MoneyItem:
         self.speed = 3
         self.type = "money"
         self.collected = False
+        
+        # 出現アニメーション用
+        self.spawn_time = pygame.time.get_ticks()
+        self.spawn_scale = 0.0  # 開始時はサイズ0
+        self.spawn_duration = 300  # 出現アニメーション時間（ミリ秒）
         
         # お金の量を設定
         if amount is None:
@@ -330,6 +361,21 @@ class MoneyItem:
             self.y += (dy / distance) * move_speed
 
     def draw(self, screen, camera_x=0, camera_y=0):
+        # 出現アニメーションのスケール計算
+        current_time = pygame.time.get_ticks()
+        time_since_spawn = current_time - self.spawn_time
+        
+        if time_since_spawn < self.spawn_duration:
+            # 出現アニメーション中：0から1にスケール
+            progress = time_since_spawn / self.spawn_duration
+            self.spawn_scale = min(1.0, progress * 1.2)  # 少しオーバーシュート
+        else:
+            self.spawn_scale = 1.0
+        
+        # スケールが0の場合は描画しない
+        if self.spawn_scale <= 0:
+            return
+            
         # アニメーション更新
         self.animation_time += 0.1
         self.bob_offset = math.sin(self.animation_time) * 2  # 上下にふわふわ
@@ -338,54 +384,60 @@ class MoneyItem:
         
         # 画像が読み込まれている場合は画像を使用
         if self.image:
-            # 画像のサイズに基づいて描画位置を調整
+            # 画像のサイズに基づいて描画位置を調整（スケール適用）
             img_w, img_h = self.image.get_size()
-            draw_x = int(self.x - img_w // 2 - camera_x)
-            draw_y = int(display_y - img_h // 2 - camera_y)
+            scaled_w = int(img_w * self.spawn_scale)
+            scaled_h = int(img_h * self.spawn_scale)
             
-            # 画像の中心座標
-            center_x = int(self.x - camera_x)
-            center_y = int(display_y - camera_y)
-            
-            # お金タイプに応じてグローの色を変更
-            glow_colors = {
-                "money1": (255, 215, 0),    # 金色
-                "money2": (255, 255, 150),  # 明るい金色
-                "money3": (255, 165, 0),    # オレンジ金色
-                "money4": (255, 69, 0),     # 赤みがかった金色
-                "money5": (138, 43, 226)    # 紫色（レア感）
-            }
-            glow_color = glow_colors.get(self.money_type, (255, 215, 0))
-            
-            # 金色の円の半径（画像サイズの約60%）
-            circle_radius = int(max(img_w, img_h) * 0.3)
-            
-            # グロー効果（複数の円を重ねて描画）
-            for i in range(4):
-                glow_radius = circle_radius + (i + 1) * 2
-                glow_alpha = max(10, 35 - i * 8)
-                glow_surf = pygame.Surface((glow_radius * 2 + 10, glow_radius * 2 + 10), pygame.SRCALPHA)
-                pygame.draw.circle(glow_surf, glow_color + (glow_alpha,), 
-                                 (glow_radius + 5, glow_radius + 5), glow_radius)
-                screen.blit(glow_surf, (center_x - glow_radius - 5, center_y - glow_radius - 5))
-            
-            # メインの色の円（背景）
-            pygame.draw.circle(screen, glow_color + (160,), (center_x, center_y), circle_radius)
-            
-            # 元の画像を上に描画
-            screen.blit(self.image, (draw_x, draw_y))
-            
-            # 金額表示（小さなテキスト）
-            try:
-                from resources import get_font
-                font = get_font(14)
-                if font:
-                    text = f"{self.amount}G"
-                    text_surf = font.render(text, True, WHITE)
-                    text_w = text_surf.get_width()
-                    screen.blit(text_surf, (center_x - text_w // 2, center_y + circle_radius + 2))
-            except Exception:
-                pass
+            # スケールされた画像を作成
+            if scaled_w > 0 and scaled_h > 0:
+                scaled_image = pygame.transform.scale(self.image, (scaled_w, scaled_h))
+                draw_x = int(self.x - scaled_w // 2 - camera_x)
+                draw_y = int(display_y - scaled_h // 2 - camera_y)
+                
+                # 画像の中心座標
+                center_x = int(self.x - camera_x)
+                center_y = int(display_y - camera_y)
+                
+                # お金タイプに応じてグローの色を変更
+                glow_colors = {
+                    "money1": (255, 215, 0),    # 金色
+                    "money2": (255, 255, 150),  # 明るい金色
+                    "money3": (255, 165, 0),    # オレンジ金色
+                    "money4": (255, 69, 0),     # 赤みがかった金色
+                    "money5": (138, 43, 226)    # 紫色（レア感）
+                }
+                glow_color = glow_colors.get(self.money_type, (255, 215, 0))
+                
+                # 金色の円の半径（スケール適用）
+                circle_radius = int(max(scaled_w, scaled_h) * 0.3)
+                
+                # グロー効果（複数の円を重ねて描画）
+                for i in range(4):
+                    glow_radius = circle_radius + (i + 1) * 2
+                    glow_alpha = max(10, int((35 - i * 8) * self.spawn_scale))
+                    glow_surf = pygame.Surface((glow_radius * 2 + 10, glow_radius * 2 + 10), pygame.SRCALPHA)
+                    pygame.draw.circle(glow_surf, glow_color + (glow_alpha,), 
+                                     (glow_radius + 5, glow_radius + 5), glow_radius)
+                    screen.blit(glow_surf, (center_x - glow_radius - 5, center_y - glow_radius - 5))
+                
+                # メインの色の円（背景、スケール適用）
+                pygame.draw.circle(screen, glow_color + (int(160 * self.spawn_scale),), (center_x, center_y), circle_radius)
+                
+                # 元の画像を上に描画
+                screen.blit(scaled_image, (draw_x, draw_y))
+                
+                # 金額表示（小さなテキスト、スケール適用）
+                try:
+                    from resources import get_font
+                    font = get_font(max(10, int(14 * self.spawn_scale)))
+                    if font:
+                        text = f"{self.amount}G"
+                        text_surf = font.render(text, True, WHITE)
+                        text_w = text_surf.get_width()
+                        screen.blit(text_surf, (center_x - text_w // 2, center_y + circle_radius + 2))
+                except Exception:
+                    pass
         else:
             # フォールバック: 金貨風の円を描画
             r = self.size

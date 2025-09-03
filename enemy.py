@@ -183,6 +183,8 @@ class Enemy:
             # 明示的なワールド座標を使用
             self.x = spawn_x
             self.y = spawn_y
+            # ワールド内にスポーンした場合は障害物チェック
+            self._adjust_spawn_position()
         else:
             # ランダムな位置に出現（ワールド外から）
             side = spawn_side if spawn_side is not None else random.randint(0, 3)
@@ -199,6 +201,63 @@ class Enemy:
             else:  # 左
                 self.x = -margin
                 self.y = random.randint(0, WORLD_HEIGHT)
+    
+    def _adjust_spawn_position(self):
+        """スポーン位置が障害物と重なっている場合、近くの通行可能な場所に移動"""
+        if not (USE_STAGE_MAP or USE_CSV_MAP):
+            return
+        
+        try:
+            from stage import get_stage_map
+            stage_map = get_stage_map()
+            
+            # 現在位置をチェック
+            if not self._is_position_blocked(self.x, self.y, stage_map):
+                return  # 問題なし
+            
+            # 周囲の通行可能な位置を探す
+            search_radius = 100
+            attempts = 50
+            
+            for _ in range(attempts):
+                # ランダムな方向と距離で新しい位置を試す
+                angle = random.uniform(0, 2 * math.pi)
+                distance = random.uniform(self.size, search_radius)
+                new_x = self.x + math.cos(angle) * distance
+                new_y = self.y + math.sin(angle) * distance
+                
+                # ワールド境界内かチェック
+                if (self.size <= new_x <= WORLD_WIDTH - self.size and 
+                    self.size <= new_y <= WORLD_HEIGHT - self.size):
+                    
+                    # 障害物チェック
+                    if not self._is_position_blocked(new_x, new_y, stage_map):
+                        self.x = new_x
+                        self.y = new_y
+                        return
+            
+            # 適切な位置が見つからない場合は、ワールド外に移動
+            self.x = -50
+            self.y = random.randint(0, WORLD_HEIGHT)
+            
+        except Exception:
+            # エラーが発生した場合は位置調整をスキップ
+            pass
+    
+    def _is_position_blocked(self, x, y, stage_map):
+        """指定座標が障害物でブロックされているかチェック"""
+        # エネミーの四隅をチェック
+        corners = [
+            (x - self.size//2, y - self.size//2),
+            (x + self.size//2, y - self.size//2),
+            (x - self.size//2, y + self.size//2),
+            (x + self.size//2, y + self.size//2),
+        ]
+        
+        for corner_x, corner_y in corners:
+            if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                return True
+        return False
 
     def get_random_enemy_type(self, game_time):
         # 時間に応じて出現する敵のタイプを制限
@@ -363,8 +422,8 @@ class Enemy:
             new_x = self.x + math.cos(angle) * self.base_speed
             new_y = self.y + math.sin(angle) * self.base_speed
         
-        # 障害物との衝突判定（マップが有効な場合のみ）
-        if USE_STAGE_MAP and (new_x != self.x or new_y != self.y):
+        # 障害物との衝突判定（CSVマップまたはステージマップが有効な場合）
+        if (USE_STAGE_MAP or USE_CSV_MAP) and (new_x != self.x or new_y != self.y):
             try:
                 from stage import get_stage_map
                 stage_map = get_stage_map()
@@ -856,8 +915,27 @@ class EnemyProjectile:
 
     def update(self):
         """弾丸の移動処理"""
-        self.x += self.vx
-        self.y += self.vy
+        new_x = self.x + self.vx
+        new_y = self.y + self.vy
+        
+        # 障害物との衝突判定（CSVマップまたはステージマップが有効な場合）
+        if USE_STAGE_MAP or USE_CSV_MAP:
+            try:
+                from stage import get_stage_map
+                stage_map = get_stage_map()
+                
+                # 弾丸の中心位置で障害物チェック
+                if stage_map.is_obstacle_at_world_pos(new_x, new_y):
+                    # 障害物に当たった弾丸は削除対象にする（期限切れにする）
+                    self.created_time = pygame.time.get_ticks() - self.lifetime
+                    return
+                
+            except Exception:
+                # エラーが発生した場合は通常の移動
+                pass
+        
+        self.x = new_x
+        self.y = new_y
 
     def draw(self, screen, camera_x=0, camera_y=0):
         """弾丸の描画（彩度ベースの色設定）"""

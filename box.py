@@ -117,6 +117,9 @@ class ItemBox:
         self.size = BOX_COLLISION_SIZE  # 当たり判定用サイズ
         self.display_size = BOX_SIZE    # 表示用サイズ
         
+        # 初期位置が障害物と重なっている場合は調整
+        self._adjust_spawn_position()
+        
         # ボックスタイプを決定（指定されていない場合はランダム）
         if box_type is None:
             rand = random.random()
@@ -139,6 +142,7 @@ class ItemBox:
         
         # 状態管理
         self.destroyed = False
+        self.is_dropping = False  # 落下中フラグを追加
         self.items_dropped = []  # 中から出たアイテムリスト
         
         # エフェクト用
@@ -147,6 +151,89 @@ class ItemBox:
         self.shake_timer = 0.0
         self.shake_duration = 0.2
         self.shake_intensity = 2
+        
+        # フロート効果用
+        self.float_offset = 0.0
+        self.float_speed = 2.0  # フロート速度
+        self.float_amplitude = 3.0  # フロート振幅
+        self.float_time = random.uniform(0, 2 * math.pi)  # フロート開始時間をランダムに
+        
+        # アニメーション用
+        self.animation_time = random.uniform(0, 2 * math.pi)  # アニメーションタイムをランダム初期化
+        
+        # 落下アニメーション用
+        self.spawn_time = pygame.time.get_ticks()
+        self.drop_height = 80  # 落下開始高さ
+        self.drop_duration = 300  # 落下時間（ミリ秒）
+        self.bounce_height = 8   # バウンス高さ
+        self.bounce_duration = 100  # バウンス時間（ミリ秒）
+        self.is_dropping = True
+        self.final_y = y  # 最終的なY座標
+        
+        # 落下アニメーション開始位置の設定
+        self.y = y - self.drop_height  # ボックスを上空に配置
+        
+        # 砂埃エフェクト用
+        self.dust_particles = []
+        self.dust_spawned = False
+        
+        # 画像の読み込み
+        self.image = self._load_box_image(self.box_type)
+    
+    def _adjust_spawn_position(self):
+        """スポーン位置が障害物と重なっている場合、近くの通行可能な場所に移動"""
+        if not (USE_STAGE_MAP or USE_CSV_MAP):
+            return
+        
+        try:
+            from stage import get_stage_map
+            stage_map = get_stage_map()
+            
+            # 現在位置をチェック
+            if not self._is_position_blocked_internal(self.x, self.y, stage_map):
+                return  # 問題なし
+            
+            # 周囲の通行可能な位置を探す
+            search_radius = 80
+            attempts = 30
+            
+            for _ in range(attempts):
+                # ランダムな方向と距離で新しい位置を試す
+                angle = random.uniform(0, 2 * math.pi)
+                distance = random.uniform(self.size, search_radius)
+                new_x = self.x + math.cos(angle) * distance
+                new_y = self.y + math.sin(angle) * distance
+                
+                # ワールド境界内かチェック
+                if (self.size <= new_x <= WORLD_WIDTH - self.size and 
+                    self.size <= new_y <= WORLD_HEIGHT - self.size):
+                    
+                    # 障害物チェック
+                    if not self._is_position_blocked_internal(new_x, new_y, stage_map):
+                        self.x = new_x
+                        self.y = new_y
+                        return
+            
+            # 適切な位置が見つからない場合は、元の位置のままにする
+            
+        except Exception:
+            # エラーが発生した場合は位置調整をスキップ
+            pass
+    
+    def _is_position_blocked_internal(self, x, y, stage_map):
+        """指定座標が障害物でブロックされているかチェック（内部用）"""
+        # ボックスの四隅をチェック
+        corners = [
+            (x - self.size//2, y - self.size//2),
+            (x + self.size//2, y - self.size//2),
+            (x - self.size//2, y + self.size//2),
+            (x + self.size//2, y + self.size//2),
+        ]
+        
+        for corner_x, corner_y in corners:
+            if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                return True
+        return False
         
         # 落下アニメーション用
         self.spawn_time = pygame.time.get_ticks()
@@ -300,8 +387,8 @@ class ItemBox:
                 self.y = self.final_y
         else:
             # 通常のふわふわアニメーション
-            self.animation_time += 0.05
-            self.float_offset = math.sin(self.animation_time) * 1  # わずかに浮遊
+            self.float_time += self.float_speed * (1.0 / 60.0)  # 60FPS想定
+            self.float_offset = math.sin(self.float_time) * self.float_amplitude
         
         # 砂埃パーティクルの更新
         self.dust_particles = [p for p in self.dust_particles if p.update()]
@@ -508,7 +595,7 @@ class BoxManager:
         min_distance = 200
         max_distance = 400
         
-        for _ in range(10):  # 最大10回試行
+        for _ in range(20):  # 最大20回試行（増加）
             angle = random.uniform(0, 2 * math.pi)
             distance = random.uniform(min_distance, max_distance)
             
@@ -518,6 +605,10 @@ class BoxManager:
             # ワールド境界内にクランプ
             spawn_x = max(50, min(WORLD_WIDTH - 50, spawn_x))
             spawn_y = max(50, min(WORLD_HEIGHT - 50, spawn_y))
+            
+            # 障害物との衝突チェック
+            if self._is_position_blocked(spawn_x, spawn_y):
+                continue
             
             # 他のボックスから十分離れているかチェック
             too_close = False
@@ -535,6 +626,34 @@ class BoxManager:
                 self.boxes.append(new_box)
                 print(f"[DEBUG] Spawned box{new_box.box_type} at ({spawn_x:.1f}, {spawn_y:.1f})")
                 break
+    
+    def _is_position_blocked(self, x, y):
+        """指定座標が障害物でブロックされているかチェック"""
+        # マップが有効でない場合は障害物なし
+        if not (USE_STAGE_MAP or USE_CSV_MAP):
+            return False
+        
+        try:
+            from stage import get_stage_map
+            stage_map = get_stage_map()
+            
+            # ボックスサイズの半分だけ余裕を持たせてチェック
+            box_size = BOX_COLLISION_SIZE
+            corners = [
+                (x - box_size//2, y - box_size//2),
+                (x + box_size//2, y - box_size//2),
+                (x - box_size//2, y + box_size//2),
+                (x + box_size//2, y + box_size//2),
+            ]
+            
+            for corner_x, corner_y in corners:
+                if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                    return True
+            return False
+            
+        except Exception:
+            # エラーが発生した場合は障害物なしと判定
+            return False
     
     def get_all_boxes(self):
         """すべてのボックスを取得（落下中でないもののみ）"""
