@@ -132,10 +132,24 @@ def main():
     if USE_CSV_MAP:
         # CSVマップファイルを読み込み（存在しない場合はサンプルを作成）
         csv_path = CSV_MAP_FILE
-        if not os.path.exists(csv_path):
+        
+        # 通常のPython実行時のみサンプル作成
+        try:
+            # PyInstallerで実行されているか確認
+            import sys
+            is_frozen = getattr(sys, 'frozen', False)
+        except:
+            is_frozen = False
+            
+        if not is_frozen and not os.path.exists(csv_path):
             print(f"[INFO] Creating sample CSV map: {csv_path}")
             map_loader.create_sample_csv(csv_path)
-        map_loader.load_csv_map(csv_path)
+            
+        # マップを読み込み（PyInstallerの場合はリソースから）
+        success = map_loader.load_csv_map(csv_path)
+        if not success:
+            print("[WARNING] Failed to load CSV map, using default map")
+            map_loader.generate_default_map()
     else:
         # デフォルトマップ（市松模様）を生成
         map_loader.generate_default_map()

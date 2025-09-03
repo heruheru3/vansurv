@@ -6,7 +6,23 @@ CSVマップ読み込みシステム
 import pygame
 import csv
 import os
+import sys
 from constants import *
+
+def get_resource_path(relative_path):
+    """PyInstallerの実行ファイル用リソースパス取得"""
+    try:
+        # PyInstallerで実行されている場合
+        base_path = sys._MEIPASS
+        print(f"[INFO] PyInstaller detected, base path: {base_path}")
+    except Exception:
+        # 通常のPython実行の場合
+        base_path = os.path.abspath(".")
+        print(f"[INFO] Normal Python execution, base path: {base_path}")
+    
+    full_path = os.path.join(base_path, relative_path)
+    print(f"[INFO] Resource path: {relative_path} -> {full_path}")
+    return full_path
 
 class MapLoader:
     def __init__(self):
@@ -32,11 +48,15 @@ class MapLoader:
     def load_csv_map(self, csv_file_path):
         """CSVファイルからマップデータを読み込む"""
         try:
-            if not os.path.exists(csv_file_path):
-                print(f"[WARNING] Map file not found: {csv_file_path}")
-                return self.generate_default_map()
+            # PyInstaller対応のリソースパスを取得
+            full_path = get_resource_path(csv_file_path)
             
-            with open(csv_file_path, 'r', encoding='utf-8') as file:
+            if not os.path.exists(full_path):
+                print(f"[WARNING] Map file not found: {full_path}")
+                print(f"[WARNING] Original path: {csv_file_path}")
+                return False
+            
+            with open(full_path, 'r', encoding='utf-8') as file:
                 reader = csv.reader(file)
                 self.map_data = []
                 for row in reader:
@@ -56,11 +76,12 @@ class MapLoader:
                 return True
             else:
                 print("[WARNING] Empty map data, using default")
-                return self.generate_default_map()
+                return False
                 
         except Exception as e:
             print(f"[ERROR] Failed to load map: {e}")
-            return self.generate_default_map()
+            print(f"[ERROR] Attempted path: {full_path}")
+            return False
     
     def generate_default_map(self):
         """デフォルトマップ（市松模様）を生成"""
