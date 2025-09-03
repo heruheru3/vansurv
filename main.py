@@ -851,6 +851,30 @@ def main():
                             hp_before = enemy.hp
                             enemy.hp -= dmg
 
+                            # ノックバック処理
+                            try:
+                                # 武器ごとのノックバック量を定義（元の値に戻す）
+                                knockback_forces = {
+                                    "whip": 80.0,          # ムチ：強い
+                                    "magic_wand": 60.0,    # 魔法の杖：中程度
+                                    "axe": 120.0,          # 斧：非常に強い
+                                    "stone": 40.0,         # 石：弱い
+                                    "knife": 50.0,         # ナイフ：弱め
+                                    "rotating_book": 30.0, # 回転する本：弱い
+                                    "thunder": 100.0,      # 雷：強い
+                                    "garlic": 20.0,        # にんにく：很弱い
+                                    "holy_water": 25.0,    # 聖水：弱い
+                                }
+                                
+                                weapon_type = getattr(attack, 'type', '')
+                                knockback_force = knockback_forces.get(weapon_type, 50.0)  # デフォルト値
+                                
+                                # ノックバックを適用
+                                if hasattr(enemy, 'apply_knockback'):
+                                    enemy.apply_knockback(attack.x, attack.y, knockback_force)
+                            except Exception:
+                                pass
+
                             # ヒット時の記録: 非持続系は hit_targets に追加、持続系は last_hit_times を更新
                             if is_persistent:
                                 attack.last_hit_times[id(enemy)] = game_time
@@ -1030,6 +1054,10 @@ def main():
                     enemies[:] = on_screen_enemies + off_screen_enemies
 
                 for enemy in enemies[:]:
+                    # ノックバック更新処理
+                    if hasattr(enemy, 'update_knockback'):
+                        enemy.update_knockback()
+                    
                     enemy.move(player)
                     
                     # 敵の攻撃処理（射撃タイプのみ、画面外は頻度制限）

@@ -175,6 +175,14 @@ class Enemy:
         self.last_x = self.x if hasattr(self, 'x') else 0
         self.last_y = self.y if hasattr(self, 'y') else 0
         
+        # ノックバック関連の変数
+        self.knockback_velocity_x = 0.0  # ノックバック速度X
+        self.knockback_velocity_y = 0.0  # ノックバック速度Y
+        self.knockback_timer = 0.0       # ノックバック残り時間（秒）
+        self.knockback_duration = 0.1    # ノックバック持続時間（秒）- 100msに変更
+        self.knockback_cooldown = 0.0    # ノックバッククールダウン残り時間
+        self.knockback_cooldown_duration = 0.4  # ノックバック後のクールダウン時間（0.5から0.4に短縮）
+        
         # 敵のタイプに応じてステータスを設定
         self.setup_enemy_stats()
         
@@ -380,8 +388,80 @@ class Enemy:
         self.facing_right = True  # 向いている方向（True: 右, False: 左）
         self.last_movement_x = 0  # 最後の移動方向を記録
 
+    def apply_knockback(self, attack_x, attack_y, knockback_force):
+        """ノックバックを適用する
+        
+        Args:
+            attack_x (float): 攻撃位置X
+            attack_y (float): 攻撃位置Y
+            knockback_force (float): ノックバックの力
+        """
+        # クールダウン中はノックバックしない
+        if self.knockback_cooldown > 0:
+            return
+            
+        # 攻撃位置から敵への方向を計算
+        dx = self.x - attack_x
+        dy = self.y - attack_y
+        distance = math.sqrt(dx**2 + dy**2)
+        
+        # ゼロ除算を回避
+        if distance == 0:
+            dx, dy = 1, 0  # デフォルト方向（右）
+            distance = 1
+        
+        # 短時間で同じ距離のノックバック
+        enhanced_force = knockback_force * 1.5  # 力を1.5倍に戻す（距離を維持）
+        
+        # 正規化してノックバック速度を設定
+        self.knockback_velocity_x = (dx / distance) * enhanced_force
+        self.knockback_velocity_y = (dy / distance) * enhanced_force
+        self.knockback_timer = self.knockback_duration
+
+    def update_knockback(self, dt=1/60):
+        """ノックバックの更新処理"""
+        # ノックバック処理
+        if self.knockback_timer > 0:
+            # ノックバック移動を適用
+            potential_x = self.x + self.knockback_velocity_x * dt
+            potential_y = self.y + self.knockback_velocity_y * dt
+            
+            # 障害物チェック（stage_mapを取得）
+            blocked = False
+            if USE_STAGE_MAP or USE_CSV_MAP:
+                try:
+                    from stage import get_stage_map
+                    stage_map = get_stage_map()
+                    blocked = self._is_position_blocked(potential_x, potential_y, stage_map)
+                except Exception:
+                    blocked = False
+            
+            if not blocked:
+                self.x = potential_x
+                self.y = potential_y
+            
+            # ノックバック時間を減らす
+            self.knockback_timer -= dt
+            
+            # ノックバック終了時にクールダウンを開始
+            if self.knockback_timer <= 0:
+                self.knockback_velocity_x = 0
+                self.knockback_velocity_y = 0
+                self.knockback_timer = 0
+                self.knockback_cooldown = self.knockback_cooldown_duration  # クールダウン開始
+        
+        # クールダウンタイマーの更新
+        if self.knockback_cooldown > 0:
+            self.knockback_cooldown -= dt
+            if self.knockback_cooldown < 0:
+                self.knockback_cooldown = 0
+
     def move(self, player):
         """行動パターンに応じた移動処理"""
+        # ノックバック中のみ通常の移動を無効にする（クールダウン中は移動可能）
+        if self.knockback_timer > 0:
+            return
+            
         new_x, new_y = self.x, self.y
         
         if self.behavior_type == 1:
