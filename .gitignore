@@ -12,6 +12,7 @@ main.spec
 .VSCodeCounter
 chat*
 _temp
+save/savedata.json
 
 # pipでインストールされるパッケージ
 venv/
