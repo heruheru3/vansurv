@@ -17,29 +17,29 @@
 ### 1. 権限設定（初回のみ）
 ```bash
 # シェルスクリプトに実行権限を付与
-chmod +x setup_permissions.sh
-./setup_permissions.sh
+chmod +x buildtools/scripts/setup_permissions.sh
+./buildtools/scripts/setup_permissions.sh
 ```
 
 ### 2. アプリケーションのビルド
 ```bash
-./create_app.sh
+./buildtools/scripts/create_app.sh
 ```
 
 ### 3. 実行ファイルの確認
-ビルドが成功すると、`dist/main`に実行ファイルが作成されます。
+ビルドが成功すると、`dist/heruheru3_vansurv`に実行ファイルが作成されます。
 
 ```bash
 # 実行ファイルのテスト
-./dist/main
+./dist/heruheru3_vansurv
 ```
 
 ## トラブルシューティング
 
 ### 権限エラーが発生する場合
 ```bash
-chmod +x create_app.sh
-chmod +x dist/main
+chmod +x buildtools/scripts/create_app.sh
+chmod +x dist/heruheru3_vansurv
 ```
 
 ### PyInstallerが見つからない場合
@@ -57,9 +57,10 @@ pip install --upgrade pygame
 
 ## ファイル構成
 
-- `create_app.sh` - Mac版ビルドスクリプト
-- `setup_permissions.sh` - 権限設定スクリプト
-- `create_exe.bat` - Windows版ビルドスクリプト（参考）
+- `buildtools/scripts/create_app.sh` - Mac版ビルドスクリプト
+- `buildtools/scripts/setup_permissions.sh` - 権限設定スクリプト
+- `buildtools/scripts/create_exe.bat` - Windows版ビルドスクリプト（参考）
+- `buildtools/config/main.spec` - PyInstaller設定ファイル
 
 ## 注意事項
 

@@ -15,18 +15,18 @@
 ## ビルド手順
 
 ### 1. バッチファイルの実行
-プロジェクトフォルダで`create_exe.bat`をダブルクリックするか、コマンドプロンプトから実行します。
+プロジェクトフォルダで`buildtools\scripts\create_exe.bat`をダブルクリックするか、コマンドプロンプトから実行します。
 
 ```cmd
-create_exe.bat
+buildtools\scripts\create_exe.bat
 ```
 
 ### 2. 実行ファイルの確認
-ビルドが成功すると、`dist\main.exe`に実行ファイルが作成されます。
+ビルドが成功すると、`dist\heruheru3_vansurv.exe`に実行ファイルが作成されます。
 
 ```cmd
 # 実行ファイルのテスト
-dist\main.exe
+dist\heruheru3_vansurv.exe
 ```
 
 ## トラブルシューティング
@@ -57,9 +57,10 @@ pyinstaller --noconfirm --onefile --console main.py
 
 ## ファイル構成
 
-- `create_exe.bat` - Windows版ビルドスクリプト
-- `create_app.sh` - Mac版ビルドスクリプト（参考）
-- `BUILD_MAC.md` - Mac版ビルドガイド（参考）
+- `buildtools\scripts\create_exe.bat` - Windows版ビルドスクリプト
+- `buildtools\scripts\create_app.sh` - Mac版ビルドスクリプト（参考）
+- `buildtools\config\main.spec` - PyInstaller設定ファイル
+- `buildtools\docs\BUILD_MAC.md` - Mac版ビルドガイド（参考）
 
 ## 配布時の注意事項
 

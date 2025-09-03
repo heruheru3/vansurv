@@ -17,8 +17,8 @@ echo   - pygame (game engine)
 echo   - pyinstaller (executable builder)
 echo.
 echo You can now run:
-echo   python main.py         (to run the game)
-echo   create_exe.bat         (to build executable)
+echo   python main.py                       (to run the game)
+echo   buildtools\scripts\create_exe.bat    (to build executable)
 echo.
 
 pause
