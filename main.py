@@ -723,6 +723,90 @@ def main():
                 # 画面揺れエフェクトの更新
                 player.update_screen_shake()
 
+                # ボックスの更新処理
+                current_time = pygame.time.get_ticks()
+                box_manager.update(current_time, player)
+                
+                # ボックスと攻撃の当たり判定（敵より先にチェック）
+                for box in box_manager.get_all_boxes():
+                    # 落下中のボックスはスキップ
+                    if box.is_dropping:
+                        continue
+                        
+                    for attack in player.active_attacks[:]:
+                        # spawn_delay によってまだ発生していない攻撃は無視する
+                        if getattr(attack, '_pending', False):
+                            continue
+                        
+                        # ボックスと攻撃の当たり判定
+                        dx = abs(box.x - attack.x)
+                        dy = abs(box.y - attack.y)
+                        attack_range = getattr(attack, 'size', 0)
+                        box_range = box.size // 2
+                        total_range = attack_range + box_range
+                        
+                        if dx < total_range and dy < total_range:
+                            # 持続系攻撃の処理
+                            persistent_types = {"garlic", "holy_water"}
+                            is_persistent = getattr(attack, 'type', '') in persistent_types
+                            
+                            # attack に必要な構造を初期化（動的に追加）
+                            if not hasattr(attack, 'hit_boxes'):
+                                attack.hit_boxes = set()
+                            if not hasattr(attack, 'last_box_hit_times'):
+                                attack.last_box_hit_times = {}
+                            
+                            # 非持続系は一度ヒットしたら再ヒットさせない
+                            if not is_persistent:
+                                if id(box) in attack.hit_boxes:
+                                    continue
+                            else:
+                                # 持続系は最後にダメージを与えた時刻から0.2秒以上経過していれば再ダメージ
+                                last = attack.last_box_hit_times.get(id(box), -999)
+                                if game_time - last < 0.2:
+                                    continue
+                            
+                            # ダメージを適用
+                            dmg = getattr(attack, 'damage', 0) or 0
+                            try:
+                                dmg = float(dmg)
+                            except Exception:
+                                dmg = 0.0
+                            
+                            # ボックスにダメージを与える
+                            destroyed = box.take_damage(dmg, player)
+                            
+                            # ヒット時の記録
+                            if is_persistent:
+                                attack.last_box_hit_times[id(box)] = game_time
+                            else:
+                                attack.hit_boxes.add(id(box))
+                            
+                            # ボックス破壊時のアイテムドロップ
+                            if destroyed:
+                                dropped_items = box.get_dropped_items()
+                                items.extend(dropped_items)
+                                
+                                # 破壊エフェクト
+                                for _ in range(6):
+                                    particles.append(DeathParticle(box.x, box.y, (139, 69, 19)))  # 茶色の破片
+                            
+                            # ヒット時のエフェクト
+                            particles.append(DeathParticle(box.x, box.y, (255, 255, 255)))
+                            # ヒット時に消費する攻撃（弾丸系など）のみ削除する
+                            consumable_on_hit = {"magic_wand"}
+                            if getattr(attack, 'type', '') in consumable_on_hit:
+                                if attack in player.active_attacks:
+                                    player.active_attacks.remove(attack)
+                            
+                            # stone は貫通させるため、貫通攻撃の一覧を定義
+                            penetrating_types = {"stone"}
+                            if getattr(attack, 'type', '') not in penetrating_types:
+                                break
+
+                # 破壊されたボックスを削除
+                box_manager.clear_destroyed_boxes()
+
                 # 攻撃と敵の当たり判定
                 for attack in player.active_attacks[:]:
                     # spawn_delay によってまだ発生していない攻撃は無視する
@@ -1156,91 +1240,6 @@ def main():
                             for _ in range(3):
                                 particles.append(DeathParticle(item.x, item.y, (255, 215, 0)))
                         items.remove(item)
-
-                # ボックスの更新処理
-                current_time = pygame.time.get_ticks()
-                box_manager.update(current_time, player)
-                
-                # ボックスと攻撃の当たり判定
-                for box in box_manager.get_all_boxes():
-                    # 落下中のボックスはスキップ
-                    if box.is_dropping:
-                        continue
-                        
-                    for attack in player.active_attacks[:]:
-                        # spawn_delay によってまだ発生していない攻撃は無視する
-                        if getattr(attack, '_pending', False):
-                            continue
-                        
-                        # ボックスと攻撃の当たり判定
-                        dx = abs(box.x - attack.x)
-                        dy = abs(box.y - attack.y)
-                        attack_range = getattr(attack, 'size', 0)
-                        box_range = box.size // 2
-                        total_range = attack_range + box_range
-                        
-                        if dx < total_range and dy < total_range:
-                            # 持続系攻撃の処理
-                            persistent_types = {"garlic", "holy_water"}
-                            is_persistent = getattr(attack, 'type', '') in persistent_types
-                            
-                            # attack に必要な構造を初期化（動的に追加）
-                            if not hasattr(attack, 'hit_boxes'):
-                                attack.hit_boxes = set()
-                            if not hasattr(attack, 'last_box_hit_times'):
-                                attack.last_box_hit_times = {}
-                            
-                            # 非持続系は一度ヒットしたら再ヒットさせない
-                            if not is_persistent:
-                                if id(box) in attack.hit_boxes:
-                                    continue
-                            else:
-                                # 持続系は最後にダメージを与えた時刻から0.2秒以上経過していれば再ダメージ
-                                last = attack.last_box_hit_times.get(id(box), -999)
-                                if game_time - last < 0.2:
-                                    continue
-                            
-                            # ダメージを適用
-                            dmg = getattr(attack, 'damage', 0) or 0
-                            try:
-                                dmg = float(dmg)
-                            except Exception:
-                                dmg = 0.0
-                            
-                            # ボックスにダメージを与える
-                            destroyed = box.take_damage(dmg, player)
-                            
-                            # ヒット時の記録
-                            if is_persistent:
-                                attack.last_box_hit_times[id(box)] = game_time
-                            else:
-                                attack.hit_boxes.add(id(box))
-                            
-                            # ボックス破壊時のアイテムドロップ
-                            if destroyed:
-                                dropped_items = box.get_dropped_items()
-                                items.extend(dropped_items)
-                                
-                                # 破壊エフェクト
-                                for _ in range(6):
-                                    particles.append(DeathParticle(box.x, box.y, (139, 69, 19)))  # 茶色の破片
-                            
-                            # ヒット時のエフェクト
-                            particles.append(DeathParticle(box.x, box.y, (255, 255, 255)))
-                            
-                            # ヒット時に消費する攻撃（弾丸系など）のみ削除する
-                            consumable_on_hit = {"magic_wand"}
-                            if getattr(attack, 'type', '') in consumable_on_hit:
-                                if attack in player.active_attacks:
-                                    player.active_attacks.remove(attack)
-                            
-                            # stone は貫通させるため、貫通攻撃の一覧を定義
-                            penetrating_types = {"stone"}
-                            if getattr(attack, 'type', '') not in penetrating_types:
-                                break
-                
-                # 破壊されたボックスを削除
-                box_manager.clear_destroyed_boxes()
 
             # パーティクルの更新と描画
             # パーティクルはカメラに依存しないため従来通り呼び出す

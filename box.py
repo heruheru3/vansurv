@@ -385,10 +385,12 @@ class ItemBox:
                 # 落下アニメーション終了
                 self.is_dropping = False
                 self.y = self.final_y
-        else:
-            # 通常のふわふわアニメーション
-            self.float_time += self.float_speed * (1.0 / 60.0)  # 60FPS想定
-            self.float_offset = math.sin(self.float_time) * self.float_amplitude
+                self.float_offset = 0.0  # フロートオフセットをリセット
+        # 落下アニメーション終了後はフロートアニメーションを無効にする
+        # else:
+        #     # 通常のふわふわアニメーション（無効化）
+        #     self.float_time += self.float_speed * (1.0 / 60.0)  # 60FPS想定
+        #     self.float_offset = math.sin(self.float_time) * self.float_amplitude
         
         # 砂埃パーティクルの更新
         self.dust_particles = [p for p in self.dust_particles if p.update()]
@@ -416,12 +418,12 @@ class ItemBox:
                 dust.draw(screen, camera_x, camera_y)
             return
         
-        # 描画位置の計算（落下アニメーション中は現在のyを使用、通常時は揺れとフロート効果）
+        # 描画位置の計算（落下アニメーション中は現在のyを使用、通常時は静止）
         draw_x = self.x
         if self.is_dropping:
             draw_y = self.y  # 落下中は現在のy座標をそのまま使用
         else:
-            draw_y = self.y + self.float_offset  # 通常時はフロート効果を適用
+            draw_y = self.y  # 通常時も静止（フロート効果を無効化）
         
         # 揺れ効果
         if self.shake_timer > 0:
