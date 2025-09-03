@@ -214,7 +214,7 @@ class GameItem:
 
 class MoneyItem:
     """お金アイテムクラス"""
-    def __init__(self, x, y, amount=None):
+    def __init__(self, x, y, amount=None, box_type=None):
         self.x = x
         self.y = y
         self.size = 10
@@ -222,22 +222,88 @@ class MoneyItem:
         self.type = "money"
         self.collected = False
         
-        # お金の量を設定（Noneの場合はランダム）
+        # お金の量を設定
         if amount is None:
-            self.amount = random.randint(MONEY_DROP_AMOUNT_MIN, MONEY_DROP_AMOUNT_MAX)
+            if box_type is not None:
+                self.amount = self._generate_amount_by_box_type(box_type)
+            else:
+                self.amount = self._generate_random_amount()
         else:
             self.amount = max(1, int(amount))
         
+        # 金額に基づいてアイコンを決定
+        self.money_type = self._get_money_type_by_amount(self.amount)
+        
         # アイテム画像を読み込む
         try:
-            icons = load_icons(size=32, icon_names=['money'])
-            self.image = icons.get('money')
+            icons = load_icons(size=32, icon_names=[self.money_type])
+            self.image = icons.get(self.money_type)
         except Exception:
             self.image = None
         
         # アニメーション用
         self.animation_time = 0
         self.bob_offset = 0
+
+    def _generate_amount_by_box_type(self, box_type):
+        """ボックスタイプに基づいて金額を生成"""
+        rand = random.random()
+        
+        if box_type == 1:
+            # Box1: money1～4
+            if rand < BOX1_MONEY1_RATE:
+                return random.randint(MONEY1_AMOUNT_MIN, MONEY1_AMOUNT_MAX)
+            elif rand < BOX1_MONEY1_RATE + BOX1_MONEY2_RATE:
+                return random.randint(MONEY2_AMOUNT_MIN, MONEY2_AMOUNT_MAX)
+            elif rand < BOX1_MONEY1_RATE + BOX1_MONEY2_RATE + BOX1_MONEY3_RATE:
+                return random.randint(MONEY3_AMOUNT_MIN, MONEY3_AMOUNT_MAX)
+            else:
+                return random.randint(MONEY4_AMOUNT_MIN, MONEY4_AMOUNT_MAX)
+        elif box_type == 2:
+            # Box2: money3～5
+            if rand < BOX2_MONEY3_RATE:
+                return random.randint(MONEY3_AMOUNT_MIN, MONEY3_AMOUNT_MAX)
+            elif rand < BOX2_MONEY3_RATE + BOX2_MONEY4_RATE:
+                return random.randint(MONEY4_AMOUNT_MIN, MONEY4_AMOUNT_MAX)
+            else:
+                return random.randint(MONEY5_AMOUNT_MIN, MONEY5_AMOUNT_MAX)
+        elif box_type == 3:
+            # Box3: money4～5 (最高額寄り)
+            if rand < BOX3_MONEY4_RATE:
+                return random.randint(MONEY4_AMOUNT_MIN, MONEY4_AMOUNT_MAX)
+            else:
+                return random.randint(MONEY5_AMOUNT_MIN, MONEY5_AMOUNT_MAX)
+        else:
+            # デフォルト（従来のランダムシステム）
+            return self._generate_random_amount()
+
+    def _generate_random_amount(self):
+        """新しい確率システムで金額を生成"""
+        rand = random.random()
+        
+        if rand < MONEY1_DROP_RATE:
+            return random.randint(MONEY1_AMOUNT_MIN, MONEY1_AMOUNT_MAX)
+        elif rand < MONEY1_DROP_RATE + MONEY2_DROP_RATE:
+            return random.randint(MONEY2_AMOUNT_MIN, MONEY2_AMOUNT_MAX)
+        elif rand < MONEY1_DROP_RATE + MONEY2_DROP_RATE + MONEY3_DROP_RATE:
+            return random.randint(MONEY3_AMOUNT_MIN, MONEY3_AMOUNT_MAX)
+        elif rand < MONEY1_DROP_RATE + MONEY2_DROP_RATE + MONEY3_DROP_RATE + MONEY4_DROP_RATE:
+            return random.randint(MONEY4_AMOUNT_MIN, MONEY4_AMOUNT_MAX)
+        else:
+            return random.randint(MONEY5_AMOUNT_MIN, MONEY5_AMOUNT_MAX)
+
+    def _get_money_type_by_amount(self, amount):
+        """金額に基づいてアイコンタイプを決定"""
+        if amount <= 10:
+            return "money1"
+        elif amount <= 50:
+            return "money2"
+        elif amount <= 200:
+            return "money3"
+        elif amount <= 1000:
+            return "money4"
+        else:
+            return "money5"
 
     def move_to_player(self, player):
         dx = player.x - self.x
@@ -281,20 +347,30 @@ class MoneyItem:
             center_x = int(self.x - camera_x)
             center_y = int(display_y - camera_y)
             
+            # お金タイプに応じてグローの色を変更
+            glow_colors = {
+                "money1": (255, 215, 0),    # 金色
+                "money2": (255, 255, 150),  # 明るい金色
+                "money3": (255, 165, 0),    # オレンジ金色
+                "money4": (255, 69, 0),     # 赤みがかった金色
+                "money5": (138, 43, 226)    # 紫色（レア感）
+            }
+            glow_color = glow_colors.get(self.money_type, (255, 215, 0))
+            
             # 金色の円の半径（画像サイズの約60%）
             circle_radius = int(max(img_w, img_h) * 0.3)
             
-            # グロー効果（複数の円を重ねて描画）- 金色
+            # グロー効果（複数の円を重ねて描画）
             for i in range(4):
                 glow_radius = circle_radius + (i + 1) * 2
                 glow_alpha = max(10, 35 - i * 8)
                 glow_surf = pygame.Surface((glow_radius * 2 + 10, glow_radius * 2 + 10), pygame.SRCALPHA)
-                pygame.draw.circle(glow_surf, (255, 215, 0, glow_alpha), 
+                pygame.draw.circle(glow_surf, glow_color + (glow_alpha,), 
                                  (glow_radius + 5, glow_radius + 5), glow_radius)
                 screen.blit(glow_surf, (center_x - glow_radius - 5, center_y - glow_radius - 5))
             
-            # メインの金色の円（背景）
-            pygame.draw.circle(screen, (255, 215, 0, 160), (center_x, center_y), circle_radius)
+            # メインの色の円（背景）
+            pygame.draw.circle(screen, glow_color + (160,), (center_x, center_y), circle_radius)
             
             # 元の画像を上に描画
             screen.blit(self.image, (draw_x, draw_y))

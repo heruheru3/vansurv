@@ -112,6 +112,86 @@ MONEY_PER_LEVEL_BONUS = 50          # レベルアップボーナス
 MONEY_PER_SURVIVAL_SECOND = 5       # 1秒生存あたりの報酬
 MONEY_GAME_CLEAR_BONUS = 1000       # ゲームクリア時のボーナス
 MONEY_CONTINUE_COST = 100           # コンティニューの費用
-# MONEY_DROP_RATE = 0.1               # 敵がお金を落とす確率（10%）- アイテムボックス用に保留
-# MONEY_DROP_AMOUNT_MIN = 5           # お金ドロップの最小額 - アイテムボックス用に保留
-# MONEY_DROP_AMOUNT_MAX = 25          # お金ドロップの最大額 - アイテムボックス用に保留
+MONEY_DROP_RATE = 0.1               # 敵がお金を落とす確率（10%）- アイテムボックス用
+MONEY_DROP_AMOUNT_MIN = 5           # お金ドロップの最小額 - アイテムボックス用
+MONEY_DROP_AMOUNT_MAX = 25          # お金ドロップの最大額 - アイテムボックス用
+
+# 新しいお金アイテム設定（money1～money5）
+# money1: 1-10G (出現率40%)
+MONEY1_AMOUNT_MIN = 1
+MONEY1_AMOUNT_MAX = 10
+MONEY1_DROP_RATE = 0.40
+
+# money2: 10-50G (出現率30%)
+MONEY2_AMOUNT_MIN = 10
+MONEY2_AMOUNT_MAX = 50
+MONEY2_DROP_RATE = 0.30
+
+# money3: 50-200G (出現率20%)
+MONEY3_AMOUNT_MIN = 50
+MONEY3_AMOUNT_MAX = 200
+MONEY3_DROP_RATE = 0.20
+
+# money4: 200-1000G (出現率8%)
+MONEY4_AMOUNT_MIN = 200
+MONEY4_AMOUNT_MAX = 1000
+MONEY4_DROP_RATE = 0.08
+
+# money5: 1000-10000G (出現率2%)
+MONEY5_AMOUNT_MIN = 1000
+MONEY5_AMOUNT_MAX = 10000
+MONEY5_DROP_RATE = 0.02
+
+# ボックス別お金ドロップ設定
+# Box1: money1～4 (低額寄り)
+BOX1_MONEY1_RATE = 0.50  # 50%
+BOX1_MONEY2_RATE = 0.30  # 30%
+BOX1_MONEY3_RATE = 0.15  # 15%
+BOX1_MONEY4_RATE = 0.05  # 5%
+
+# Box2: money3～5 (高額寄り)
+BOX2_MONEY3_RATE = 0.60  # 60%
+BOX2_MONEY4_RATE = 0.30  # 30%
+BOX2_MONEY5_RATE = 0.10  # 10%
+
+# Box3: money4～5 (最高額寄り)
+BOX3_MONEY4_RATE = 0.50  # 50%
+BOX3_MONEY5_RATE = 0.50  # 50%
+
+# アイテムボックス設定
+BOX_SPAWN_RATE = 0.02               # ボックスの基本出現率（2%）
+BOX_SPAWN_INTERVAL_MIN = 1000       # ボックス出現の最小間隔（ミリ秒）- 1秒に変更
+BOX_SPAWN_INTERVAL_MAX = 5000       # ボックス出現の最大間隔（ミリ秒）- 5秒に変更
+
+# ボックス種類別出現率
+BOX1_SPAWN_RATE = 0.6               # box1の出現率（60%）
+BOX2_SPAWN_RATE = 0.3              # box2の出現率（30%）
+BOX3_SPAWN_RATE = 0.1              # box3の出現率（10%）
+
+# ボックス1の中身（コイン系のみ）
+BOX1_COIN_RATE = 1.0                # コイン100%
+BOX1_COIN_AMOUNT_MIN = 10           # 最小コイン額
+BOX1_COIN_AMOUNT_MAX = 30           # 最大コイン額
+
+# ボックス2の中身（コイン90%、その他10%）
+BOX2_COIN_RATE = 0.9                # コイン90%
+BOX2_COIN_AMOUNT_MIN = 20           # 最小コイン額
+BOX2_COIN_AMOUNT_MAX = 50           # 最大コイン額
+BOX2_HEAL_RATE = 0.033              # 回復アイテム3.3%（10%の1/3）
+BOX2_BOMB_RATE = 0.033              # ボムアイテム3.3%（10%の1/3）
+BOX2_MAGNET_RATE = 0.034            # マグネットアイテム3.4%（10%の1/3、端数調整）
+
+# ボックス3の中身（お金・回復・ボム・マグネット各25%）
+BOX3_MONEY_RATE = 0.25              # お金25%
+BOX3_HEAL_RATE = 0.25               # 回復アイテム25%
+BOX3_BOMB_RATE = 0.25               # ボムアイテム25%
+BOX3_MAGNET_RATE = 0.25             # マグネットアイテム25%
+
+# ボックスHP
+BOX1_HP = 5                         # box1のHP（軽く叩けば壊れる）
+BOX2_HP = 10                        # box2のHP
+BOX3_HP = 20                        # box3のHP（少し硬い）
+
+# ボックスサイズ
+BOX_SIZE = 64                       # ボックスの表示サイズ（ピクセル）- 倍のサイズに変更
+BOX_COLLISION_SIZE = 56             # ボックスの当たり判定サイズ

@@ -774,6 +774,15 @@ class Player:
         except Exception:
             return 0.0
 
+    def get_magnet_level(self):
+        """マグネットサブアイテム（gem_pickup_range）のレベルを取得"""
+        try:
+            if 'gem_pickup_range' in self.subitems:
+                return int(self.subitems.get('gem_pickup_range').level)
+            return 0
+        except Exception:
+            return 0
+
     def upgrade_subitems(self, count=1):
         try:
             return random_upgrade(self.subitems, count=count)

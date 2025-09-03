@@ -162,6 +162,14 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
     exp_rect = exp_text.get_rect(midleft=(bar_x + 8, exp_y + meter_h // 2))
     screen.blit(exp_text, exp_rect.topleft)
 
+    # 獲得金額をHPパネルの右側に表示（パネルの外側）
+    panel_right = 8 + panel_w  # パネルの右端
+    money_text = font.render(f"Money: {game_money}G", True, YELLOW)
+    money_x = panel_right + 20  # パネルから20px右
+    money_y = 8 + pad + meter_h // 2  # HPバーと同じ高さ
+    money_rect = money_text.get_rect(midleft=(money_x, money_y))
+    screen.blit(money_text, money_rect.topleft)
+
     # # 時間表示
     # time_text = font.render(f"Time: {int(game_time)}s", True, WHITE)
     # screen.blit(time_text, (16, 76))
