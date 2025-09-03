@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "created_at": "2025-09-03T12:14:43.899338",
+  "last_updated": "2025-09-03T12:20:31.918312",
+  "player_stats": {
+    "total_money": 1394,
+    "money_earned_total": 1394,
+    "games_played": 2,
+    "total_playtime": 64.13333333333226,
+    "best_survival_time": 32.06666666666613,
+    "total_enemies_killed": 54,
+    "total_experience_gained": 16,
+    "max_level_reached": 3
+  },
+  "weapon_stats": {
+    "whip": 0,
+    "holy_water": 0,
+    "garlic": 0,
+    "magic_wand": 0,
+    "axe": 0,
+    "stone": 0,
+    "rotating_book": 0,
+    "knife": 1,
+    "thunder": 0
+  },
+  "subitem_stats": {
+    "hp": 0,
+    "speed": 0,
+    "base_damage": 0,
+    "effect_range": 0,
+    "effect_time": 0,
+    "extra_projectiles": 1,
+    "projectile_speed": 1,
+    "defense": 0
+  },
+  "weapon_usage_stats": {
+    "knife": {
+      "total_damage": 1274.463956869797,
+      "games_used": 2
+    }
+  },
+  "achievements": {
+    "first_clear": false,
+    "weapon_master": false,
+    "millionaire": false,
+    "survivor": false
+  }
+}

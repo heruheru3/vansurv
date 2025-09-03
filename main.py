@@ -238,6 +238,23 @@ def main():
                         print(f"[INFO] SHOW_FPS set to {SHOW_FPS}")
                         continue
 
+                    # ESCキーでゲーム途中でも強制終了
+                    if event.key == pygame.K_ESCAPE and not game_over and not game_clear:
+                        print("[INFO] Game forcibly ended by ESC key")
+                        # 強制終了フラグを立てる（game_overと同じ扱い）
+                        game_over = True
+                        # セーブデータに記録
+                        save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
+                        save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
+                        # 武器使用統計も記録
+                        if damage_stats:
+                            save_system.record_weapon_usage(damage_stats)
+                        # 実績チェック
+                        save_system.check_achievements()
+                        save_system.save()
+                        print(f"[INFO] Game data saved (forced end). Total money now: {save_system.get_money()}G")
+                        continue
+
                     # フルスクリーン切替（F11）
                     if event.key == pygame.K_F11:
                         try:
@@ -406,6 +423,11 @@ def main():
                             # セーブデータに記録（クリアボーナス含む）
                             save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
                             save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
+                            # 武器使用統計も記録
+                            if damage_stats:
+                                save_system.record_weapon_usage(damage_stats)
+                            # 実績チェック
+                            save_system.check_achievements()
                             save_system.save()
                             print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                             
@@ -428,6 +450,13 @@ def main():
                             # セーブデータに記録（生存時間ボーナス含む）
                             save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
                             save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
+                            # 武器使用統計も記録
+                            if damage_stats:
+                                save_system.record_weapon_usage(damage_stats)
+                            # 実績チェック
+                            save_system.check_achievements()
+                            save_system.save()
+                            print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                             save_system.save()
                             print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                             
@@ -437,12 +466,22 @@ def main():
                             enemies_killed_this_game = 0
                             # ボックスマネージャーをリセット
                             box_manager = BoxManager()
-                            # HP回復エフェクト用のコールバックを設定
-                            def heal_effect_callback(x, y, heal_amount, is_auto=False):
-                                if is_auto:
-                                    particles.append(AutoHealEffect(x, y))
-                                particles.append(HealEffect(x, y, heal_amount))
-                            player.heal_effect_callback = heal_effect_callback
+
+                        # 武器使用統計も記録
+                        if damage_stats:
+                            save_system.record_weapon_usage(damage_stats)
+                        # 実績チェック
+                        save_system.check_achievements()
+                        save_system.save()
+                        print(f"[INFO] Game data saved (forced end). Total money now: {save_system.get_money()}G")
+                    
+                    # HP回復エフェクト用のコールバックを設定
+                    def heal_effect_callback(x, y, heal_amount, is_auto=False):
+                        if is_auto:
+                            particles.append(AutoHealEffect(x, y))
+                        particles.append(HealEffect(x, y, heal_amount))
+                    player.heal_effect_callback = heal_effect_callback
+                
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     # マウス座標を仮想画面座標に変換
                     def convert_mouse_pos(mouse_x, mouse_y):
@@ -586,6 +625,11 @@ def main():
                                 # セーブデータに記録
                                 save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
                                 save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
+                                # 武器使用統計も記録
+                                if damage_stats:
+                                    save_system.record_weapon_usage(damage_stats)
+                                # 実績チェック
+                                save_system.check_achievements()
                                 save_system.save()
                                 print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                                 

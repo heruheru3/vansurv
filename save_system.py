@@ -50,6 +50,9 @@ class SaveSystem:
                 "projectile_speed": 0,
                 "defense": 0
             },
+            "weapon_usage_stats": {
+                # 武器使用統計（ダメージベース）
+            },
             "achievements": {
                 # 実績システム用（将来拡張）
                 "first_clear": False,
@@ -138,6 +141,20 @@ class SaveSystem:
         if subitem_name in self.data["subitem_stats"]:
             self.data["subitem_stats"][subitem_name] += 1
     
+    def record_weapon_usage(self, weapon_damage_stats):
+        """武器使用統計をダメージベースで記録"""
+        if "weapon_usage_stats" not in self.data:
+            self.data["weapon_usage_stats"] = {}
+        
+        for weapon_name, damage in weapon_damage_stats.items():
+            if weapon_name not in self.data["weapon_usage_stats"]:
+                self.data["weapon_usage_stats"][weapon_name] = {
+                    "total_damage": 0,
+                    "games_used": 0
+                }
+            self.data["weapon_usage_stats"][weapon_name]["total_damage"] += damage
+            self.data["weapon_usage_stats"][weapon_name]["games_used"] += 1
+    
     # 統計取得メソッド
     def get_weapon_stats(self):
         """武器統計を取得"""
@@ -150,6 +167,10 @@ class SaveSystem:
     def get_player_stats(self):
         """プレイヤー統計を取得"""
         return self.data["player_stats"].copy()
+    
+    def get_weapon_usage_stats(self):
+        """武器使用統計を取得"""
+        return self.data.get("weapon_usage_stats", {}).copy()
     
     # 実績関連メソッド
     def unlock_achievement(self, achievement_name):
