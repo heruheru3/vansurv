@@ -1,6 +1,7 @@
 # filepath: e:\jupy_work\vansurv\effects\items.py
 import pygame
 import math
+import random
 from constants import *
 from resources import load_icons
 
@@ -210,3 +211,132 @@ class GameItem:
                 pygame.draw.arc(surf, CYAN, (cx-r+2, cy-r+2, r*2-4, r*2-4), 0, math.pi, 2)
                 
                 screen.blit(surf, (int(self.x - cx - camera_x), int(self.y - cy - camera_y)))
+
+class MoneyItem:
+    """お金アイテムクラス"""
+    def __init__(self, x, y, amount=None):
+        self.x = x
+        self.y = y
+        self.size = 10
+        self.speed = 3
+        self.type = "money"
+        self.collected = False
+        
+        # お金の量を設定（Noneの場合はランダム）
+        if amount is None:
+            self.amount = random.randint(MONEY_DROP_AMOUNT_MIN, MONEY_DROP_AMOUNT_MAX)
+        else:
+            self.amount = max(1, int(amount))
+        
+        # アイテム画像を読み込む
+        try:
+            icons = load_icons(size=32, icon_names=['money'])
+            self.image = icons.get('money')
+        except Exception:
+            self.image = None
+        
+        # アニメーション用
+        self.animation_time = 0
+        self.bob_offset = 0
+
+    def move_to_player(self, player):
+        dx = player.x - self.x
+        dy = player.y - self.y
+        distance = math.sqrt(dx**2 + dy**2)
+        
+        # アイテムの引き寄せも同様にサブアイテムで拡張
+        try:
+            extra = float(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0.0
+        except Exception:
+            extra = 0.0
+        attract_threshold = 120.0 + extra  # お金は少し広い範囲から引き寄せ
+
+        # マグネット効果が有効な場合、全画面からの引き寄せ＋速度アップ
+        if hasattr(player, 'is_magnet_active') and player.is_magnet_active():
+            attract_threshold = float('inf')  # 距離制限なし
+            speed_multiplier = MAGNET_FORCE_MULTIPLIER
+        else:
+            speed_multiplier = 1.0
+
+        if distance < attract_threshold and distance != 0:
+            move_speed = self.speed * speed_multiplier
+            self.x += (dx / distance) * move_speed
+            self.y += (dy / distance) * move_speed
+
+    def draw(self, screen, camera_x=0, camera_y=0):
+        # アニメーション更新
+        self.animation_time += 0.1
+        self.bob_offset = math.sin(self.animation_time) * 2  # 上下にふわふわ
+        
+        display_y = self.y + self.bob_offset
+        
+        # 画像が読み込まれている場合は画像を使用
+        if self.image:
+            # 画像のサイズに基づいて描画位置を調整
+            img_w, img_h = self.image.get_size()
+            draw_x = int(self.x - img_w // 2 - camera_x)
+            draw_y = int(display_y - img_h // 2 - camera_y)
+            
+            # 画像の中心座標
+            center_x = int(self.x - camera_x)
+            center_y = int(display_y - camera_y)
+            
+            # 金色の円の半径（画像サイズの約60%）
+            circle_radius = int(max(img_w, img_h) * 0.3)
+            
+            # グロー効果（複数の円を重ねて描画）- 金色
+            for i in range(4):
+                glow_radius = circle_radius + (i + 1) * 2
+                glow_alpha = max(10, 35 - i * 8)
+                glow_surf = pygame.Surface((glow_radius * 2 + 10, glow_radius * 2 + 10), pygame.SRCALPHA)
+                pygame.draw.circle(glow_surf, (255, 215, 0, glow_alpha), 
+                                 (glow_radius + 5, glow_radius + 5), glow_radius)
+                screen.blit(glow_surf, (center_x - glow_radius - 5, center_y - glow_radius - 5))
+            
+            # メインの金色の円（背景）
+            pygame.draw.circle(screen, (255, 215, 0, 160), (center_x, center_y), circle_radius)
+            
+            # 元の画像を上に描画
+            screen.blit(self.image, (draw_x, draw_y))
+            
+            # 金額表示（小さなテキスト）
+            try:
+                from resources import get_font
+                font = get_font(14)
+                if font:
+                    text = f"{self.amount}G"
+                    text_surf = font.render(text, True, WHITE)
+                    text_w = text_surf.get_width()
+                    screen.blit(text_surf, (center_x - text_w // 2, center_y + circle_radius + 2))
+            except Exception:
+                pass
+        else:
+            # フォールバック: 金貨風の円を描画
+            r = self.size
+            cx, cy = int(self.x - camera_x), int(display_y - camera_y)
+            
+            # 金色のコイン風描画
+            gold_color = (255, 215, 0)
+            dark_gold = (200, 165, 0)
+            light_gold = (255, 255, 150)
+            
+            # 影
+            pygame.draw.circle(screen, (100, 80, 0), (cx + 2, cy + 2), r + 2)
+            # メインの金色
+            pygame.draw.circle(screen, gold_color, (cx, cy), r)
+            # ハイライト
+            pygame.draw.circle(screen, light_gold, (cx - r//3, cy - r//3), r//2)
+            # 輪郭
+            pygame.draw.circle(screen, dark_gold, (cx, cy), r, 2)
+            
+            # 金額表示
+            try:
+                from resources import get_font
+                font = get_font(12)
+                if font:
+                    text = f"{self.amount}"
+                    text_surf = font.render(text, True, BLACK)
+                    text_w, text_h = text_surf.get_size()
+                    screen.blit(text_surf, (cx - text_w // 2, cy - text_h // 2))
+            except Exception:
+                pass

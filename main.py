@@ -31,7 +31,7 @@ def draw_test_checkerboard(surface, camera_x, camera_y):
 
 from player import Player
 from enemy import Enemy
-from effects.items import ExperienceGem, GameItem
+from effects.items import ExperienceGem, GameItem, MoneyItem
 from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber, AvoidanceParticle, HealEffect, AutoHealEffect
 from ui import draw_ui, draw_minimap, draw_level_choice, draw_end_buttons, get_end_button_rects
 from stage import draw_stage_background
@@ -42,6 +42,7 @@ from game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item_effe
                        update_difficulty, handle_player_level_up, collect_experience_gems, collect_items)
 from collision import check_player_enemy_collision, check_attack_enemy_collision
 from map import MapLoader
+from save_system import SaveSystem
 
 # ランタイムで切り替え可能なデバッグフラグ（F3でトグル）
 DEBUG_MODE = DEBUG
@@ -85,6 +86,10 @@ def main():
     preload_res = resources.preload_all(icon_size=16)
     ICONS = preload_res.get('icons', {})
 
+    # セーブシステムを初期化
+    save_system = SaveSystem()
+    print(f"[INFO] Save system initialized. Current money: {save_system.get_money()}G")
+
     clock = pygame.time.Clock()
     # FPSカウンター用
     fps_values = []
@@ -112,7 +117,11 @@ def main():
     CAMERA_LERP = 0.18
 
     # ゲーム状態の初期化
-    player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+    player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen, save_system)
+
+    # お金関連の初期化
+    current_game_money = 0  # 現在のゲームセッションで獲得したお金
+    enemies_killed_this_game = 0  # 今回のゲームで倒した敵の数
 
     # マップローダーの初期化
     map_loader = MapLoader()
@@ -388,6 +397,14 @@ def main():
                         # ゲームクリア後は（規定時間生存）プレイヤー状態を保持して続行する
                         if game_clear:
                             print("[INFO] Survived required time - continuing without resetting player/weapons.")
+                            # ゲームクリアボーナスを追加
+                            current_game_money += MONEY_GAME_CLEAR_BONUS
+                            # セーブデータに記録（クリアボーナス含む）
+                            save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
+                            save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
+                            save_system.save()
+                            print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
+                            
                             enemies = []
                             experience_gems = []
                             items = []
@@ -397,9 +414,21 @@ def main():
                             game_time = 0
                             last_difficulty_increase = 0
                             game_clear = False
+                            # リセット
+                            current_game_money = 0
+                            enemies_killed_this_game = 0
                         else:
                             # 通常のリスタート（全て再初期化）
-                            player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+                            # セーブデータに記録（生存時間ボーナス含む）
+                            save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
+                            save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
+                            save_system.save()
+                            print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
+                            
+                            player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen, save_system)
+                            # リセット
+                            current_game_money = 0
+                            enemies_killed_this_game = 0
                             # HP回復エフェクト用のコールバックを設定
                             def heal_effect_callback(x, y, heal_amount, is_auto=False):
                                 if is_auto:
@@ -546,7 +575,16 @@ def main():
                                 continue
                             # Restart
                             if rects.get('restart') and rects['restart'].collidepoint(mx, my):
-                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen)
+                                # セーブデータに記録
+                                save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
+                                save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
+                                save_system.save()
+                                print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
+                                
+                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen, save_system)
+                                # リセット
+                                current_game_money = 0
+                                enemies_killed_this_game = 0
                                 # HP回復エフェクト用のコールバックを設定
                                 def heal_effect_callback(x, y, heal_amount, is_auto=False):
                                     if is_auto:
@@ -727,7 +765,12 @@ def main():
                                 for _ in range(4):  # 8から4に削減
                                     particles.append(DeathParticle(enemy.x, enemy.y, enemy.color))
 
+                                # 撃破カウンターを増加
+                                enemies_killed_this_game += 1
+                                current_game_money += MONEY_PER_ENEMY_KILLED
+
                                 rand = random.random()
+                                # お金ドロップは廃止（将来的にアイテムボックス用に）
                                 if rand < HEAL_ITEM_DROP_RATE:
                                     items.append(GameItem(enemy.x, enemy.y, "heal"))
                                 elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE:
@@ -1018,6 +1061,8 @@ def main():
                             particles.append(LevelUpEffect(player.x, player.y))
                             for _ in range(12):
                                 particles.append(DeathParticle(player.x, player.y, CYAN))
+                            # レベルアップボーナス
+                            current_game_money += MONEY_PER_LEVEL_BONUS
 
                 for item in items[:]:
                     item.move_to_player(player)
@@ -1040,6 +1085,17 @@ def main():
                         elif item.type == "magnet":
                             # マグネット効果を有効化
                             player.activate_magnet()
+                        elif item.type == "money":
+                            # お金を獲得
+                            money_amount = getattr(item, 'amount', MONEY_DROP_AMOUNT_MIN)
+                            current_game_money += money_amount
+                            # お金取得のエフェクト
+                            try:
+                                from effects.particles import MoneyPickupEffect
+                                particles.append(MoneyPickupEffect(item.x, item.y, money_amount))
+                            except Exception:
+                                # フォールバック：普通のエフェクト
+                                particles.append(DeathParticle(item.x, item.y, (255, 215, 0)))
                         items.remove(item)
 
             # パーティクルの更新と描画

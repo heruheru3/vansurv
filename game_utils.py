@@ -63,11 +63,14 @@ def enforce_experience_gems_limit(gems, max_gems=MAX_GEMS_ON_SCREEN, player_x=No
         pass
 
 
-def init_game_state(screen):
+def init_game_state(screen, save_system=None):
     """ゲームの初期状態を設定する関数"""
     from player import Player
     
     player = Player(screen)
+    # セーブシステムへの参照を設定
+    if save_system:
+        player.save_system = save_system
     # 初期武器選択：すべての武器を3x3グリッドで表示
     player.awaiting_subitem_choice = False
     player.last_subitem_choices = []

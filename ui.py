@@ -123,7 +123,7 @@ def get_minimap_surf(map_w, map_h, alpha=128, bg=(20,20,20)):
         _surf_cache[key] = s
     return s
 
-def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True):
+def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True, money=0, game_money=0):
     # メイン画面のフォントをやや小さく（約70%）にする
     font = get_font(18)
     
@@ -132,7 +132,7 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
     meter_h = 24
     pad = 12
     panel_w = meter_w + pad * 2
-    panel_h = meter_h * 2 + pad * 3
+    panel_h = meter_h * 2 + pad * 3  # 元の2バー分に戻す
     # パネル背景（半透明）
     panel_surf = get_panel_surf(panel_w, panel_h, radius=8, alpha=160)
     screen.blit(panel_surf, (8, 8))

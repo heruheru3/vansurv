@@ -476,6 +476,13 @@ class Player:
             print(f"[DEBUG] Subitem choices prepared: {choices}")
 
     def apply_subitem_choice(self, chosen_key):
+        # セーブシステムに記録
+        if hasattr(self, 'save_system') and self.save_system:
+            try:
+                self.save_system.record_subitem_selection(chosen_key)
+            except Exception:
+                pass
+        
         try:
             old_bonus = 0.0
             if chosen_key in self.subitems:
@@ -548,6 +555,16 @@ class Player:
         self.last_subitem_choices = []
 
     def apply_level_choice(self, chosen):
+        # セーブシステムに記録
+        if hasattr(self, 'save_system') and self.save_system:
+            try:
+                if isinstance(chosen, str) and ':' in chosen:
+                    parts = chosen.split(':', 1)
+                    if len(parts) == 2 and parts[0] == 'weapon':
+                        self.save_system.record_weapon_selection(parts[1])
+            except Exception:
+                pass
+                
         try:
             typ = 'weapon'
             key = chosen

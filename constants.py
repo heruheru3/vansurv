@@ -105,3 +105,13 @@ ENEMY_WALK_ROTATION_SPEED = 5.0  # 回転振動の速度
 
 # パフォーマンス設定
 ENABLE_ENEMY_WALK_ANIMATION = True  # エネミー歩行アニメーションの有効/無効
+
+# お金・経済システム設定
+MONEY_PER_ENEMY_KILLED = 10         # 敵1体撃破あたりの基本報酬
+MONEY_PER_LEVEL_BONUS = 50          # レベルアップボーナス
+MONEY_PER_SURVIVAL_SECOND = 5       # 1秒生存あたりの報酬
+MONEY_GAME_CLEAR_BONUS = 1000       # ゲームクリア時のボーナス
+MONEY_CONTINUE_COST = 100           # コンティニューの費用
+# MONEY_DROP_RATE = 0.1               # 敵がお金を落とす確率（10%）- アイテムボックス用に保留
+# MONEY_DROP_AMOUNT_MIN = 5           # お金ドロップの最小額 - アイテムボックス用に保留
+# MONEY_DROP_AMOUNT_MAX = 25          # お金ドロップの最大額 - アイテムボックス用に保留
