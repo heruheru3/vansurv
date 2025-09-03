@@ -227,7 +227,7 @@ class Player:
             new_y = self.y + ny * sp
             
             # 障害物との衝突判定（マップが有効な場合のみ）
-            if USE_STAGE_MAP:
+            if USE_STAGE_MAP or USE_CSV_MAP:
                 try:
                     from stage import get_stage_map
                     stage_map = get_stage_map()
@@ -918,7 +918,7 @@ class Player:
     
     def _adjust_spawn_position(self):
         """障害物のない安全な開始位置に調整（マップが有効な場合のみ）"""
-        if not USE_STAGE_MAP:
+        if not (USE_STAGE_MAP or USE_CSV_MAP):
             return  # マップが無効な場合は何もしない
             
         try:

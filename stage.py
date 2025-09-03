@@ -220,7 +220,30 @@ class StageMap:
         self.tile_renderer = TileRenderer()
         self.tiles = {}
         self.obstacles = set()
+        
+        # CSVマップキャッシュ
+        self._csv_map_cache = None
+        self._csv_map_loaded = False
+        
         self._generate_map()
+    
+    def _load_csv_map_cache(self):
+        """CSVマップをキャッシュに読み込む（一度だけ実行）"""
+        if self._csv_map_loaded:
+            return
+        
+        try:
+            from constants import USE_CSV_MAP, CSV_MAP_FILE
+            if USE_CSV_MAP:
+                from map.map_loader import MapLoader
+                temp_loader = MapLoader()
+                if temp_loader.load_csv_map(CSV_MAP_FILE):
+                    self._csv_map_cache = temp_loader
+                    print(f"[DEBUG] CSV map cached successfully")
+        except Exception as e:
+            print(f"[DEBUG] Failed to load CSV map cache: {e}")
+            
+        self._csv_map_loaded = True
     
     def _generate_map(self):
         """プロシージャル生成でマップを作成"""
@@ -292,12 +315,38 @@ class StageMap:
     
     def get_tile_at_world_pos(self, world_x, world_y):
         """ワールド座標からタイル種類を取得"""
+        # CSVマップが有効な場合はCSVマップのタイルを取得
+        from constants import USE_CSV_MAP
+        if USE_CSV_MAP:
+            # キャッシュからCSVマップを取得
+            self._load_csv_map_cache()
+            if self._csv_map_cache:
+                try:
+                    return self._csv_map_cache.get_tile_at(world_x, world_y)
+                except Exception as e:
+                    print(f"[DEBUG] CSV tile lookup failed: {e}")
+        
+        # 従来のプロシージャル生成マップのタイル取得
         tile_x = int(world_x // TILE_SIZE)
         tile_y = int(world_y // TILE_SIZE)
         return self.tiles.get((tile_x, tile_y), TILE_GRASS)
     
     def is_obstacle_at_world_pos(self, world_x, world_y):
         """ワールド座標が障害物かどうかチェック"""
+        # CSVマップが有効な場合はCSVマップのブロッカータイルをチェック
+        from constants import USE_CSV_MAP
+        if USE_CSV_MAP:
+            # キャッシュからCSVマップを取得
+            self._load_csv_map_cache()
+            if self._csv_map_cache:
+                try:
+                    tile_id = self._csv_map_cache.get_tile_at(world_x, world_y)
+                    # ブロッカータイル: 5(森), 7(水), 8(危険地帯), 9(石/岩)
+                    return tile_id in [5, 7, 8, 9]
+                except Exception as e:
+                    print(f"[DEBUG] CSV collision check failed: {e}")
+        
+        # 従来のプロシージャル生成マップの障害物チェック
         tile_x = int(world_x // TILE_SIZE)
         tile_y = int(world_y // TILE_SIZE)
         return (tile_x, tile_y) in self.obstacles
