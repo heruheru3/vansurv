@@ -51,6 +51,7 @@ class Enemy:
                         'attack_cooldown': int(row['attack_cooldown']),
                         'image_file': row['image_file'],
                         'image_size': int(row['image_size']),
+                        'projectile_speed': float(row['projectile_speed']) if row['projectile_speed'] else 2.0,
                         'description': row['description']
                     }
             cls._stats_loaded = True
@@ -85,6 +86,7 @@ class Enemy:
                         'spawn_time': int(row['spawn_time']),  # 出現時間（秒）
                         'image_file': row['image_file'],
                         'image_size': int(row['image_size']),
+                        'projectile_speed': float(row['projectile_speed']) if row['projectile_speed'] else 2.0,
                         'description': row['description']
                     }
             cls._boss_stats_loaded = True
@@ -105,10 +107,16 @@ class Enemy:
     
     @classmethod
     def get_boss_config_by_type(cls, boss_type):
-        """指定されたタイプのボス設定を取得"""
+        """指定されたタイプのボス設定を取得（最初の行のみ）"""
         cls.load_boss_stats()
         key = (boss_type, 1)  # レベルは1固定
         return cls._boss_stats.get(key, None)
+    
+    @classmethod
+    def get_all_boss_configs(cls):
+        """全てのボス設定を取得（行ごと）"""
+        cls.load_boss_stats()
+        return cls._boss_stats.copy()
     
     @classmethod
     def _load_enemy_image(cls, enemy_type, level_or_behavior):
@@ -291,6 +299,11 @@ class Enemy:
         self.last_attack_time = 0  # 最後の攻撃時刻
         self.projectiles = []  # 敵が発射した弾丸
         
+        # 跳ね返りタイプ（タイプ2）用の変数
+        self.velocity_x = 0  # X方向の速度
+        self.velocity_y = 0  # Y方向の速度
+        self.bounces_remaining = 5  # 残り跳ね返り回数（無限にしたい場合は大きな値）
+        
         # 生存時間管理
         self.spawn_time = pygame.time.get_ticks()  # 生成時刻
         
@@ -472,6 +485,7 @@ class Enemy:
                 self.base_speed = boss_config['base_speed'] * boss_config['speed_multiplier']
                 self.damage = boss_config['base_damage']
                 self.attack_cooldown = boss_config['attack_cooldown']
+                self.projectile_speed = boss_config['projectile_speed']
                 
                 # ボス用サイズ設定
                 image_size = boss_config['image_size']
@@ -531,6 +545,7 @@ class Enemy:
         self.base_speed = stats['base_speed'] * stats['speed_multiplier']
         self.damage = stats['base_damage']
         self.attack_cooldown = stats['attack_cooldown']
+        self.projectile_speed = stats.get('projectile_speed', 2.0)  # デフォルト値2.0
         
         # CSVからサイズ情報を取得（当たり判定用）
         if key in self._enemy_stats:
@@ -656,7 +671,7 @@ class Enemy:
             if self.knockback_cooldown < 0:
                 self.knockback_cooldown = 0
 
-    def move(self, player):
+    def move(self, player, camera_x=0, camera_y=0):
         """行動パターンに応じた移動処理"""
         # ノックバック中のみ通常の移動を無効にする（クールダウン中は移動可能）
         if self.knockback_timer > 0:
@@ -671,14 +686,69 @@ class Enemy:
             new_y = self.y + math.sin(angle) * self.base_speed
             
         elif self.behavior_type == 2:
-            # 2. プレイヤーに向かうがそのまま直進して画面端に消える
+            # 2. 跳ね返り直進タイプ（Stoneのような動き）
             if self.initial_direction is None:
-                # 初回のみプレイヤー方向を計算して保存
+                # 初回のみプレイヤー方向を計算して保存し、速度ベクトルを設定
                 self.initial_direction = math.atan2(player.y - self.y, player.x - self.x)
+                self.velocity_x = math.cos(self.initial_direction) * self.base_speed
+                self.velocity_y = math.sin(self.initial_direction) * self.base_speed
             
-            # 初期方向に直進
-            new_x = self.x + math.cos(self.initial_direction) * self.base_speed
-            new_y = self.y + math.sin(self.initial_direction) * self.base_speed
+            # 速度ベクトルによる移動
+            new_x = self.x + self.velocity_x
+            new_y = self.y + self.velocity_y
+            
+            # 不可侵地形チェック（ステージマップ使用時のみ）
+            try:
+                if USE_STAGE_MAP:
+                    from stage import get_stage_map
+                    stage_map = get_stage_map()
+                    if stage_map and hasattr(stage_map, 'get_tile_at_world_pos'):
+                        # 敵の四隅をチェック（より正確な衝突判定）
+                        half_size = self.size // 2
+                        check_points = [
+                            (new_x - half_size, new_y - half_size),  # 左上
+                            (new_x + half_size, new_y - half_size),  # 右上
+                            (new_x - half_size, new_y + half_size),  # 左下
+                            (new_x + half_size, new_y + half_size),  # 右下
+                            (new_x, new_y)                          # 中央
+                        ]
+                        
+                        terrain_collision = False
+                        for check_x, check_y in check_points:
+                            tile_id = stage_map.get_tile_at_world_pos(check_x, check_y)
+                            # エリア5,9: ソリッドブロッカー（凸地形）で跳ね返り
+                            # エリア6,7: パススルーブロッカー（凹地形）でも跳ね返り
+                            # 敵はすべてのブロッカー地形で跳ね返る
+                            if tile_id in {5, 6, 7, 9}:  # 全ブロッカー地形
+                                terrain_collision = True
+                                break
+                        
+                        if terrain_collision:
+                            # 不可侵地形に衝突する場合、速度を反転（跳ね返り）
+                            self.velocity_x *= -1
+                            self.velocity_y *= -1
+                            # 新しい方向で移動先を再計算
+                            new_x = self.x + self.velocity_x
+                            new_y = self.y + self.velocity_y
+            except Exception:
+                # ステージマップが利用できない場合は何もしない
+                pass
+            
+            # カメラ範囲での跳ね返り処理
+            screen_left = camera_x
+            screen_right = camera_x + 1280  # SCREEN_WIDTH
+            screen_top = camera_y
+            screen_bottom = camera_y + 720  # SCREEN_HEIGHT
+            
+            # 左右の境界での跳ね返り
+            if new_x <= screen_left or new_x >= screen_right:
+                self.velocity_x *= -1
+                new_x = max(screen_left + 1, min(new_x, screen_right - 1))
+            
+            # 上下の境界での跳ね返り
+            if new_y <= screen_top or new_y >= screen_bottom:
+                self.velocity_y *= -1
+                new_y = max(screen_top + 1, min(new_y, screen_bottom - 1))
             
         elif self.behavior_type == 3:
             # 3. プレイヤーから一定の距離を保ち、魔法の杖のような弾を発射する
@@ -1030,7 +1100,9 @@ class Enemy:
         if current_time - self.last_attack_time >= self.attack_cooldown:
             # プレイヤーに向けて弾丸を発射
             angle = math.atan2(player.y - self.y, player.x - self.x)
-            projectile = EnemyProjectile(self.x, self.y, angle, self.damage // 2, self.behavior_type, self.enemy_type)
+            # ボスの弾かどうかを判定
+            is_boss = hasattr(self, 'enemy_type') and self.enemy_type >= 101
+            projectile = EnemyProjectile(self.x, self.y, angle, self.damage // 2, self.behavior_type, self.enemy_type, is_boss_bullet=is_boss, projectile_speed=self.projectile_speed)
             self.projectiles.append(projectile)
             self.last_attack_time = current_time
 
@@ -1076,6 +1148,41 @@ class Enemy:
         return (self.x < -margin or self.x > WORLD_WIDTH + margin or 
                 self.y < -margin or self.y > WORLD_HEIGHT + margin)
 
+    def is_boss_off_screen(self):
+        """ボスが画面外に出たかどうかを判定（リスポーン用）"""
+        if not self.is_boss:
+            return False
+            
+        margin = 150  # ボス用の大きめのマージン
+        return (self.x < -margin or self.x > WORLD_WIDTH + margin or 
+                self.y < -margin or self.y > WORLD_HEIGHT + margin)
+
+    def respawn_boss_randomly(self, player):
+        """ボスをランダムな位置にリスポーン（HPは維持）"""
+        if not self.is_boss:
+            return
+            
+        # 画面外からランダムにスポーン
+        screen_margin = 100
+        side = random.randint(0, 3)  # 0:上, 1:右, 2:下, 3:左
+        
+        if side == 0:  # 上から
+            self.x = player.x + random.randint(-SCREEN_WIDTH//2, SCREEN_WIDTH//2)
+            self.y = player.y - SCREEN_HEIGHT//2 - screen_margin
+        elif side == 1:  # 右から
+            self.x = player.x + SCREEN_WIDTH//2 + screen_margin
+            self.y = player.y + random.randint(-SCREEN_HEIGHT//2, SCREEN_HEIGHT//2)
+        elif side == 2:  # 下から
+            self.x = player.x + random.randint(-SCREEN_WIDTH//2, SCREEN_WIDTH//2)
+            self.y = player.y + SCREEN_HEIGHT//2 + screen_margin
+        else:  # 左から
+            self.x = player.x - SCREEN_WIDTH//2 - screen_margin
+            self.y = player.y + random.randint(-SCREEN_HEIGHT//2, SCREEN_HEIGHT//2)
+        
+        # ワールド境界をクランプ
+        self.x = max(50, min(WORLD_WIDTH - 50, self.x))
+        self.y = max(50, min(WORLD_HEIGHT - 50, self.y))
+
     def is_far_from_player(self, player, margin=800):
         """プレイヤーから十分に離れているかどうかを判定（視界外削除用）"""
         # ボスは距離に関係なく削除されない
@@ -1115,12 +1222,15 @@ class Enemy:
         return is_in_bounds
 
     def should_be_removed_by_time(self):
-        """生存時間に基づく削除判定（距離保持射撃用のみ）"""
+        """生存時間に基づく削除判定"""
         # ボスは時間による削除もされない
         if self.is_boss:
             return False
             
-        if self.behavior_type == 3:  # 距離保持射撃
+        if self.behavior_type == 2:  # 跳ね返り直進
+            # 跳ね返りタイプは60秒で削除（長めに設定）
+            return pygame.time.get_ticks() - self.spawn_time > 60000
+        elif self.behavior_type == 3:  # 距離保持射撃
             # 距離保持射撃は45秒で削除
             return pygame.time.get_ticks() - self.spawn_time > 45000
         else:
@@ -1131,7 +1241,7 @@ class Enemy:
         """敵の種類情報を取得（デバッグ用）"""
         behavior_names = {
             1: "追跡",
-            2: "直進", 
+            2: "跳ね返り", 
             3: "距離保持",
             4: "近接射撃"
         }
@@ -1243,14 +1353,15 @@ class Enemy:
 
 class EnemyProjectile:
     """敵が発射する弾丸クラス"""
-    def __init__(self, x, y, angle, damage, behavior_type=3, enemy_level=1):
+    def __init__(self, x, y, angle, damage, behavior_type=3, enemy_level=1, is_boss_bullet=False, projectile_speed=2.0):
         self.x = x
         self.y = y
         self.angle = angle
         self.damage = damage
         self.behavior_type = behavior_type
         self.enemy_level = enemy_level  # 敵のレベルを記録
-        self.speed = 2.0  # 弾丸の速度（半分に減速）
+        self.is_boss_bullet = is_boss_bullet  # ボスの弾かどうか
+        self.speed = projectile_speed  # 弾丸の速度（CSVから設定）
         self.size = 18  # 弾丸のサイズ（1.5倍に拡大：12 * 1.5 = 18）
         self.lifetime = 3000  # 3秒で消滅（ミリ秒）
         self.created_time = pygame.time.get_ticks()
@@ -1264,6 +1375,11 @@ class EnemyProjectile:
 
     def _setup_bullet_color(self):
         """敵のレベルと行動パターンに応じた弾丸の色を設定"""
+        # ボスの弾は特別な色（金色、相殺不可を表現）
+        if self.is_boss_bullet:
+            self.base_color = (255, 215, 0)  # 金色
+            return
+        
         # 彩度設定：レベル1は低彩度（白っぽい）、レベル5は高彩度（鮮やか）
         saturation = 0.2 + (self.enemy_level - 1) * 0.2  # 0.2-1.0の範囲
         base_value = 200  # 明度は固定

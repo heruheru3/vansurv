@@ -976,24 +976,24 @@ def main():
                     spawn_interval = max(10, spawn_interval - 5)
                     last_difficulty_increase = game_time
 
-                # ボス生成処理（CSVから設定を読み込み）
+                # ボス生成処理（CSVの各行を個別チェック）
                 boss_spawn_timer += 1
                 
-                # 全てのボスタイプ（101-104）をチェック
-                for boss_type in [101, 102, 103, 104]:
-                    boss_config = Enemy.get_boss_config_by_type(boss_type)
+                # 全てのボス設定を取得
+                all_boss_configs = Enemy.get_all_boss_configs()
+                
+                for (boss_type, level), boss_config in all_boss_configs.items():
+                    spawn_time_frames = boss_config['spawn_time'] * 60  # 秒をフレームに変換
                     
-                    if boss_config:
-                        spawn_time_frames = boss_config['spawn_time'] * 60  # 秒をフレームに変換
-                        
-                        # 指定時間に達したら1回だけスポーン（既にスポーン済みでない場合）
-                        should_spawn = False
-                        if game_time * 60 >= spawn_time_frames:  # 指定時間を過ぎている
-                            # このタイプのボスがまだスポーンしていない場合
-                            if boss_type not in spawned_boss_types:
-                                should_spawn = True
-                        
-                        if should_spawn:
+                    # 指定時間に達したら1回だけスポーン（既にスポーン済みでない場合）
+                    should_spawn = False
+                    if game_time * 60 >= spawn_time_frames:  # 指定時間を過ぎている
+                        # この特定の行のボスがまだスポーンしていない場合
+                        boss_key = (boss_type, boss_config['spawn_time'])  # タイプ+スポーン時間で識別
+                        if boss_key not in spawned_boss_types:
+                            should_spawn = True
+                    
+                    if should_spawn:
                             
                             # ボスを画面外からスポーン
                             screen_margin = 100  # 画面外の距離
@@ -1020,8 +1020,9 @@ def main():
                             boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type)
                             enemies.append(boss)
                             
-                            # このボスタイプを出現済みリストに追加
-                            spawned_boss_types.add(boss_type)
+                            # この特定の行のボスを出現済みリストに追加
+                            boss_key = (boss_type, boss_config['spawn_time'])
+                            spawned_boss_types.add(boss_key)
                             
                             # ボススポーンエフェクト（大きめ）
                             if len(particles) < 300:
@@ -1116,55 +1117,77 @@ def main():
                         # リストを再構築（ボスを含める）
                         enemies[:] = boss_enemies + on_screen_enemies + off_screen_enemies
 
+                # 削除対象の敵を記録するリスト
+                enemies_to_remove = []
+                
                 for enemy in enemies[:]:
                     # ノックバック更新処理
                     if hasattr(enemy, 'update_knockback'):
                         enemy.update_knockback()
                     
-                    enemy.move(player)
+                    enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y))
+                    
+                    # ボスの画面外チェックとリスポーン処理
+                    if hasattr(enemy, 'is_boss') and enemy.is_boss:
+                        if hasattr(enemy, 'is_boss_off_screen') and enemy.is_boss_off_screen():
+                            # ボスを画面外からランダムにリスポーン（HPは維持）
+                            enemy.respawn_boss_randomly(player)
+                            
+                            # リスポーンエフェクト
+                            if len(particles) < 300:
+                                for _ in range(10):
+                                    particles.append(SpawnParticle(enemy.x, enemy.y, (255, 215, 0)))  # 金色
                     
                     # 敵の攻撃処理（射撃タイプのみ、画面外は頻度制限）
                     if not enemy.is_off_screen() or frame_count % 3 == 0:
                         enemy.update_attack(player)
                         enemy.update_projectiles(player)
                     
-                    # 直進タイプが画面外に出た場合は削除（ボス以外）
-                    if enemy.behavior_type == 2 and enemy.is_off_screen() and not getattr(enemy, 'is_boss', False):
-                        enemies.remove(enemy)
-                        continue
-                    
-                    # 生存時間による削除チェック（固定砲台・距離保持射撃用、ボス以外）
-                    if enemy.should_be_removed_by_time() and not getattr(enemy, 'is_boss', False):
-                        enemies.remove(enemy)
-                        continue
-                    
-                    # プレイヤーの視界外に十分離れた敵を削除（パフォーマンス向上）（ボス以外）
-                    # 画面範囲内の敵は絶対に削除しない（適切なマージンで保護）
-                    if not enemy.is_boss and not enemy.is_in_screen_bounds(player, screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT, margin=300):
-                        # 画面外の敵のみ距離による削除を適用
-                        # 行動パターン別削除条件:
-                        # 1.追跡: 8000px（通常マージン）
-                        # 2.直進: 9000px（画面外削除と併用）
-                        # 3.距離保持: 15000px（45秒時間制限と併用）
-                        # 4.固定砲台: 18000px（30秒時間制限と併用）
-                        if enemy.behavior_type == 1:  # 追跡タイプ
-                            delete_margin = 8000
-                        elif enemy.behavior_type == 2:  # 直進タイプ
-                            delete_margin = 9000
-                        elif enemy.behavior_type == 3:  # 距離保持射撃
-                            delete_margin = 15000
-                        elif enemy.behavior_type == 4:  # 固定砲台
-                            delete_margin = 18000
-                        else:
-                            delete_margin = 8000  # デフォルト
+                    # 削除条件チェック（ボス以外のみ）
+                    if not getattr(enemy, 'is_boss', False):
+                        # 跳ね返りタイプ（タイプ2）は画面外削除しない
+                        # 他のタイプで画面外に出た場合のチェックは後で追加
                         
-                        if enemy.is_far_from_player(player, margin=delete_margin):
-                            enemies.remove(enemy)
+                        # 生存時間による削除チェック（固定砲台・距離保持射撃用）
+                        if enemy.should_be_removed_by_time():
+                            enemies_to_remove.append(enemy)
                             continue
-                    else:
-                        # 視界内の敵は削除しない
-                        pass
-                    
+                        
+                        # プレイヤーの視界外に十分離れた敵を削除（パフォーマンス向上）
+                        # 画面範囲内の敵は絶対に削除しない（適切なマージンで保護）
+                        if not enemy.is_in_screen_bounds(player, screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT, margin=300):
+                            # 画面外の敵のみ距離による削除を適用
+                            # 行動パターン別削除条件:
+                            # 1.追跡: 8000px（通常マージン）
+                            # 2.直進: 9000px（画面外削除と併用）
+                            # 3.距離保持: 15000px（45秒時間制限と併用）
+                            # 4.固定砲台: 18000px（30秒時間制限と併用）
+                            if enemy.behavior_type == 1:  # 追跡タイプ
+                                delete_margin = 8000
+                            elif enemy.behavior_type == 2:  # 直進タイプ
+                                delete_margin = 9000
+                            elif enemy.behavior_type == 3:  # 距離保持射撃
+                                delete_margin = 15000
+                            elif enemy.behavior_type == 4:  # 固定砲台
+                                delete_margin = 18000
+                            else:
+                                delete_margin = 8000  # デフォルト
+                            
+                            if enemy.is_far_from_player(player, margin=delete_margin):
+                                enemies_to_remove.append(enemy)
+                                continue
+                
+                # 削除対象の敵を一括削除
+                for enemy in enemies_to_remove:
+                    if enemy in enemies:
+                        enemies.remove(enemy)
+                
+                # 残った敵の当たり判定処理
+                for enemy in enemies:
+                    # 削除対象に含まれている敵はスキップ
+                    if enemy in enemies_to_remove:
+                        continue
+                        
                     # プレイヤーとの正方形当たり判定（最高速化）
                     # プレイヤーと敵の境界ボックスが重なるかチェック
                     player_half = getattr(player, 'size', 0) // 2
@@ -1253,21 +1276,22 @@ def main():
                                 enemy.projectiles.remove(projectile)
                                 continue  # 弾丸が削除されたので次の弾丸へ
                             
-                        # 弾丸とプレイヤーの武器の衝突判定
+                        # 弾丸とプレイヤーの武器の衝突判定（ボスの弾は相殺不可）
                         projectile_hit = False
-                        for attack in player.active_attacks:
-                            if projectile_hit:
-                                break
-                            
-                            # 武器と弾丸の正方形衝突判定（最高速化）
-                            attack_half = getattr(attack, 'size', 0) // 2
-                            proj_half = projectile.size // 2
-                            
-                            if (abs(attack.x - projectile.x) < attack_half + proj_half and 
-                                abs(attack.y - projectile.y) < attack_half + proj_half):
-                                # 武器が弾丸を迎撃
-                                projectile_hit = True
-                                break
+                        if not getattr(projectile, 'is_boss_bullet', False):  # ボスの弾でない場合のみ相殺可能
+                            for attack in player.active_attacks:
+                                if projectile_hit:
+                                    break
+                                
+                                # 武器と弾丸の正方形衝突判定（最高速化）
+                                attack_half = getattr(attack, 'size', 0) // 2
+                                proj_half = projectile.size // 2
+                                
+                                if (abs(attack.x - projectile.x) < attack_half + proj_half and 
+                                    abs(attack.y - projectile.y) < attack_half + proj_half):
+                                    # 武器が弾丸を迎撃
+                                    projectile_hit = True
+                                    break
                         
                         if projectile_hit:
                             # 弾丸迎撃エフェクトを追加
@@ -1312,13 +1336,8 @@ def main():
                             # 体力回復（割合回復）
                             player.heal(HEAL_ITEM_AMOUNT, "item")
                         elif item.type == "bomb":
-                            # 画面揺れエフェクトを発生させる
-                            player.activate_screen_shake()
-                            for enemy in enemies[:]:
-                                experience_gems.append(ExperienceGem(enemy.x, enemy.y))
-                                # 各追加ごとに上限をチェックしてプレイヤーから遠いものを削除しつつ価値を集約
-                                enforce_experience_gems_limit(experience_gems, player_x=player.x, player_y=player.y)
-                            enemies.clear()
+                            # ボムアイテム効果処理（100ダメージ）
+                            handle_bomb_item_effect(enemies, experience_gems, particles, player.x, player.y, player)
                         elif item.type == "magnet":
                             # マグネット効果を有効化
                             player.activate_magnet()
