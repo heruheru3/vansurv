@@ -20,7 +20,8 @@ class Attack:
     
     def __init__(self, x, y, size_x, size_y, type_, duration=1000, target=None, 
                  speed=0, bounces=0, follow_player=None, direction=None, 
-                 velocity_x=None, velocity_y=None, rotation_speed=None, damage=0):
+                 velocity_x=None, velocity_y=None, rotation_speed=None, damage=0,
+                 stage=None):
         self.x = x
         self.y = y
         self.size_x = size_x
@@ -39,6 +40,7 @@ class Attack:
         self.velocity_y = velocity_y
         self.rotation_speed = rotation_speed if rotation_speed is not None else 0
         self.damage = damage  # 攻撃のダメージ量
+        self.stage = stage  # 不可侵領域チェック用のステージ参照
 
         # 武器画像を読み込み（存在すれば）
         self.weapon_image = self._load_weapon_image(type_)
@@ -161,6 +163,16 @@ class Attack:
                 except Exception:
                     pass
         elif self.type == "axe":
+            # 不可侵領域チェック（axe は影響を受ける武器）
+            if self.stage and hasattr(self.stage, 'is_weapon_blocked_at_pos'):
+                # 次の位置をチェック
+                next_x = self.x + (self.velocity_x if self.velocity_x is not None else 0)
+                next_y = self.y + (self.velocity_y if self.velocity_y is not None else -self.speed)
+                if self.stage.is_weapon_blocked_at_pos(next_x, next_y, "axe"):
+                    # 不可侵領域に衝突する場合、攻撃を削除
+                    self.duration = 0
+                    return
+            
             # 回転速度が指定されていればそれを使用
             self.angle += self.rotation_speed
             # 速度ベクトルがあればそれで移動（投げる軌道）
@@ -171,6 +183,15 @@ class Attack:
                 self.y -= self.speed  # 上方向に移動
                 self.x += math.sin(self.angle) * 3  # 横方向に揺れる動き
         elif self.type == "magic_wand":
+            # 不可侵領域チェック（magic_wand は影響を受ける武器）
+            if self.stage and hasattr(self.stage, 'is_weapon_blocked_at_pos'):
+                next_x = self.x + getattr(self, 'dx', 0)
+                next_y = self.y + getattr(self, 'dy', 0)
+                if self.stage.is_weapon_blocked_at_pos(next_x, next_y, "magic_wand"):
+                    # 不可侵領域に衝突する場合、攻撃を削除
+                    self.duration = 0
+                    return
+            
             # 移動と軌跡記録
             self.x += getattr(self, 'dx', 0)
             self.y += getattr(self, 'dy', 0)
@@ -223,14 +244,39 @@ class Attack:
         elif (getattr(self, 'velocity_x', None) is not None and getattr(self, 'velocity_y', None) is not None) and self.type not in ("stone", "axe", "magic_wand"):
             # 一般的な速度ベースの移動（ナイフ等）
             try:
+                # 不可侵領域チェック（knife は影響を受ける武器）
+                if self.type == "knife" and self.stage and hasattr(self.stage, 'is_weapon_blocked_at_pos'):
+                    # 次の位置をチェック
+                    next_x = self.x + self.velocity_x
+                    next_y = self.y + self.velocity_y
+                    if self.stage.is_weapon_blocked_at_pos(next_x, next_y, "knife"):
+                        # 不可侵領域に衝突する場合、攻撃を削除（消去）
+                        self.duration = 0
+                        return
+                
                 self.x += self.velocity_x
                 self.y += self.velocity_y
             except Exception:
                 pass
         elif self.type == "stone":
+            # 次の移動先を計算
+            next_x = self.x + self.velocity_x
+            next_y = self.y + self.velocity_y
+            
+            # 不可侵領域チェック（stone は影響を受ける武器）
+            if self.stage and hasattr(self.stage, 'is_weapon_blocked_at_pos'):
+                if self.stage.is_weapon_blocked_at_pos(next_x, next_y, "stone"):
+                    # 不可侵領域に衝突する場合、バウンド処理（移動前に方向転換）
+                    self.velocity_x *= -1
+                    self.velocity_y *= -1
+                    self.bounces_remaining -= 1  # 不可侵領域でのバウンドもバウンド回数を消費
+                    # 新しい方向で移動先を再計算
+                    next_x = self.x + self.velocity_x
+                    next_y = self.y + self.velocity_y
+            
             # 速度に基づいて位置を更新
-            self.x += self.velocity_x
-            self.y += self.velocity_y
+            self.x = next_x
+            self.y = next_y
 
             # 画面端での跳ね返り処理（カメラ範囲の境界で判定するように変更）
             if camera_x is not None and camera_y is not None:

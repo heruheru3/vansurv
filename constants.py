@@ -195,3 +195,31 @@ BOX3_HP = 20                        # box3のHP（少し硬い）
 # ボックスサイズ
 BOX_SIZE = 64                       # ボックスの表示サイズ（ピクセル）- 倍のサイズに変更
 BOX_COLLISION_SIZE = 56             # ボックスの当たり判定サイズ
+
+# 不可侵領域の境界線設定
+BORDER_THICKNESS = 18                # ブロッカー領域の境界線の太さ（ピクセル）
+
+# 武器の不可侵領域設定
+# エリア5,9: 通常のブロッカー領域（武器に影響）
+# エリア6,7: 貫通可能領域（武器に影響しない）
+BLOCKER_AREAS_SOLID = {5, 9}        # 武器に影響するブロッカーエリア
+BLOCKER_AREAS_PASSTHROUGH = {6, 7}  # 武器が貫通可能なブロッカーエリア
+
+# 不可侵領域の影響を受ける武器
+WEAPONS_AFFECTED_BY_BLOCKERS = {
+    "stone",      # 石
+    "knife",      # ナイフ
+    "axe",        # 斧
+    "magic_wand"  # 魔法の杖
+}
+
+# 不可侵領域の影響を受けない武器（参考）
+# "whip"        # ムチ
+# "garlic"      # ガーリック
+# "holy_water"  # 聖水
+# "rotating_book" # 回転する本
+# "thunder"     # 雷
+
+# ノックバック設定
+KNOCKBACK_DURATION = 0.1             # ノックバック持続時間（秒）
+KNOCKBACK_COOLDOWN_DURATION = 0.8    # ノックバック後のクールダウン時間（秒）

@@ -179,9 +179,9 @@ class Enemy:
         self.knockback_velocity_x = 0.0  # ノックバック速度X
         self.knockback_velocity_y = 0.0  # ノックバック速度Y
         self.knockback_timer = 0.0       # ノックバック残り時間（秒）
-        self.knockback_duration = 0.1    # ノックバック持続時間（秒）- 100msに変更
+        self.knockback_duration = KNOCKBACK_DURATION    # ノックバック持続時間（秒）
         self.knockback_cooldown = 0.0    # ノックバッククールダウン残り時間
-        self.knockback_cooldown_duration = 0.4  # ノックバック後のクールダウン時間（0.5から0.4に短縮）
+        self.knockback_cooldown_duration = KNOCKBACK_COOLDOWN_DURATION  # ノックバック後のクールダウン時間
         
         # 敵のタイプに応じてステータスを設定
         self.setup_enemy_stats()
@@ -331,11 +331,11 @@ class Enemy:
     def setup_enemy_stats(self):
         # 基本ステータス（タイプに応じて設定）
         base_stats = {
-            1: {'hp': 10, 'speed': 1.125, 'damage': 2},
-            2: {'hp': 20, 'speed': 1.5, 'damage': 4},
-            3: {'hp': 30, 'speed': 1.875, 'damage': 6},
-            4: {'hp': 40, 'speed': 2.0, 'damage': 8},
-            5: {'hp': 50, 'speed': 2.25, 'damage': 10}
+            1: {'hp': 15, 'speed': 1.125, 'damage': 2},
+            2: {'hp': 30, 'speed': 1.5, 'damage': 5},
+            3: {'hp': 45, 'speed': 1.875, 'damage': 7},
+            4: {'hp': 60, 'speed': 2.0, 'damage': 10},
+            5: {'hp': 75, 'speed': 2.25, 'damage': 15}
         }
         
         stats = base_stats.get(self.enemy_type, base_stats[1])

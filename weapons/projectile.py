@@ -184,6 +184,15 @@ class MagicWand(Weapon):
                               key=lambda e: math.sqrt((e.x - player.x)**2 + (e.y - player.y)**2))
         targets = sorted_enemies[:effective_num]
         
+        # ステージマップ参照を取得
+        stage = None
+        try:
+            if USE_CSV_MAP:
+                from stage import get_stage_map
+                stage = get_stage_map()
+        except Exception:
+            pass
+        
         for target in targets:
             attacks.append(
                 Attack(x=player.x, 
@@ -193,7 +202,8 @@ class MagicWand(Weapon):
                       type_="magic_wand", 
                       target=target, 
                       speed=effective_speed,
-                      damage=effective_damage)
+                      damage=effective_damage,
+                      stage=stage)
             )
         
         return attacks
@@ -257,6 +267,15 @@ class Axe(Weapon):
         effective_damage = self.damage * base_mult
         effective_num = min(5, int(1 + extra))
         
+        # ステージマップ参照を取得
+        stage = None
+        try:
+            if USE_CSV_MAP:
+                from stage import get_stage_map
+                stage = get_stage_map()
+        except Exception:
+            pass
+        
         attacks = []
         for i in range(effective_num):
             # ランダムな角度で発射（複数投擲時は若干の分散を持たせる）
@@ -276,7 +295,8 @@ class Axe(Weapon):
                                   velocity_x=vx,
                                   velocity_y=vy,
                                   rotation_speed=self.rotation_speed,
-                                  damage=effective_damage))
+                                  damage=effective_damage,
+                                  stage=stage))
         
         return attacks
 
@@ -331,6 +351,15 @@ class Stone(Weapon):
         except Exception:
             extra = 0
 
+        # ステージマップ参照を取得
+        stage = None
+        try:
+            if USE_CSV_MAP:
+                from stage import get_stage_map
+                stage = get_stage_map()
+        except Exception:
+            pass
+
         return [Attack(
             x=player.x, 
             y=player.y, 
@@ -342,7 +371,8 @@ class Stone(Weapon):
             bounces=self.bounces + extra,
             velocity_x=math.cos(angle) * spd,
             velocity_y=math.sin(angle) * spd,
-            damage=self.damage * base_mult
+            damage=self.damage * base_mult,
+            stage=stage
         )]
 
     def level_up(self):
@@ -539,6 +569,16 @@ class Knife(Weapon):
             extra = 0
         effective_knives = max(1, int(self.num_knives + extra))
         mid = (effective_knives - 1) / 2.0
+        
+        # ステージマップ参照を取得
+        stage = None
+        try:
+            if USE_CSV_MAP:
+                from stage import get_stage_map
+                stage = get_stage_map()
+        except Exception:
+            pass
+        
         # 発射遅延（ms）: 中央は0、周辺ほど遅らせる
         delay_step = 100
         for i in range(effective_knives):
@@ -554,7 +594,8 @@ class Knife(Weapon):
                          duration=1500,
                          velocity_x=vx,
                          velocity_y=vy,
-                         damage=self.damage)
+                         damage=self.damage,
+                         stage=stage)
             # 追加: 中央からの距離に応じて発射を遅延させる
             try:
                 import math as _math
