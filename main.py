@@ -995,13 +995,26 @@ def main():
                         
                         if should_spawn:
                             
-                            # ボスをプレイヤーの近くにスポーン
-                            boss_x = player.x + random.randint(-200, 200)
-                            boss_y = player.y + random.randint(-200, 200)
+                            # ボスを画面外からスポーン
+                            screen_margin = 100  # 画面外の距離
+                            side = random.randint(0, 3)  # 0:上, 1:右, 2:下, 3:左
+                            
+                            if side == 0:  # 上から
+                                boss_x = player.x + random.randint(-SCREEN_WIDTH//2, SCREEN_WIDTH//2)
+                                boss_y = player.y - SCREEN_HEIGHT//2 - screen_margin
+                            elif side == 1:  # 右から
+                                boss_x = player.x + SCREEN_WIDTH//2 + screen_margin
+                                boss_y = player.y + random.randint(-SCREEN_HEIGHT//2, SCREEN_HEIGHT//2)
+                            elif side == 2:  # 下から
+                                boss_x = player.x + random.randint(-SCREEN_WIDTH//2, SCREEN_WIDTH//2)
+                                boss_y = player.y + SCREEN_HEIGHT//2 + screen_margin
+                            else:  # 左から
+                                boss_x = player.x - SCREEN_WIDTH//2 - screen_margin
+                                boss_y = player.y + random.randint(-SCREEN_HEIGHT//2, SCREEN_HEIGHT//2)
                             
                             # ワールド境界をクランプ
-                            boss_x = max(100, min(WORLD_WIDTH - 100, boss_x))
-                            boss_y = max(100, min(WORLD_HEIGHT - 100, boss_y))
+                            boss_x = max(50, min(WORLD_WIDTH - 50, boss_x))
+                            boss_y = max(50, min(WORLD_HEIGHT - 50, boss_y))
                             
                             # ボス生成（CSVの設定に基づき）
                             boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type)

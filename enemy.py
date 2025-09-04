@@ -458,6 +458,7 @@ class Enemy:
             if boss_config:
                 # ボス設定から直接ステータスを設定
                 self.hp = boss_config['base_hp']
+                self.max_hp = boss_config['base_hp']  # 最大HPを記録
                 self.base_speed = boss_config['base_speed'] * boss_config['speed_multiplier']
                 self.damage = boss_config['base_damage']
                 self.attack_cooldown = boss_config['attack_cooldown']
@@ -504,6 +505,7 @@ class Enemy:
         
         # 基本ステータス設定
         self.hp = stats['base_hp']
+        self.max_hp = stats['base_hp']  # 最大HPを記録
         self.base_speed = stats['base_speed'] * stats['speed_multiplier']
         self.damage = stats['base_damage']
         self.attack_cooldown = stats['attack_cooldown']
@@ -807,6 +809,14 @@ class Enemy:
                 # 使用する画像を決定
                 current_image = image
                 
+                # ボス用の赤いオーラ効果（enemy_typeが101以上の場合のみ）
+                if hasattr(self, 'enemy_type') and self.enemy_type >= 101:
+                    self._draw_boss_aura(screen, base_x, base_y, current_image, image_size)
+                
+                # ボス用のHPバー（enemy_typeが101以上の場合のみ）
+                if hasattr(self, 'enemy_type') and self.enemy_type >= 101:
+                    self._draw_boss_hp_bar(screen, sx, sy, image_size)
+                
                 # アニメーションが無効または足が動かない場合は通常描画
                 if (not ENABLE_ENEMY_WALK_ANIMATION or not self.is_moving or 
                     ENEMY_WALK_BOB_AMPLITUDE <= 0 or foot_offset_y == 0):
@@ -902,6 +912,18 @@ class Enemy:
     
     def _draw_circle(self, screen, sx, sy):
         """従来の円描画（画像がない場合のフォールバック）"""
+        # ボス用の赤いオーラ（円形の場合、enemy_typeが101以上の場合のみ）
+        if hasattr(self, 'enemy_type') and self.enemy_type >= 101:
+            aura_radius = self.size + 6
+            aura_color = (255, 50, 50, 100)  # 赤色、透明
+            aura_surface = pygame.Surface((aura_radius*2, aura_radius*2), pygame.SRCALPHA)
+            pygame.draw.circle(aura_surface, aura_color, (aura_radius, aura_radius), aura_radius, 3)
+            screen.blit(aura_surface, (sx - aura_radius, sy - aura_radius))
+        
+        # ボス用のHPバー（円形の場合、enemy_typeが101以上の場合のみ）
+        if hasattr(self, 'enemy_type') and self.enemy_type >= 101:
+            self._draw_boss_hp_bar(screen, sx, sy, self.size * 2)
+        
         # 陰影付きの円で描画（色は self.color をベースに調整）
         r = self.size
         surf = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
@@ -1129,6 +1151,71 @@ class Enemy:
             max(0, min(255, int(g * 255))),
             max(0, min(255, int(b * 255)))
         )
+
+    def _draw_boss_aura(self, screen, base_x, base_y, image, image_size):
+        """ボス用の赤いオーラ効果を描画（アルファチャンネル対応）"""
+        # オーラの厚さとオフセット
+        aura_thickness = 3
+        aura_offset = 2
+        
+        # 元画像のアルファマスクを作成
+        alpha_mask = pygame.mask.from_surface(image)
+        
+        # オーラ描画用のサーフェースを作成（元画像より大きく）
+        aura_size = image_size + (aura_thickness + aura_offset) * 2
+        aura_surface = pygame.Surface((aura_size, aura_size), pygame.SRCALPHA)
+        
+        # 複数のオフセットでアルファマスクを描画してアウトライン効果を作成
+        red_color = (255, 50, 50, 180)  # 赤色、やや透明
+        
+        center_offset = (aura_thickness + aura_offset)
+        
+        # 8方向にオフセットして描画
+        offsets = [
+            (-aura_thickness, -aura_thickness),
+            (0, -aura_thickness),
+            (aura_thickness, -aura_thickness),
+            (-aura_thickness, 0),
+            (aura_thickness, 0),
+            (-aura_thickness, aura_thickness),
+            (0, aura_thickness),
+            (aura_thickness, aura_thickness)
+        ]
+        
+        for dx, dy in offsets:
+            # マスクを使って赤いアウトラインを描画
+            outline_pos = (center_offset + dx, center_offset + dy)
+            for point in alpha_mask.outline():
+                x, y = point
+                pygame.draw.circle(aura_surface, red_color, 
+                                 (x + outline_pos[0], y + outline_pos[1]), 1)
+        
+        # オーラを画面に描画（画像の下に）
+        aura_x = base_x - (aura_thickness + aura_offset)
+        aura_y = base_y - (aura_thickness + aura_offset)
+        screen.blit(aura_surface, (aura_x, aura_y))
+
+    def _draw_boss_hp_bar(self, screen, center_x, center_y, entity_size):
+        """ボス用のHPバーを描画（小型版、文字なし）"""
+        bar_width = max(30, (entity_size + 20) // 2)  # 元の半分のサイズ
+        bar_height = 3  # 高さも半分
+        bar_x = center_x - bar_width // 2
+        bar_y = center_y - entity_size // 2 - 20  # エンティティの上部に配置（より離して）
+        
+        # 背景バー（暗い緑）
+        pygame.draw.rect(screen, (0, 100, 0), (bar_x, bar_y, bar_width, bar_height))
+        
+        # HPバー（緑色、宝箱と同じ）
+        hp_ratio = max(0, self.hp / self.max_hp)
+        hp_width = int(bar_width * hp_ratio)
+        
+        if hp_width > 0:
+            # 宝箱と同じ緑色で統一
+            hp_color = (0, 200, 0)  # 緑色
+            pygame.draw.rect(screen, hp_color, (bar_x, bar_y, hp_width, bar_height))
+        
+        # 枠線（白）
+        pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)
 
 
 class EnemyProjectile:

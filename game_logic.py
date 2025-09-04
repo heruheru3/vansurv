@@ -121,13 +121,24 @@ def handle_bomb_item_effect(enemies, experience_gems, particles, player_x, playe
     if player and hasattr(player, 'activate_screen_shake'):
         player.activate_screen_shake()
     
-    # 全敵を経験値ジェムに変換
-    for enemy in enemies[:]:
-        experience_gems.append(ExperienceGem(enemy.x, enemy.y))
-        # 各追加ごとに上限をチェックしてプレイヤーから遠いものを削除しつつ価値を集約
-        enforce_experience_gems_limit(experience_gems, player_x=player_x, player_y=player_y)
+    # 全敵に100ダメージを与える
+    bomb_damage = 100
+    enemies_to_remove = []
     
-    enemies.clear()
+    for enemy in enemies:
+        enemy.hp -= bomb_damage
+        
+        # HPが0以下になった敵を処理
+        if enemy.hp <= 0:
+            # 経験値ジェムを生成
+            experience_gems.append(ExperienceGem(enemy.x, enemy.y))
+            # 各追加ごとに上限をチェックしてプレイヤーから遠いものを削除しつつ価値を集約
+            enforce_experience_gems_limit(experience_gems, player_x=player_x, player_y=player_y)
+            enemies_to_remove.append(enemy)
+    
+    # 死亡した敵を削除
+    for enemy in enemies_to_remove:
+        enemies.remove(enemy)
 
 
 def update_difficulty(game_time, last_difficulty_increase, spawn_interval):
