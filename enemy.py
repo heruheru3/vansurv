@@ -264,7 +264,17 @@ class Enemy:
         if self.is_boss:
             # ボスタイプ（101以上）
             self.enemy_type = self.boss_type  # boss_typeを使用
-            self.behavior_type = 1  # ボスの行動パターンは1固定（追跡タイプ）
+            # ボスタイプに応じて行動パターンを設定
+            if self.boss_type == 101:
+                self.behavior_type = 1  # 追跡タイプ
+            elif self.boss_type == 102:
+                self.behavior_type = 2  # 直進タイプ
+            elif self.boss_type == 103:
+                self.behavior_type = 3  # 距離保持射撃タイプ
+            elif self.boss_type == 104:
+                self.behavior_type = 4  # プレイヤーに近づきながら射撃
+            else:
+                self.behavior_type = 1  # デフォルトは追跡
             self.level = 1  # ボスのレベルは1固定（タイプで区別）
         else:
             # 行動パターン（type）をランダムに決定
@@ -473,6 +483,18 @@ class Enemy:
                 # ボス用のスピード設定
                 self.speed = self.base_speed
                 
+                # ボスタイプに応じた行動パターンを設定
+                if self.boss_type == 101:
+                    self.behavior_type = 1  # 追跡
+                elif self.boss_type == 102:
+                    self.behavior_type = 2  # 直進
+                elif self.boss_type == 103:
+                    self.behavior_type = 3  # 距離保持射撃
+                elif self.boss_type == 104:
+                    self.behavior_type = 4  # ランダム移動
+                else:
+                    self.behavior_type = 1  # デフォルトは追跡
+                
                 # ボス画像の読み込み
                 try:
                     self.images = self._load_enemy_image(self.enemy_type, self.level)  # レベル（1固定）を使用
@@ -675,7 +697,7 @@ class Enemy:
             # 適切な距離の場合は移動しない
             
         elif self.behavior_type == 4:
-            # 4. 遅い速度でプレイヤーに近づく
+            # 4. プレイヤーに近づきながら射撃攻撃
             angle = math.atan2(player.y - self.y, player.x - self.x)
             new_x = self.x + math.cos(angle) * self.base_speed
             new_y = self.y + math.sin(angle) * self.base_speed
@@ -980,18 +1002,19 @@ class Enemy:
         elif self.behavior_type == 3:  # 距離保持射撃 - 円
             pygame.draw.circle(screen, (255, 255, 255), 
                              (sx, sy + icon_y_offset), icon_size, 1)
-        elif self.behavior_type == 4:  # 遅速追跡 - 太矢印
-            # 遅い移動を表す太めの矢印を描画
-            points = [
-                (sx, sy + icon_y_offset - icon_size),
-                (sx - icon_size//2, sy + icon_y_offset),
-                (sx - icon_size//4, sy + icon_y_offset),
-                (sx - icon_size//4, sy + icon_y_offset + icon_size//2),
-                (sx + icon_size//4, sy + icon_y_offset + icon_size//2),
-                (sx + icon_size//4, sy + icon_y_offset),
-                (sx + icon_size//2, sy + icon_y_offset)
-            ]
-            pygame.draw.polygon(screen, (255, 255, 255), points)
+        elif self.behavior_type == 4:  # 近接射撃 - 星マーク
+            # プレイヤーに近づきながら射撃することを表す星マーク
+            star_points = []
+            for i in range(8):
+                angle = i * math.pi / 4
+                if i % 2 == 0:
+                    radius = icon_size
+                else:
+                    radius = icon_size // 2
+                x = sx + radius * math.cos(angle)
+                y = sy + icon_y_offset + radius * math.sin(angle)
+                star_points.append((x, y))
+            pygame.draw.polygon(screen, (255, 255, 255), star_points)
 
     def on_hit(self):
         """敵が被弾したときに呼ぶ。白フラッシュをトリガーする."""
@@ -1110,7 +1133,7 @@ class Enemy:
             1: "追跡",
             2: "直進", 
             3: "距離保持",
-            4: "遅速追跡"
+            4: "近接射撃"
         }
         
         color_names = {
