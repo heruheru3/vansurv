@@ -118,7 +118,7 @@ def main():
     CAMERA_LERP = 0.18
 
     # ゲーム状態の初期化
-    player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen, save_system)
+    player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer = init_game_state(screen, save_system)
 
     # お金関連の初期化
     current_game_money = 0  # 現在のゲームセッションで獲得したお金
@@ -450,6 +450,7 @@ def main():
                             items = []
                             particles = []
                             spawn_timer = 0
+                            boss_spawn_timer = 0  # ボススポーンタイマーもリセット
                             spawn_interval = 60
                             game_time = 0
                             last_difficulty_increase = 0
@@ -474,7 +475,7 @@ def main():
                             save_system.save()
                             print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                             
-                            player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen, save_system)
+                            player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer = init_game_state(screen, save_system)
                             # リセット
                             current_game_money = 0
                             enemies_killed_this_game = 0
@@ -647,7 +648,7 @@ def main():
                                 save_system.save()
                                 print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                                 
-                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats = init_game_state(screen, save_system)
+                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer = init_game_state(screen, save_system)
                                 # リセット
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
@@ -975,6 +976,61 @@ def main():
                     spawn_interval = max(10, spawn_interval - 5)
                     last_difficulty_increase = game_time
 
+                # ボス生成処理（CSVから設定を読み込み）
+                boss_spawn_timer += 1
+                
+                # 現在のゲーム時間に基づいてボスレベルを決定
+                boss_level = min(5, max(1, int(game_time // 60) + 1))  # 1分ごとにレベルアップ、最大レベル5
+                boss_config = Enemy.get_boss_config(boss_level)
+                
+                if boss_config:
+                    spawn_time_frames = boss_config['spawn_time'] * 60  # 秒をフレームに変換
+                    spawn_interval_frames = boss_config['spawn_interval'] * 60  # 秒をフレームに変換
+                    
+                    # 初回出現時間をチェック
+                    should_spawn = False
+                    if game_time * 60 >= spawn_time_frames:  # 初回出現時間を過ぎている
+                        # 出現間隔をチェック
+                        if boss_spawn_timer >= spawn_interval_frames:
+                            should_spawn = True
+                    
+                    if should_spawn:
+                        boss_spawn_timer = 0
+                        
+                        # ボスをプレイヤーの近くにスポーン
+                        boss_x = player.x + random.randint(-200, 200)
+                        boss_y = player.y + random.randint(-200, 200)
+                        
+                        # ワールド境界をクランプ
+                        boss_x = max(100, min(WORLD_WIDTH - 100, boss_x))
+                        boss_y = max(100, min(WORLD_HEIGHT - 100, boss_y))
+                        
+                        # ボス生成（CSVの設定に基づき）
+                        boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_level=boss_level)
+                        enemies.append(boss)
+                        
+                        # ボススポーンエフェクト（大きめ）
+                        if len(particles) < 300:
+                            for _ in range(15):  # 通常より多めのエフェクト
+                                particles.append(SpawnParticle(boss_x, boss_y, (255, 215, 0)))  # 金色
+                        
+                        # 現在のボス数をログ出力
+                        boss_count = sum(1 for enemy in enemies if getattr(enemy, 'is_boss', False))
+                        print(f"[INFO] Boss Level {boss_level} spawned at ({boss_x:.0f}, {boss_y:.0f}). Player at ({player.x:.0f}, {player.y:.0f}). Total bosses: {boss_count}")
+                else:
+                    # フォールバック：CSVが読み込めない場合の従来処理
+                    boss_spawn_interval = 600  # 30秒 * 60FPS
+                    if boss_spawn_timer >= boss_spawn_interval and game_time >= 10:
+                        boss_spawn_timer = 0
+                        boss_x = player.x + random.randint(-200, 200)
+                        boss_y = player.y + random.randint(-200, 200)
+                        boss_x = max(100, min(WORLD_WIDTH - 100, boss_x))
+                        boss_y = max(100, min(WORLD_HEIGHT - 100, boss_y))
+                        boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True)
+                        enemies.append(boss)
+                        boss_count = sum(1 for enemy in enemies if getattr(enemy, 'is_boss', False))
+                        print(f"[INFO] Boss spawned at ({boss_x:.0f}, {boss_y:.0f}). Player at ({player.x:.0f}, {player.y:.0f}). Total bosses: {boss_count}")
+
                 # 敵の生成を爆発的に
                 spawn_timer += 1
                 if spawn_timer >= spawn_interval:
@@ -1022,36 +1078,42 @@ def main():
                 MAX_ENEMIES = BASE_MAX_ENEMIES + LEVEL_SCALING
                 
                 if len(enemies) > MAX_ENEMIES:
-                    # 画面外の敵を優先的に削除（画面内の敵は絶対に保護）
-                    enemies_to_remove = len(enemies) - MAX_ENEMIES
-                    if DEBUG and enemies_to_remove > 0:
-                        print(f"[DEBUG] Removing {enemies_to_remove} enemies due to limit (current: {len(enemies)}, max: {MAX_ENEMIES})")
+                    # ボスは削除対象から除外
+                    regular_enemies = [e for e in enemies if not getattr(e, 'is_boss', False)]
+                    boss_enemies = [e for e in enemies if getattr(e, 'is_boss', False)]
                     
-                    # 画面外の敵を特定して優先的に削除（より大きなマージンで確実に保護）
-                    off_screen_enemies = []
-                    on_screen_enemies = []
-                    
-                    for enemy in enemies:
-                        # 適切なマージンで視界内の敵を保護
-                        if enemy.is_in_screen_bounds(player, screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT, margin=200):
-                            on_screen_enemies.append(enemy)
-                        else:
-                            off_screen_enemies.append(enemy)
-                    
-                    # 画面外の敵から削除
-                    removed = 0
-                    while removed < enemies_to_remove and off_screen_enemies:
-                        off_screen_enemies.pop(0)
-                        removed += 1
-                    
-                    # まだ削除が必要な場合のみ画面内の敵から削除（古い順）
-                    # ただし、視界内の敵は絶対に削除しない
-                    if removed < enemies_to_remove:
-                        if DEBUG:
-                            print(f"[DEBUG] WARNING: Could not remove enough enemies without affecting visible enemies ({removed}/{enemies_to_remove})")
-                    
-                    # リストを再構築
-                    enemies[:] = on_screen_enemies + off_screen_enemies
+                    # 通常エネミーのみで制限チェック
+                    if len(regular_enemies) > MAX_ENEMIES:
+                        # 画面外の敵を優先的に削除（画面内の敵は絶対に保護）
+                        enemies_to_remove = len(regular_enemies) - MAX_ENEMIES
+                        if DEBUG and enemies_to_remove > 0:
+                            print(f"[DEBUG] Removing {enemies_to_remove} enemies due to limit (current: {len(regular_enemies)}, max: {MAX_ENEMIES}, bosses: {len(boss_enemies)})")
+                        
+                        # 画面外の敵を特定して優先的に削除（より大きなマージンで確実に保護）
+                        off_screen_enemies = []
+                        on_screen_enemies = []
+                        
+                        for enemy in regular_enemies:
+                            # 適切なマージンで視界内の敵を保護
+                            if enemy.is_in_screen_bounds(player, screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT, margin=200):
+                                on_screen_enemies.append(enemy)
+                            else:
+                                off_screen_enemies.append(enemy)
+                        
+                        # 画面外の敵から削除
+                        removed = 0
+                        while removed < enemies_to_remove and off_screen_enemies:
+                            off_screen_enemies.pop(0)
+                            removed += 1
+                        
+                        # まだ削除が必要な場合のみ画面内の敵から削除（古い順）
+                        # ただし、視界内の敵は絶対に削除しない
+                        if removed < enemies_to_remove:
+                            if DEBUG:
+                                print(f"[DEBUG] WARNING: Could not remove enough enemies without affecting visible enemies ({removed}/{enemies_to_remove})")
+                        
+                        # リストを再構築（ボスを含める）
+                        enemies[:] = boss_enemies + on_screen_enemies + off_screen_enemies
 
                 for enemy in enemies[:]:
                     # ノックバック更新処理
@@ -1065,19 +1127,19 @@ def main():
                         enemy.update_attack(player)
                         enemy.update_projectiles(player)
                     
-                    # 直進タイプが画面外に出た場合は削除
-                    if enemy.behavior_type == 2 and enemy.is_off_screen():
+                    # 直進タイプが画面外に出た場合は削除（ボス以外）
+                    if enemy.behavior_type == 2 and enemy.is_off_screen() and not getattr(enemy, 'is_boss', False):
                         enemies.remove(enemy)
                         continue
                     
-                    # 生存時間による削除チェック（固定砲台・距離保持射撃用）
-                    if enemy.should_be_removed_by_time():
+                    # 生存時間による削除チェック（固定砲台・距離保持射撃用、ボス以外）
+                    if enemy.should_be_removed_by_time() and not getattr(enemy, 'is_boss', False):
                         enemies.remove(enemy)
                         continue
                     
-                    # プレイヤーの視界外に十分離れた敵を削除（パフォーマンス向上）
+                    # プレイヤーの視界外に十分離れた敵を削除（パフォーマンス向上）（ボス以外）
                     # 画面範囲内の敵は絶対に削除しない（適切なマージンで保護）
-                    if not enemy.is_in_screen_bounds(player, screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT, margin=300):
+                    if not enemy.is_boss and not enemy.is_in_screen_bounds(player, screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT, margin=300):
                         # 画面外の敵のみ距離による削除を適用
                         # 行動パターン別削除条件:
                         # 1.追跡: 8000px（通常マージン）
@@ -1135,14 +1197,16 @@ def main():
                                 except Exception:
                                     pass
 
-                                # この敵は処理済み
-                                enemies.remove(enemy)
+                                # この敵は処理済み（ボス以外は削除）
+                                if not getattr(enemy, 'is_boss', False):
+                                    enemies.remove(enemy)
                                 if player.hp <= 0:
                                     game_over = True
                             else:
-                                # 無敵中はノーダメージ、敵だけ消す（多段ヒット防止）
+                                # 無敵中はノーダメージ、敵だけ消す（多段ヒット防止、ボス以外）
                                 try:
-                                    enemies.remove(enemy)
+                                    if not getattr(enemy, 'is_boss', False):
+                                        enemies.remove(enemy)
                                 except Exception:
                                     pass
 

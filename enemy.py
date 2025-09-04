@@ -25,6 +25,10 @@ class Enemy:
     _enemy_stats = {}
     _stats_loaded = False
     
+    # ボス設定のキャッシュ
+    _boss_stats = {}
+    _boss_stats_loaded = False
+    
     @classmethod
     def load_enemy_stats(cls):
         """エネミーステータスをCSVファイルから読み込む"""
@@ -59,22 +63,80 @@ class Enemy:
             cls._stats_loaded = False
     
     @classmethod
-    def _load_enemy_image(cls, enemy_type, enemy_level):
+    def load_boss_stats(cls):
+        """ボス設定をCSVファイルから読み込む"""
+        if cls._boss_stats_loaded:
+            return
+            
+        csv_path = resource_path("boss_stats.csv")
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    type_id = int(row['type'])
+                    level = int(row['level'])
+                    key = (type_id, level)
+                    cls._boss_stats[key] = {
+                        'base_hp': int(row['base_hp']),
+                        'base_speed': float(row['base_speed']),
+                        'base_damage': int(row['base_damage']),
+                        'speed_multiplier': float(row['speed_multiplier']),
+                        'attack_cooldown': int(row['attack_cooldown']),
+                        'spawn_time': int(row['spawn_time']),  # 最初の出現時間（秒）
+                        'spawn_interval': int(row['spawn_interval']),  # 出現間隔（秒）
+                        'image_file': row['image_file'],
+                        'image_size': int(row['image_size']),
+                        'description': row['description']
+                    }
+            cls._boss_stats_loaded = True
+            print(f"[INFO] Loaded {len(cls._boss_stats)} boss configurations from {csv_path}")
+        except FileNotFoundError:
+            print(f"[ERROR] Boss stats file not found: {csv_path}")
+            cls._boss_stats_loaded = False
+        except Exception as e:
+            print(f"[ERROR] Failed to load boss stats: {e}")
+            cls._boss_stats_loaded = False
+    
+    @classmethod
+    def get_boss_config(cls, boss_level):
+        """指定されたレベルのボス設定を取得"""
+        cls.load_boss_stats()
+        key = (101, boss_level)  # ボスタイプは101固定
+        return cls._boss_stats.get(key, None)
+    
+    @classmethod
+    def _load_enemy_image(cls, enemy_type, behavior_type):
         """敵の画像を読み込む（キャッシュ機能付き）"""
-        # CSVからの画像情報を優先
-        cls.load_enemy_stats()
-        key = (enemy_type, enemy_level)
-        
-        if key in cls._enemy_stats:
-            # CSVから画像ファイル名とサイズを取得
-            image_file = cls._enemy_stats[key]['image_file'] + '.png'
-            image_size = cls._enemy_stats[key]['image_size']
-            cache_key = cls._enemy_stats[key]['image_file']
+        # ボスの場合はボス設定から読み込み
+        if enemy_type >= 101:
+            cls.load_boss_stats()
+            key = (enemy_type, behavior_type)
+            
+            if key in cls._boss_stats:
+                # ボスCSVから画像ファイル名とサイズを取得
+                image_file = cls._boss_stats[key]['image_file'] + '.png'
+                image_size = cls._boss_stats[key]['image_size']
+                cache_key = cls._boss_stats[key]['image_file']
+            else:
+                # フォールバック：従来の命名規則
+                cache_key = f"boss-{behavior_type:02d}"
+                image_file = f"{cache_key}.png"
+                image_size = 96  # デフォルトボスサイズ
         else:
-            # フォールバック：従来の命名規則
-            cache_key = f"{enemy_type:02d}-{enemy_level:02d}"
-            image_file = f"{cache_key}.png"
-            image_size = 32 + int((48 - 32) * (enemy_level - 1) / 4)  # デフォルトサイズ計算
+            # 通常エネミーの場合はエネミー設定から読み込み
+            cls.load_enemy_stats()
+            key = (enemy_type, behavior_type)
+            
+            if key in cls._enemy_stats:
+                # CSVから画像ファイル名とサイズを取得
+                image_file = cls._enemy_stats[key]['image_file'] + '.png'
+                image_size = cls._enemy_stats[key]['image_size']
+                cache_key = cls._enemy_stats[key]['image_file']
+            else:
+                # フォールバック：従来の命名規則
+                cache_key = f"{enemy_type:02d}-{behavior_type:02d}"
+                image_file = f"{cache_key}.png"
+                image_size = 32 + int((48 - 32) * (behavior_type - 1) / 4)  # デフォルトサイズ計算
         
         # キャッシュから画像を取得
         if cache_key in cls._image_cache:
@@ -84,7 +146,6 @@ class Enemy:
         image_path = resource_path(os.path.join("assets", "character", "enemy", image_file))
         
         try:
-            print(f"[DEBUG] Attempting to load enemy image: {image_path}")
             # ファイルの存在確認
             if not os.path.exists(image_path):
                 print(f"[WARNING] Enemy image file not found: {image_path}")
@@ -93,7 +154,6 @@ class Enemy:
                 
             # 画像を読み込み
             image = pygame.image.load(image_path).convert_alpha()
-            print(f"[DEBUG] Successfully loaded enemy image: {cache_key}")
             
             # CSVで指定されたサイズにスケール
             image = pygame.transform.scale(image, (image_size, image_size))
@@ -121,7 +181,6 @@ class Enemy:
         except Exception as e:
             print(f"[ERROR] Unexpected error loading enemy image {cache_key}: {e}")
             cls._image_cache[cache_key] = None
-            return None
             return None
     
     @classmethod
@@ -180,8 +239,10 @@ class Enemy:
         
         return adjusted_surface
     
-    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None):
+    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1):
         self.screen = screen
+        self.is_boss = is_boss  # ボス判定フラグ
+        self.boss_level = boss_level if is_boss else 1  # ボスレベル（ボス以外は1）
         
         # ヒット時のフラッシュ用タイマ（秒）
         self.hit_flash_timer = 0.0
@@ -192,11 +253,19 @@ class Enemy:
         self.base_speed = 1.5
         self.speed = self.base_speed
         
-        # 敵の種類をランダムに決定（game_timeに応じて変化）
-        self.enemy_type = self.get_random_enemy_type(game_time)
-        
-        # 行動パターンをランダムに決定
-        self.behavior_type = self.get_random_behavior_type(game_time)
+        # ボスか通常敵かで敵タイプを決定
+        if self.is_boss:
+            # ボスタイプ（101以上）
+            self.enemy_type = 101  # 現在は1種類のみ
+            self.behavior_type = 1  # ボスの行動パターンは1固定（追跡タイプ）
+            self.level = self.boss_level  # ボスレベルをレベルとして使用
+        else:
+            # 行動パターン（type）をランダムに決定
+            self.behavior_type = self.get_random_behavior_type(game_time)
+            # 強さレベル（level）をランダムに決定
+            self.level = self.get_random_strength_level(game_time)
+            # CSVのキーとして使用（type, level）
+            self.enemy_type = self.behavior_type  # typeと同じ値
         
         # 行動パターン用の変数
         self.initial_direction = None  # 直進タイプ用の初期方向
@@ -306,39 +375,12 @@ class Enemy:
                 return True
         return False
 
-    def get_random_enemy_type(self, game_time):
-        # 時間に応じて出現する敵のタイプを制限
-        if game_time <= 30:  # 序盤（0-30秒）
-            rand = random.random()
-            if rand < 0.7:    # 70%
-                return 1      # 最弱
-            else:            # 30%
-                return 2      # 弱
-        elif game_time <= 70:  # 中盤（31-70秒）
-            rand = random.random()
-            if rand < 0.3:    # 30%
-                return 1      # 最弱
-            elif rand < 0.6:  # 30%
-                return 2      # 弱
-            elif rand < 0.85: # 25%
-                return 3      # 中
-            else:            # 15%
-                return 4      # 強
-        else:                # 終盤（71秒以降）
-            rand = random.random()
-            if rand < 0.3:    # 30%
-                return 3      # 中
-            elif rand < 0.6:  # 30%
-                return 4      # 強
-            else:            # 40%
-                return 5      # 最強
-
     def get_random_behavior_type(self, game_time):
-        """行動パターンをランダムに決定
-        1: プレイヤーに寄ってくる（追跡）
-        2: プレイヤーに向かうがそのまま直進して画面端に消える
-        3: プレイヤーから一定の距離を保ち、魔法の杖のような弾を発射する
-        4: 遅い速度でプレイヤーに近づき、遠距離攻撃も行う
+        """行動パターン（type）をランダムに決定
+        type 1: プレイヤーに寄ってくる（追跡）
+        type 2: プレイヤーに向かうがそのまま直進して画面端に消える
+        type 3: プレイヤーから一定の距離を保ち、魔法の杖のような弾を発射する
+        type 4: 遅い速度でプレイヤーに近づき、遠距離攻撃も行う
         """
         if game_time <= 30:  # 序盤は単純な行動のみ
             rand = random.random()
@@ -367,8 +409,62 @@ class Enemy:
             else:            # 25%
                 return 4      # 固定砲台
 
+    def get_random_strength_level(self, game_time):
+        """強さレベル（level）をランダムに決定
+        level 1-5: そのtypeの中での強さ（1が最弱、5が最強）
+        """
+        if game_time <= 30:  # 序盤（0-30秒）
+            rand = random.random()
+            if rand < 0.7:    # 70%
+                return 1      # 最弱
+            else:            # 30%
+                return 2      # 弱
+        elif game_time <= 70:  # 中盤（31-70秒）
+            rand = random.random()
+            if rand < 0.4:    # 40%
+                return 1      # 最弱
+            elif rand < 0.7:  # 30%
+                return 2      # 弱
+            elif rand < 0.9:  # 20%
+                return 3      # 中
+            else:            # 10%
+                return 4      # 強
+        else:                # 終盤（71秒以降）
+            rand = random.random()
+            if rand < 0.25:   # 25%
+                return 1      # 弱
+            elif rand < 0.5:  # 25%
+                return 2      # 中の下
+            elif rand < 0.75: # 25%
+                return 3      # 中の上
+            else:            # 25%
+                return 4      # 強
+
     def setup_enemy_stats(self):
-        # CSVからエネミーステータスを読み込み
+        # ボスの場合はボス設定から読み込み
+        if self.is_boss:
+            Enemy.load_boss_stats()
+            boss_config = Enemy.get_boss_config(self.boss_level)
+            if boss_config:
+                # ボス設定から直接ステータスを設定
+                self.hp = boss_config['base_hp']
+                self.base_speed = boss_config['base_speed'] * boss_config['speed_multiplier']
+                self.damage = boss_config['base_damage']
+                self.attack_cooldown = boss_config['attack_cooldown']
+                
+                # ボス用サイズ設定
+                image_size = boss_config['image_size']
+                self.size = int(image_size * 0.7)  # 画像サイズの70%
+                
+                # ボス用の色設定（金色）
+                self.color = (255, 215, 0)  # ゴールド
+                
+                # ボス用のスピード設定
+                self.speed = self.base_speed
+                
+                return
+        
+        # 通常エネミーの場合はエネミー設定から読み込み
         Enemy.load_enemy_stats()
         
         # ステータス取得のフォールバック（CSVが読み込めない場合の基本設定）
@@ -380,7 +476,10 @@ class Enemy:
             'attack_cooldown': 0
         }
         
-        key = (self.behavior_type, self.enemy_type)
+        # CSVのキー構造: (type, level)
+        # enemy_type: 敵の種類（1-4）→CSVのtype列
+        # level: そのタイプ内でのレベル（1-5）→CSVのlevel列
+        key = (self.enemy_type, getattr(self, 'level', 1))  # levelが未定義の場合は1
         stats = self._enemy_stats.get(key, default_stats)
         
         # 基本ステータス設定
@@ -401,34 +500,45 @@ class Enemy:
             self.size = base_radius + int((max_radius - base_radius) * (self.enemy_type - 1) / 4)
         
         # 行動パターンに応じた色設定（レベルに応じて彩度を変える）
-        # 彩度設定：レベル1は低彩度（白っぽい）、レベル5は高彩度（鮮やか）
-        saturation = 0.2 + (self.enemy_type - 1) * 0.2  # 0.2-1.0の範囲
-        base_value = 200  # 明度は固定
-        
-        if self.behavior_type == 1:  # 追跡 - 赤
-            # 赤色: 彩度が低いと白っぽい、高いと鮮やかな赤
-            self.color = self._hsv_to_rgb(0.0, saturation, base_value)
-        elif self.behavior_type == 2:  # 直進 - 青
-            # 青色: 色相240度
-            self.color = self._hsv_to_rgb(240.0, saturation, base_value)
-        elif self.behavior_type == 3:  # 距離保持射撃 - 緑
-            # 緑色: 色相120度
-            self.color = self._hsv_to_rgb(120.0, saturation, base_value)
-        elif self.behavior_type == 4:  # 固定砲台 - 橙
-            # オレンジ色: 色相30度
-            self.color = self._hsv_to_rgb(30.0, saturation, base_value)
+        if self.is_boss:
+            # ボス専用の色（金色/黄色）
+            self.color = self._hsv_to_rgb(50.0, 0.8, 220)  # 金色
+        else:
+            # 彩度設定：レベル1は低彩度（白っぽい）、レベル5は高彩度（鮮やか）
+            saturation = 0.2 + (self.enemy_type - 1) * 0.2  # 0.2-1.0の範囲
+            base_value = 200  # 明度は固定
+            
+            if self.behavior_type == 1:  # 追跡 - 赤
+                # 赤色: 彩度が低いと白っぽい、高いと鮮やかな赤
+                self.color = self._hsv_to_rgb(0.0, saturation, base_value)
+            elif self.behavior_type == 2:  # 直進 - 青
+                # 青色: 色相240度
+                self.color = self._hsv_to_rgb(240.0, saturation, base_value)
+            elif self.behavior_type == 3:  # 距離保持射撃 - 緑
+                # 緑色: 色相120度
+                self.color = self._hsv_to_rgb(120.0, saturation, base_value)
+            elif self.behavior_type == 4:  # 固定砲台 - 橙
+                # オレンジ色: 色相30度
+                self.color = self._hsv_to_rgb(30.0, saturation, base_value)
         
         self.speed = self.base_speed
         
         # 画像の読み込み（エラーハンドリング強化）
         try:
-            self.images = self._load_enemy_image(self.behavior_type, self.enemy_type)
+            # ボスの場合はbehavior_type、通常敵の場合はlevelを渡す
+            level_or_behavior = self.behavior_type if self.is_boss else getattr(self, 'level', 1)
+            self.images = self._load_enemy_image(self.enemy_type, level_or_behavior)
             # 画像読み込みに失敗した場合のフォールバック
             if self.images is None:
                 print(f"[WARNING] Failed to load enemy image for type {self.behavior_type}-{self.enemy_type}, using fallback")
                 self.images = None
         except Exception as e:
             print(f"[ERROR] Exception while loading enemy image: {e}")
+            self.images = None
+            
+        # images属性が設定されていない場合の安全対策
+        if not hasattr(self, 'images'):
+            print(f"[ERROR] images attribute not set, initializing to None")
             self.images = None
             
         self.facing_right = True  # 向いている方向（True: 右, False: 左）
@@ -649,7 +759,7 @@ class Enemy:
         sy = int(self.y - camera_y)
 
         # 画像がある場合は画像を描画、ない場合は従来の円を描画
-        if (self.images and isinstance(self.images, dict) and 
+        if (hasattr(self, 'images') and self.images and isinstance(self.images, dict) and 
             'right' in self.images and 'left' in self.images and
             self.images['right'] is not None and self.images['left'] is not None):
             
@@ -893,12 +1003,20 @@ class Enemy:
 
     def is_off_screen(self):
         """敵が画面外に出たかどうかを判定（直進タイプ用）"""
+        # ボスは画面外でも削除されない
+        if self.is_boss:
+            return False
+            
         margin = 100
         return (self.x < -margin or self.x > WORLD_WIDTH + margin or 
                 self.y < -margin or self.y > WORLD_HEIGHT + margin)
 
     def is_far_from_player(self, player, margin=800):
         """プレイヤーから十分に離れているかどうかを判定（視界外削除用）"""
+        # ボスは距離に関係なく削除されない
+        if self.is_boss:
+            return False
+            
         dx = self.x - player.x
         dy = self.y - player.y
         distance_squared = dx * dx + dy * dy
@@ -914,6 +1032,10 @@ class Enemy:
             screen_height: 画面高さ  
             margin: 画面端からの余裕（この範囲内では削除しない）
         """
+        # ボスは常に画面範囲内とみなす（削除されない）
+        if self.is_boss:
+            return True
+            
         # プレイヤーを中心とした画面範囲を計算（適切なマージンで保護）
         half_width = screen_width / 2 + margin
         half_height = screen_height / 2 + margin
@@ -929,6 +1051,10 @@ class Enemy:
 
     def should_be_removed_by_time(self):
         """生存時間に基づく削除判定（距離保持射撃用のみ）"""
+        # ボスは時間による削除もされない
+        if self.is_boss:
+            return False
+            
         if self.behavior_type == 3:  # 距離保持射撃
             # 距離保持射撃は45秒で削除
             return pygame.time.get_ticks() - self.spawn_time > 45000

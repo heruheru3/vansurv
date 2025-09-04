@@ -13,10 +13,34 @@ from game_utils import enforce_experience_gems_limit
 
 
 def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval, 
-                 player_x, player_y, camera_x, camera_y):
+                 player_x, player_y, camera_x, camera_y, boss_spawn_timer=0):
     """敵の生成処理"""
     new_spawn_timer = spawn_timer + 1
+    new_boss_spawn_timer = boss_spawn_timer + 1
     
+    # ボス出現チェック（1分=3600フレーム間隔）
+    boss_spawn_interval = 3600  # 60秒 * 60FPS
+    if new_boss_spawn_timer >= boss_spawn_interval and game_time >= 60:
+        new_boss_spawn_timer = 0
+        
+        # ボスを画面中央付近にスポーン
+        boss_x = camera_x + SCREEN_WIDTH // 2 + random.randint(-100, 100)
+        boss_y = camera_y + SCREEN_HEIGHT // 2 + random.randint(-100, 100)
+        
+        # ワールド境界をクランプ
+        boss_x = max(100, min(WORLD_WIDTH - 100, boss_x))
+        boss_y = max(100, min(WORLD_HEIGHT - 100, boss_y))
+        
+        # ボス生成
+        boss = Enemy(None, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True)
+        enemies.append(boss)
+        
+        # ボススポーンエフェクト（大きめ）
+        if len(particles) < 300:
+            for _ in range(15):  # 通常より多めのエフェクト
+                particles.append(SpawnParticle(boss_x, boss_y, size=3))
+    
+    # 通常の敵スポーン処理
     if new_spawn_timer >= spawn_interval:
         new_spawn_timer = 0
         
@@ -53,14 +77,14 @@ def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval,
             x = max(50, min(WORLD_WIDTH - 50, x))
             y = max(50, min(WORLD_HEIGHT - 50, y))
             
-            enemy = Enemy(x, y)
+            enemy = Enemy(None, game_time, spawn_x=x, spawn_y=y)
             enemies.append(enemy)
             
             # スポーンエフェクト
             if len(particles) < 300:  # パーティクル制限
                 particles.append(SpawnParticle(x, y))
     
-    return new_spawn_timer
+    return new_spawn_timer, new_boss_spawn_timer
 
 
 def handle_enemy_death(enemy, enemies, experience_gems, items, particles, damage_stats, 
