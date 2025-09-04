@@ -105,6 +105,7 @@ def init_game_state(screen, save_system=None):
     game_clear = False
     spawn_timer = 0
     boss_spawn_timer = 0  # ボススポーン用タイマー
+    spawned_boss_types = set()  # 一度出現したボスタイプを記録
     spawn_interval = 60
     game_time = 0
     last_difficulty_increase = 0
@@ -117,7 +118,7 @@ def init_game_state(screen, save_system=None):
     except Exception:
         pass
     
-    return player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer
+    return player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types
 
 
 def clamp_to_world(x, y, world_width, world_height, margin=50):

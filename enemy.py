@@ -82,8 +82,7 @@ class Enemy:
                         'base_damage': int(row['base_damage']),
                         'speed_multiplier': float(row['speed_multiplier']),
                         'attack_cooldown': int(row['attack_cooldown']),
-                        'spawn_time': int(row['spawn_time']),  # 最初の出現時間（秒）
-                        'spawn_interval': int(row['spawn_interval']),  # 出現間隔（秒）
+                        'spawn_time': int(row['spawn_time']),  # 出現時間（秒）
                         'image_file': row['image_file'],
                         'image_size': int(row['image_size']),
                         'description': row['description']
@@ -99,18 +98,25 @@ class Enemy:
     
     @classmethod
     def get_boss_config(cls, boss_level):
-        """指定されたレベルのボス設定を取得"""
+        """指定されたレベルのボス設定を取得（旧版・互換性用）"""
         cls.load_boss_stats()
         key = (101, boss_level)  # ボスタイプは101固定
         return cls._boss_stats.get(key, None)
     
     @classmethod
-    def _load_enemy_image(cls, enemy_type, behavior_type):
+    def get_boss_config_by_type(cls, boss_type):
+        """指定されたタイプのボス設定を取得"""
+        cls.load_boss_stats()
+        key = (boss_type, 1)  # レベルは1固定
+        return cls._boss_stats.get(key, None)
+    
+    @classmethod
+    def _load_enemy_image(cls, enemy_type, level_or_behavior):
         """敵の画像を読み込む（キャッシュ機能付き）"""
         # ボスの場合はボス設定から読み込み
         if enemy_type >= 101:
             cls.load_boss_stats()
-            key = (enemy_type, behavior_type)
+            key = (enemy_type, level_or_behavior)  # ボスの場合は(type, level)
             
             if key in cls._boss_stats:
                 # ボスCSVから画像ファイル名とサイズを取得
@@ -119,13 +125,13 @@ class Enemy:
                 cache_key = cls._boss_stats[key]['image_file']
             else:
                 # フォールバック：従来の命名規則
-                cache_key = f"boss-{behavior_type:02d}"
+                cache_key = f"boss-{level_or_behavior:02d}"
                 image_file = f"{cache_key}.png"
                 image_size = 96  # デフォルトボスサイズ
         else:
             # 通常エネミーの場合はエネミー設定から読み込み
             cls.load_enemy_stats()
-            key = (enemy_type, behavior_type)
+            key = (enemy_type, level_or_behavior)
             
             if key in cls._enemy_stats:
                 # CSVから画像ファイル名とサイズを取得
@@ -134,9 +140,9 @@ class Enemy:
                 cache_key = cls._enemy_stats[key]['image_file']
             else:
                 # フォールバック：従来の命名規則
-                cache_key = f"{enemy_type:02d}-{behavior_type:02d}"
+                cache_key = f"{enemy_type:02d}-{level_or_behavior:02d}"
                 image_file = f"{cache_key}.png"
-                image_size = 32 + int((48 - 32) * (behavior_type - 1) / 4)  # デフォルトサイズ計算
+                image_size = 32 + int((48 - 32) * (level_or_behavior - 1) / 4)  # デフォルトサイズ計算
         
         # キャッシュから画像を取得
         if cache_key in cls._image_cache:
@@ -239,10 +245,11 @@ class Enemy:
         
         return adjusted_surface
     
-    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1):
+    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None):
         self.screen = screen
         self.is_boss = is_boss  # ボス判定フラグ
         self.boss_level = boss_level if is_boss else 1  # ボスレベル（ボス以外は1）
+        self.boss_type = boss_type if boss_type is not None else 101  # ボスタイプ（デフォルトは101）
         
         # ヒット時のフラッシュ用タイマ（秒）
         self.hit_flash_timer = 0.0
@@ -256,9 +263,9 @@ class Enemy:
         # ボスか通常敵かで敵タイプを決定
         if self.is_boss:
             # ボスタイプ（101以上）
-            self.enemy_type = 101  # 現在は1種類のみ
+            self.enemy_type = self.boss_type  # boss_typeを使用
             self.behavior_type = 1  # ボスの行動パターンは1固定（追跡タイプ）
-            self.level = self.boss_level  # ボスレベルをレベルとして使用
+            self.level = 1  # ボスのレベルは1固定（タイプで区別）
         else:
             # 行動パターン（type）をランダムに決定
             self.behavior_type = self.get_random_behavior_type(game_time)
@@ -282,6 +289,9 @@ class Enemy:
         self.is_moving = False     # 移動しているかどうか
         self.last_x = self.x if hasattr(self, 'x') else 0
         self.last_y = self.y if hasattr(self, 'y') else 0
+        
+        # 描画用変数
+        self.facing_right = True  # 敵の向き（右向きかどうか）
         
         # ノックバック関連の変数
         self.knockback_velocity_x = 0.0  # ノックバック速度X
@@ -444,7 +454,7 @@ class Enemy:
         # ボスの場合はボス設定から読み込み
         if self.is_boss:
             Enemy.load_boss_stats()
-            boss_config = Enemy.get_boss_config(self.boss_level)
+            boss_config = Enemy.get_boss_config_by_type(self.boss_type)
             if boss_config:
                 # ボス設定から直接ステータスを設定
                 self.hp = boss_config['base_hp']
@@ -461,6 +471,16 @@ class Enemy:
                 
                 # ボス用のスピード設定
                 self.speed = self.base_speed
+                
+                # ボス画像の読み込み
+                try:
+                    self.images = self._load_enemy_image(self.enemy_type, self.level)  # レベル（1固定）を使用
+                    if self.images is None:
+                        print(f"[WARNING] Failed to load boss image, using fallback")
+                        self.images = None
+                except Exception as e:
+                    print(f"[ERROR] Exception while loading boss image: {e}")
+                    self.images = None
                 
                 return
         
@@ -525,8 +545,8 @@ class Enemy:
         
         # 画像の読み込み（エラーハンドリング強化）
         try:
-            # ボスの場合はbehavior_type、通常敵の場合はlevelを渡す
-            level_or_behavior = self.behavior_type if self.is_boss else getattr(self, 'level', 1)
+            # ボスの場合はboss_level、通常敵の場合はlevelを渡す
+            level_or_behavior = self.boss_level if self.is_boss else getattr(self, 'level', 1)
             self.images = self._load_enemy_image(self.enemy_type, level_or_behavior)
             # 画像読み込みに失敗した場合のフォールバック
             if self.images is None:

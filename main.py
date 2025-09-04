@@ -118,7 +118,7 @@ def main():
     CAMERA_LERP = 0.18
 
     # ゲーム状態の初期化
-    player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer = init_game_state(screen, save_system)
+    player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
 
     # お金関連の初期化
     current_game_money = 0  # 現在のゲームセッションで獲得したお金
@@ -475,7 +475,7 @@ def main():
                             save_system.save()
                             print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                             
-                            player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer = init_game_state(screen, save_system)
+                            player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
                             # リセット
                             current_game_money = 0
                             enemies_killed_this_game = 0
@@ -648,7 +648,7 @@ def main():
                                 save_system.save()
                                 print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                                 
-                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer = init_game_state(screen, save_system)
+                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
                                 # リセット
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
@@ -979,57 +979,45 @@ def main():
                 # ボス生成処理（CSVから設定を読み込み）
                 boss_spawn_timer += 1
                 
-                # 現在のゲーム時間に基づいてボスレベルを決定
-                boss_level = min(5, max(1, int(game_time // 60) + 1))  # 1分ごとにレベルアップ、最大レベル5
-                boss_config = Enemy.get_boss_config(boss_level)
-                
-                if boss_config:
-                    spawn_time_frames = boss_config['spawn_time'] * 60  # 秒をフレームに変換
-                    spawn_interval_frames = boss_config['spawn_interval'] * 60  # 秒をフレームに変換
+                # 全てのボスタイプ（101-104）をチェック
+                for boss_type in [101, 102, 103, 104]:
+                    boss_config = Enemy.get_boss_config_by_type(boss_type)
                     
-                    # 初回出現時間をチェック
-                    should_spawn = False
-                    if game_time * 60 >= spawn_time_frames:  # 初回出現時間を過ぎている
-                        # 出現間隔をチェック
-                        if boss_spawn_timer >= spawn_interval_frames:
-                            should_spawn = True
-                    
-                    if should_spawn:
-                        boss_spawn_timer = 0
+                    if boss_config:
+                        spawn_time_frames = boss_config['spawn_time'] * 60  # 秒をフレームに変換
                         
-                        # ボスをプレイヤーの近くにスポーン
-                        boss_x = player.x + random.randint(-200, 200)
-                        boss_y = player.y + random.randint(-200, 200)
+                        # 指定時間に達したら1回だけスポーン（既にスポーン済みでない場合）
+                        should_spawn = False
+                        if game_time * 60 >= spawn_time_frames:  # 指定時間を過ぎている
+                            # このタイプのボスがまだスポーンしていない場合
+                            if boss_type not in spawned_boss_types:
+                                should_spawn = True
                         
-                        # ワールド境界をクランプ
-                        boss_x = max(100, min(WORLD_WIDTH - 100, boss_x))
-                        boss_y = max(100, min(WORLD_HEIGHT - 100, boss_y))
-                        
-                        # ボス生成（CSVの設定に基づき）
-                        boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_level=boss_level)
-                        enemies.append(boss)
-                        
-                        # ボススポーンエフェクト（大きめ）
-                        if len(particles) < 300:
-                            for _ in range(15):  # 通常より多めのエフェクト
-                                particles.append(SpawnParticle(boss_x, boss_y, (255, 215, 0)))  # 金色
-                        
-                        # 現在のボス数をログ出力
-                        boss_count = sum(1 for enemy in enemies if getattr(enemy, 'is_boss', False))
-                        print(f"[INFO] Boss Level {boss_level} spawned at ({boss_x:.0f}, {boss_y:.0f}). Player at ({player.x:.0f}, {player.y:.0f}). Total bosses: {boss_count}")
-                else:
-                    # フォールバック：CSVが読み込めない場合の従来処理
-                    boss_spawn_interval = 600  # 30秒 * 60FPS
-                    if boss_spawn_timer >= boss_spawn_interval and game_time >= 10:
-                        boss_spawn_timer = 0
-                        boss_x = player.x + random.randint(-200, 200)
-                        boss_y = player.y + random.randint(-200, 200)
-                        boss_x = max(100, min(WORLD_WIDTH - 100, boss_x))
-                        boss_y = max(100, min(WORLD_HEIGHT - 100, boss_y))
-                        boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True)
-                        enemies.append(boss)
-                        boss_count = sum(1 for enemy in enemies if getattr(enemy, 'is_boss', False))
-                        print(f"[INFO] Boss spawned at ({boss_x:.0f}, {boss_y:.0f}). Player at ({player.x:.0f}, {player.y:.0f}). Total bosses: {boss_count}")
+                        if should_spawn:
+                            
+                            # ボスをプレイヤーの近くにスポーン
+                            boss_x = player.x + random.randint(-200, 200)
+                            boss_y = player.y + random.randint(-200, 200)
+                            
+                            # ワールド境界をクランプ
+                            boss_x = max(100, min(WORLD_WIDTH - 100, boss_x))
+                            boss_y = max(100, min(WORLD_HEIGHT - 100, boss_y))
+                            
+                            # ボス生成（CSVの設定に基づき）
+                            boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type)
+                            enemies.append(boss)
+                            
+                            # このボスタイプを出現済みリストに追加
+                            spawned_boss_types.add(boss_type)
+                            
+                            # ボススポーンエフェクト（大きめ）
+                            if len(particles) < 300:
+                                for _ in range(15):  # 通常より多めのエフェクト
+                                    particles.append(SpawnParticle(boss_x, boss_y, (255, 215, 0)))  # 金色
+                            
+                            # 現在のボス数をログ出力
+                            boss_count = sum(1 for enemy in enemies if getattr(enemy, 'is_boss', False))
+                            print(f"[INFO] Boss Type {boss_type} spawned at ({boss_x:.0f}, {boss_y:.0f}). Player at ({player.x:.0f}, {player.y:.0f}). Total bosses: {boss_count}")
 
                 # 敵の生成を爆発的に
                 spawn_timer += 1
