@@ -4,6 +4,7 @@ import math
 import os
 import sys
 import colorsys
+import csv
 from constants import *
 
 def resource_path(relative_path):
@@ -20,18 +21,67 @@ class Enemy:
     # 画像キャッシュ（クラス変数）
     _image_cache = {}
     
+    # エネミーステータスのキャッシュ
+    _enemy_stats = {}
+    _stats_loaded = False
+    
+    @classmethod
+    def load_enemy_stats(cls):
+        """エネミーステータスをCSVファイルから読み込む"""
+        if cls._stats_loaded:
+            return
+            
+        csv_path = resource_path("enemy_stats.csv")
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    type_id = int(row['type'])
+                    level = int(row['level'])
+                    key = (type_id, level)
+                    cls._enemy_stats[key] = {
+                        'base_hp': int(row['base_hp']),
+                        'base_speed': float(row['base_speed']),
+                        'base_damage': int(row['base_damage']),
+                        'speed_multiplier': float(row['speed_multiplier']),
+                        'attack_cooldown': int(row['attack_cooldown']),
+                        'image_file': row['image_file'],
+                        'image_size': int(row['image_size']),
+                        'description': row['description']
+                    }
+            cls._stats_loaded = True
+            print(f"[INFO] Loaded {len(cls._enemy_stats)} enemy configurations from {csv_path}")
+        except FileNotFoundError:
+            print(f"[ERROR] Enemy stats file not found: {csv_path}")
+            cls._stats_loaded = False
+        except Exception as e:
+            print(f"[ERROR] Failed to load enemy stats: {e}")
+            cls._stats_loaded = False
+    
     @classmethod
     def _load_enemy_image(cls, enemy_type, enemy_level):
         """敵の画像を読み込む（キャッシュ機能付き）"""
-        # キャッシュキーを作成
-        cache_key = f"{enemy_type:02d}-{enemy_level:02d}"
+        # CSVからの画像情報を優先
+        cls.load_enemy_stats()
+        key = (enemy_type, enemy_level)
+        
+        if key in cls._enemy_stats:
+            # CSVから画像ファイル名とサイズを取得
+            image_file = cls._enemy_stats[key]['image_file'] + '.png'
+            image_size = cls._enemy_stats[key]['image_size']
+            cache_key = cls._enemy_stats[key]['image_file']
+        else:
+            # フォールバック：従来の命名規則
+            cache_key = f"{enemy_type:02d}-{enemy_level:02d}"
+            image_file = f"{cache_key}.png"
+            image_size = 32 + int((48 - 32) * (enemy_level - 1) / 4)  # デフォルトサイズ計算
         
         # キャッシュから画像を取得
         if cache_key in cls._image_cache:
             return cls._image_cache[cache_key]
         
         # 画像ファイルパスを構築（PyInstaller対応）
-        image_path = resource_path(os.path.join("assets", "character", "enemy", f"{cache_key}.png"))
+        image_path = resource_path(os.path.join("assets", "character", "enemy", image_file))
         
         try:
             print(f"[DEBUG] Attempting to load enemy image: {image_path}")
@@ -45,13 +95,8 @@ class Enemy:
             image = pygame.image.load(image_path).convert_alpha()
             print(f"[DEBUG] Successfully loaded enemy image: {cache_key}")
             
-            # レベルに応じたサイズを計算（レベル1: 32px, レベル5: 48px）
-            base_size = 32
-            max_size = 48
-            size = base_size + int((max_size - base_size) * (enemy_level - 1) / 4)
-            
-            # レベルに応じたサイズにスケール
-            image = pygame.transform.scale(image, (size, size))
+            # CSVで指定されたサイズにスケール
+            image = pygame.transform.scale(image, (image_size, image_size))
             
             # HSVを調整
             image = cls._adjust_hsv(image, ENEMY_IMAGE_HUE_SHIFT, ENEMY_IMAGE_SATURATION, ENEMY_IMAGE_VALUE)
@@ -63,7 +108,7 @@ class Enemy:
             cls._image_cache[cache_key] = {
                 'left': image,      # 左向き（元画像）
                 'right': flipped_image,  # 右向き（反転）
-                'size': size        # 実際のサイズ
+                'size': image_size        # 実際のサイズ
             }
             
             return cls._image_cache[cache_key]
@@ -149,12 +194,6 @@ class Enemy:
         
         # 敵の種類をランダムに決定（game_timeに応じて変化）
         self.enemy_type = self.get_random_enemy_type(game_time)
-        
-        # レベルに応じたサイズを設定（レベル1: 15px, レベル5: 24px の半径）
-        # 画像サイズが32-48pxなので、当たり判定は少し小さめに設定
-        base_radius = 15
-        max_radius = 24
-        self.size = base_radius + int((max_radius - base_radius) * (self.enemy_type - 1) / 4)
         
         # 行動パターンをランダムに決定
         self.behavior_type = self.get_random_behavior_type(game_time)
@@ -329,19 +368,37 @@ class Enemy:
                 return 4      # 固定砲台
 
     def setup_enemy_stats(self):
-        # 基本ステータス（タイプに応じて設定）
-        base_stats = {
-            1: {'hp': 15, 'speed': 1.125, 'damage': 2},
-            2: {'hp': 30, 'speed': 1.5, 'damage': 5},
-            3: {'hp': 45, 'speed': 1.875, 'damage': 7},
-            4: {'hp': 60, 'speed': 2.0, 'damage': 10},
-            5: {'hp': 75, 'speed': 2.25, 'damage': 15}
+        # CSVからエネミーステータスを読み込み
+        Enemy.load_enemy_stats()
+        
+        # ステータス取得のフォールバック（CSVが読み込めない場合の基本設定）
+        default_stats = {
+            'base_hp': 15,
+            'base_speed': 1.125,
+            'base_damage': 2,
+            'speed_multiplier': 1.0,
+            'attack_cooldown': 0
         }
         
-        stats = base_stats.get(self.enemy_type, base_stats[1])
-        self.hp = stats['hp']
-        self.base_speed = stats['speed']
-        self.damage = stats['damage']
+        key = (self.behavior_type, self.enemy_type)
+        stats = self._enemy_stats.get(key, default_stats)
+        
+        # 基本ステータス設定
+        self.hp = stats['base_hp']
+        self.base_speed = stats['base_speed'] * stats['speed_multiplier']
+        self.damage = stats['base_damage']
+        self.attack_cooldown = stats['attack_cooldown']
+        
+        # CSVからサイズ情報を取得（当たり判定用）
+        if key in self._enemy_stats:
+            image_size = self._enemy_stats[key]['image_size']
+            # 当たり判定は画像サイズより少し小さめに設定
+            self.size = int(image_size * 0.7)  # 画像サイズの70%
+        else:
+            # フォールバック：従来の計算方式
+            base_radius = 15
+            max_radius = 24
+            self.size = base_radius + int((max_radius - base_radius) * (self.enemy_type - 1) / 4)
         
         # 行動パターンに応じた色設定（レベルに応じて彩度を変える）
         # 彩度設定：レベル1は低彩度（白っぽい）、レベル5は高彩度（鮮やか）
@@ -360,17 +417,6 @@ class Enemy:
         elif self.behavior_type == 4:  # 固定砲台 - 橙
             # オレンジ色: 色相30度
             self.color = self._hsv_to_rgb(30.0, saturation, base_value)
-        
-        # 行動パターンに応じた調整
-        if self.behavior_type == 2:  # 直進タイプ
-            self.base_speed *= 2.0  # 速度アップ
-        elif self.behavior_type == 3:  # 距離保持射撃
-            self.base_speed *= 0.35  # 速度ダウン（半分に減速）
-            self.attack_cooldown = 8000  # 8秒間隔で攻撃（2秒から4倍に延長）
-        elif self.behavior_type == 4:  # 遅速追跡（旧固定砲台）
-            self.base_speed *= 0.25  # 通常の5分の1の速度で移動
-            self.attack_cooldown = 6000  # 6秒間隔で攻撃
-            # HP調整なし（デフォルト値のまま）
         
         self.speed = self.base_speed
         
