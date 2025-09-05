@@ -722,13 +722,13 @@ class Enemy:
                 
                 if terrain_collision:
                     # 不可侵地形に衝突する場合、速度を反転（跳ね返り）
-                    print(f"[DEBUG] Enemy {self.enemy_type} bouncing at ({new_x:.1f}, {new_y:.1f}), velocity: ({self.velocity_x:.1f}, {self.velocity_y:.1f})")
+                    # print(f"[DEBUG] Enemy {self.enemy_type} bouncing at ({new_x:.1f}, {new_y:.1f}), velocity: ({self.velocity_x:.1f}, {self.velocity_y:.1f})")
                     self.velocity_x *= -1
                     self.velocity_y *= -1
                     # 新しい方向で移動先を再計算
                     new_x = self.x + self.velocity_x
                     new_y = self.y + self.velocity_y
-                    print(f"[DEBUG] After bounce: velocity: ({self.velocity_x:.1f}, {self.velocity_y:.1f}), new_pos: ({new_x:.1f}, {new_y:.1f})")
+                    # print(f"[DEBUG] After bounce: velocity: ({self.velocity_x:.1f}, {self.velocity_y:.1f}), new_pos: ({new_x:.1f}, {new_y:.1f})")
                     
             except Exception as e:
                 # デバッグ用：エラーログを出力
@@ -1336,15 +1336,15 @@ class Enemy:
         bar_x = center_x - bar_width // 2
         bar_y = center_y - entity_size // 2 - 20  # エンティティの上部に配置（より離して）
         
-        # 背景バー（暗い緑）
-        pygame.draw.rect(screen, (0, 100, 0), (bar_x, bar_y, bar_width, bar_height))
+        # 背景バー（赤色 - 失われたHP部分）
+        pygame.draw.rect(screen, (200, 0, 0), (bar_x, bar_y, bar_width, bar_height))
         
-        # HPバー（緑色、宝箱と同じ）
+        # HPバー（緑色 - 残りのHP部分）
         hp_ratio = max(0, self.hp / self.max_hp)
         hp_width = int(bar_width * hp_ratio)
         
         if hp_width > 0:
-            # 宝箱と同じ緑色で統一
+            # 残りのHPを緑色で表示
             hp_color = (0, 200, 0)  # 緑色
             pygame.draw.rect(screen, hp_color, (bar_x, bar_y, hp_width, bar_height))
         

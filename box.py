@@ -626,7 +626,7 @@ class BoxManager:
                 # ボックス生成
                 new_box = ItemBox(spawn_x, spawn_y)
                 self.boxes.append(new_box)
-                print(f"[DEBUG] Spawned box{new_box.box_type} at ({spawn_x:.1f}, {spawn_y:.1f})")
+                # print(f"[DEBUG] Spawned box{new_box.box_type} at ({spawn_x:.1f}, {spawn_y:.1f})")
                 break
     
     def _is_position_blocked(self, x, y):
