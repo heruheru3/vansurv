@@ -76,14 +76,15 @@ class Enemy:
                 for row in reader:
                     type_id = int(row['type'])
                     level = int(row['level'])
-                    key = (type_id, level)
+                    spawn_time = int(row['spawn_time'])
+                    key = (type_id, level, spawn_time)  # spawn_timeも含めて重複を避ける
                     cls._boss_stats[key] = {
                         'base_hp': int(row['base_hp']),
                         'base_speed': float(row['base_speed']),
                         'base_damage': int(row['base_damage']),
                         'speed_multiplier': float(row['speed_multiplier']),
                         'attack_cooldown': int(row['attack_cooldown']),
-                        'spawn_time': int(row['spawn_time']),  # 出現時間（秒）
+                        'spawn_time': spawn_time,  # 出現時間（秒）
                         'image_file': row['image_file'],
                         'image_size': int(row['image_size']),
                         'projectile_speed': float(row['projectile_speed']) if row['projectile_speed'] else 2.0,
@@ -109,8 +110,14 @@ class Enemy:
     def get_boss_config_by_type(cls, boss_type):
         """指定されたタイプのボス設定を取得（最初の行のみ）"""
         cls.load_boss_stats()
-        key = (boss_type, 1)  # レベルは1固定
-        return cls._boss_stats.get(key, None)
+        # spawn_timeが最も小さいものを取得
+        min_spawn_time = float('inf')
+        result = None
+        for key, config in cls._boss_stats.items():
+            if key[0] == boss_type and config['spawn_time'] < min_spawn_time:
+                min_spawn_time = config['spawn_time']
+                result = config
+        return result
     
     @classmethod
     def get_all_boss_configs(cls):
@@ -124,13 +131,19 @@ class Enemy:
         # ボスの場合はボス設定から読み込み
         if enemy_type >= 101:
             cls.load_boss_stats()
-            key = (enemy_type, level_or_behavior)  # ボスの場合は(type, level)
+            # spawn_timeが最も小さいものを取得
+            min_spawn_time = float('inf')
+            boss_config = None
+            for key, config in cls._boss_stats.items():
+                if key[0] == enemy_type and config['spawn_time'] < min_spawn_time:
+                    min_spawn_time = config['spawn_time']
+                    boss_config = config
             
-            if key in cls._boss_stats:
+            if boss_config:
                 # ボスCSVから画像ファイル名とサイズを取得
-                image_file = cls._boss_stats[key]['image_file'] + '.png'
-                image_size = cls._boss_stats[key]['image_size']
-                cache_key = cls._boss_stats[key]['image_file']
+                image_file = boss_config['image_file'] + '.png'
+                image_size = boss_config['image_size']
+                cache_key = boss_config['image_file']
             else:
                 # フォールバック：従来の命名規則
                 cache_key = f"boss-{level_or_behavior:02d}"

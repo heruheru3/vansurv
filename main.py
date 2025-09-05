@@ -980,14 +980,14 @@ def main():
                 # 全てのボス設定を取得
                 all_boss_configs = Enemy.get_all_boss_configs()
                 
-                for (boss_type, level), boss_config in all_boss_configs.items():
+                for (boss_type, level, spawn_time), boss_config in all_boss_configs.items():
                     spawn_time_frames = boss_config['spawn_time'] * 60  # 秒をフレームに変換
                     
                     # 指定時間に達したら1回だけスポーン（既にスポーン済みでない場合）
                     should_spawn = False
                     if game_time * 60 >= spawn_time_frames:  # 指定時間を過ぎている
                         # この特定の行のボスがまだスポーンしていない場合
-                        boss_key = (boss_type, boss_config['spawn_time'])  # タイプ+スポーン時間で識別
+                        boss_key = (boss_type, level, spawn_time)  # タイプ+レベル+スポーン時間で識別
                         if boss_key not in spawned_boss_types:
                             should_spawn = True
                     
@@ -1019,7 +1019,7 @@ def main():
                             enemies.append(boss)
                             
                             # この特定の行のボスを出現済みリストに追加
-                            boss_key = (boss_type, boss_config['spawn_time'])
+                            boss_key = (boss_type, level, spawn_time)
                             spawned_boss_types.add(boss_key)
                             
                             # ボススポーンエフェクト（大きめ）
