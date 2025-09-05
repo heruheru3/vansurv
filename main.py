@@ -55,9 +55,7 @@ def main():
     pygame.init()
     
     # ステージを最初に初期化（プレイヤーの安全な開始位置決定のため、マップが有効な場合のみ）
-    if USE_STAGE_MAP:
-        stage.init_stage()
-    
+   
     # ディスプレイ情報取得（フルスクリーン切替に使用）
     try:
         display_info = pygame.display.Info()
@@ -1125,7 +1123,7 @@ def main():
                     if hasattr(enemy, 'update_knockback'):
                         enemy.update_knockback()
                     
-                    enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y))
+                    enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader)
                     
                     # ボスの画面外チェックとリスポーン処理
                     if hasattr(enemy, 'is_boss') and enemy.is_boss:
@@ -1395,10 +1393,7 @@ def main():
             world_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
 
             # 背景描画（設定により切り替え）
-            if USE_STAGE_MAP:
-                # レトロマップチップ背景
-                draw_stage_background(world_surf, int_cam_x, int_cam_y)
-            elif USE_CSV_MAP:
+            if USE_CSV_MAP:
                 # CSVマップ背景
                 map_loader.draw_map(world_surf, int_cam_x, int_cam_y)
             else:

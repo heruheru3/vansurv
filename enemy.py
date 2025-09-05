@@ -353,7 +353,7 @@ class Enemy:
     
     def _adjust_spawn_position(self):
         """スポーン位置が障害物と重なっている場合、近くの通行可能な場所に移動"""
-        if not (USE_STAGE_MAP or USE_CSV_MAP):
+        if not USE_CSV_MAP:
             return
         
         try:
@@ -643,7 +643,7 @@ class Enemy:
             
             # 障害物チェック（stage_mapを取得）
             blocked = False
-            if USE_STAGE_MAP or USE_CSV_MAP:
+            if USE_CSV_MAP:
                 try:
                     from stage import get_stage_map
                     stage_map = get_stage_map()
@@ -671,7 +671,7 @@ class Enemy:
             if self.knockback_cooldown < 0:
                 self.knockback_cooldown = 0
 
-    def move(self, player, camera_x=0, camera_y=0):
+    def move(self, player, camera_x=0, camera_y=0, map_loader=None):
         """行動パターンに応じた移動処理"""
         # ノックバック中のみ通常の移動を無効にする（クールダウン中は移動可能）
         if self.knockback_timer > 0:
@@ -697,41 +697,42 @@ class Enemy:
             new_x = self.x + self.velocity_x
             new_y = self.y + self.velocity_y
             
-            # 不可侵地形チェック（ステージマップ使用時のみ）
+            # 不可侵地形チェック（ステージマップまたはCSVマップ使用時）
             try:
-                if USE_STAGE_MAP:
-                    from stage import get_stage_map
-                    stage_map = get_stage_map()
-                    if stage_map and hasattr(stage_map, 'get_tile_at_world_pos'):
-                        # 敵の四隅をチェック（より正確な衝突判定）
-                        half_size = self.size // 2
-                        check_points = [
-                            (new_x - half_size, new_y - half_size),  # 左上
-                            (new_x + half_size, new_y - half_size),  # 右上
-                            (new_x - half_size, new_y + half_size),  # 左下
-                            (new_x + half_size, new_y + half_size),  # 右下
-                            (new_x, new_y)                          # 中央
-                        ]
-                        
-                        terrain_collision = False
-                        for check_x, check_y in check_points:
-                            tile_id = stage_map.get_tile_at_world_pos(check_x, check_y)
-                            # エリア5,9: ソリッドブロッカー（凸地形）で跳ね返り
-                            # エリア6,7: パススルーブロッカー（凹地形）でも跳ね返り
-                            # 敵はすべてのブロッカー地形で跳ね返る
-                            if tile_id in {5, 6, 7, 9}:  # 全ブロッカー地形
-                                terrain_collision = True
-                                break
-                        
-                        if terrain_collision:
-                            # 不可侵地形に衝突する場合、速度を反転（跳ね返り）
-                            self.velocity_x *= -1
-                            self.velocity_y *= -1
-                            # 新しい方向で移動先を再計算
-                            new_x = self.x + self.velocity_x
-                            new_y = self.y + self.velocity_y
-            except Exception:
-                # ステージマップが利用できない場合は何もしない
+                terrain_collision = False
+                
+                               
+                if USE_CSV_MAP and map_loader:
+                    # CSVマップでの地形判定
+                    half_size = self.size // 2
+                    check_points = [
+                        (new_x - half_size, new_y - half_size),  # 左上
+                        (new_x + half_size, new_y - half_size),  # 右上
+                        (new_x - half_size, new_y + half_size),  # 左下
+                        (new_x + half_size, new_y + half_size),  # 右下
+                        (new_x, new_y)                          # 中央
+                    ]
+                    
+                    for check_x, check_y in check_points:
+                        tile_id = map_loader.get_tile_at(check_x, check_y)
+                        # CSVマップのブロッカータイル: 5,7,8,9
+                        if tile_id in {5, 7, 8, 9}:  # CSVマップのブロッカー地形
+                            terrain_collision = True
+                            break
+                
+                if terrain_collision:
+                    # 不可侵地形に衝突する場合、速度を反転（跳ね返り）
+                    print(f"[DEBUG] Enemy {self.enemy_type} bouncing at ({new_x:.1f}, {new_y:.1f}), velocity: ({self.velocity_x:.1f}, {self.velocity_y:.1f})")
+                    self.velocity_x *= -1
+                    self.velocity_y *= -1
+                    # 新しい方向で移動先を再計算
+                    new_x = self.x + self.velocity_x
+                    new_y = self.y + self.velocity_y
+                    print(f"[DEBUG] After bounce: velocity: ({self.velocity_x:.1f}, {self.velocity_y:.1f}), new_pos: ({new_x:.1f}, {new_y:.1f})")
+                    
+            except Exception as e:
+                # デバッグ用：エラーログを出力
+                print(f"[DEBUG] Enemy terrain check error: {e}")
                 pass
             
             # カメラ範囲での跳ね返り処理
@@ -773,7 +774,7 @@ class Enemy:
             new_y = self.y + math.sin(angle) * self.base_speed
         
         # 障害物との衝突判定（CSVマップまたはステージマップが有効な場合）
-        if (USE_STAGE_MAP or USE_CSV_MAP) and (new_x != self.x or new_y != self.y):
+        if USE_CSV_MAP and (new_x != self.x or new_y != self.y):
             try:
                 from stage import get_stage_map
                 stage_map = get_stage_map()
@@ -1417,7 +1418,7 @@ class EnemyProjectile:
         new_y = self.y + self.vy
         
         # 障害物との衝突判定（CSVマップまたはステージマップが有効な場合）
-        if USE_STAGE_MAP or USE_CSV_MAP:
+        if USE_CSV_MAP:
             try:
                 from stage import get_stage_map
                 stage_map = get_stage_map()

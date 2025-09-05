@@ -182,7 +182,7 @@ class ItemBox:
     
     def _adjust_spawn_position(self):
         """スポーン位置が障害物と重なっている場合、近くの通行可能な場所に移動"""
-        if not (USE_STAGE_MAP or USE_CSV_MAP):
+        if not USE_CSV_MAP:
             return
         
         try:
@@ -632,7 +632,7 @@ class BoxManager:
     def _is_position_blocked(self, x, y):
         """指定座標が障害物でブロックされているかチェック"""
         # マップが有効でない場合は障害物なし
-        if not (USE_STAGE_MAP or USE_CSV_MAP):
+        if not USE_CSV_MAP:
             return False
         
         try:

@@ -38,7 +38,6 @@ DEBUG = False   # デバッグ用ログ出力のON/OFF
 SHOW_FPS = True  # FPS表示のON/OFF
 
 # マップ・ステージ設定
-USE_STAGE_MAP = False  # True: レトロマップチップ使用, False: 市松模様背景（テスト用）
 USE_CSV_MAP = True    # True: CSVマップ使用, False: ランダム生成背景
 TEST_TILE_SIZE = 64    # テスト用背景の市松模様のタイルサイズ
 
