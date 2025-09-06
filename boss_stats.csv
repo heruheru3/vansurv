@@ -1,4 +1,5 @@
 type,level,base_hp,base_speed,base_damage,speed_multiplier,attack_cooldown,spawn_time,image_file,image_size,projectile_speed,description
+101,1,30,1,25,1.2,0,1,boss-01,60,1,ボスタイプ1
 101,1,300,1,25,1.2,0,20,boss-01,60,1,ボスタイプ1
 101,1,300,1,25,1.2,0,21,boss-01,60,1,ボスタイプ1
 102,1,600,1,35,3,0,40,boss-02,72,1,ボスタイプ2

@@ -940,11 +940,15 @@ def main():
                                 for _ in range(4):  # 8から4に削減
                                     particles.append(DeathParticle(enemy.x, enemy.y, enemy.color))
 
-                                # ボス死亡時の特別エフェクト（赤いドット）
+                                # ボス死亡時の特別エフェクト（赤いドット＋拡大赤円フラッシュ＋画面揺れ）
                                 if getattr(enemy, 'is_boss', False):
                                     try:
-                                        from effects.particles import BossDeathEffect
+                                        from effects.particles import BossDeathEffect, BossDeathFlash
                                         particles.append(BossDeathEffect(enemy.x, enemy.y))
+                                        particles.append(BossDeathFlash(enemy.x, enemy.y))
+                                        # 画面揺れ（ボム取得時と同じ）
+                                        if hasattr(player, 'activate_screen_shake'):
+                                            player.activate_screen_shake()
                                     except Exception as e:
                                         print(f"[WARNING] Failed to create boss death effect: {e}")
 

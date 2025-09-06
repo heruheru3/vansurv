@@ -456,3 +456,28 @@ class BossDeathEffect:
                 except Exception:
                     # フォールバック：通常の円描画
                     pygame.draw.circle(screen, (255, 0, 0), (px, py), size)
+
+class BossDeathFlash:
+    """ボス撃破時の拡大赤円フラッシュ（フェードアウト）"""
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.timer = 16  # 約0.5秒
+        self.duration = 32
+        self.max_radius = 180  # 最大半径
+    
+    def update(self):
+        self.timer -= 1
+        return self.timer > 0
+    
+    def draw(self, screen, camera_x=0, camera_y=0):
+        if self.timer <= 0:
+            return
+        progress = 1 - (self.timer / self.duration)
+        radius = int(40 + self.max_radius * progress)
+        alpha = int(180 * (1 - progress))
+        sx = int(self.x - camera_x)
+        sy = int(self.y - camera_y)
+        surf = pygame.Surface((radius*2, radius*2), pygame.SRCALPHA)
+        pygame.draw.circle(surf, (200, 200, 0, alpha), (radius, radius), radius)
+        screen.blit(surf, (sx - radius, sy - radius))
