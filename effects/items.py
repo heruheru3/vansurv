@@ -5,10 +5,12 @@ import random
 from constants import *
 from resources import load_icons
 
+
 class ExperienceGem:
     def __init__(self, x, y, value=1):
         self.x = x
         self.y = y
+        self.type = "experience"
         self.size = 8
         self.speed = 6
         self.collected = False

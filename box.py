@@ -4,7 +4,7 @@ import math
 import os
 import sys
 from constants import *
-from effects.items import GameItem, MoneyItem
+from effects.items import GameItem, MoneyItem, ExperienceGem
 
 def resource_path(relative_path):
     """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
@@ -130,13 +130,16 @@ class ItemBox:
             else:
                 self.box_type = 3
         else:
-            self.box_type = max(1, min(3, int(box_type)))
+            # allow box_type 1-4; box4 reserved for boss drops
+            self.box_type = max(1, min(4, int(box_type)))
         
         # ボックスタイプに応じてHPを設定
         if self.box_type == 1:
             self.hp = self.max_hp = BOX1_HP
         elif self.box_type == 2:
             self.hp = self.max_hp = BOX2_HP
+        elif self.box_type == 4:
+            self.hp = self.max_hp = BOX4_HP
         else:
             self.hp = self.max_hp = BOX3_HP
         
@@ -353,6 +356,27 @@ class ItemBox:
             item.y += math.sin(offset_angle) * offset_distance
         
         self.items_dropped = items
+
+        # 特別処理: box_type 4 はボス専用の「レア箱」扱い
+        if self.box_type == 4:
+            # box4 は複数の高級報酬 (経験ジェム + 大量お金 + レアアイテム) を確実に落とす
+            # 上書きして確実にレアな中身にする
+            items = []
+            # 経験値ジェムを複数
+            for _ in range(3):
+                items.append(ExperienceGem(drop_x, drop_y, value=10))
+            # 高額のお金
+            items.append(MoneyItem(drop_x, drop_y, amount=random.randint(MONEY4_AMOUNT_MIN, MONEY4_AMOUNT_MAX), box_type=4))
+            # さらにレアアイテム（回復 or bomb or magnet のいずれか）を1つ
+            rare = random.choice(["heal", "bomb", "magnet"])
+            items.append(GameItem(drop_x, drop_y, rare))
+            # 散らす位置
+            for i, item in enumerate(items):
+                offset_angle = random.uniform(0, 2 * math.pi)
+                offset_distance = random.uniform(20, 50)
+                item.x += math.cos(offset_angle) * offset_distance
+                item.y += math.sin(offset_angle) * offset_distance
+            self.items_dropped = items
 
     def update(self):
         """ボックスの更新処理"""

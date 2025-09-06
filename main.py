@@ -952,6 +952,20 @@ def main():
                                     except Exception as e:
                                         print(f"[WARNING] Failed to create boss death effect: {e}")
 
+                                    # ボス撃破時に特別な宝箱 (box4.png) をドロップ
+                                    try:
+                                        # ItemBox は BoxManager を通じて管理されるべきなので、box_manager に追加
+                                        from box import ItemBox
+                                        special_box = ItemBox(enemy.x, enemy.y, box_type=4)
+                                        box_manager.boxes.append(special_box)
+                                        # 大きめのスポーンエフェクト
+                                        if len(particles) < 300:
+                                            for _ in range(12):
+                                                particles.append(SpawnParticle(special_box.x, special_box.y, (255, 100, 100)))
+                                        print(f"[INFO] Special boss box spawned at ({special_box.x:.0f},{special_box.y:.0f})")
+                                    except Exception as e:
+                                        print(f"[WARNING] Failed to spawn boss special box: {e}")
+
                                 # 撃破カウンターを増加
                                 enemies_killed_this_game += 1
                                 current_game_money += MONEY_PER_ENEMY_KILLED
