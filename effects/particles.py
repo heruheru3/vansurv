@@ -392,3 +392,67 @@ class AutoHealEffect:
                 px = int(particle['x'] - camera_x)
                 py = int(particle['y'] - camera_y)
                 pygame.draw.circle(screen, (100, 255, 100), (px, py), 2)
+
+
+class BossDeathEffect:
+    """ボス死亡時のFinal Fantasy風赤いドットエフェクト"""
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.timer = 120  # 2秒間（60FPS想定で120フレーム）
+        self.particles = []
+        
+        # 赤いドットを放射状に生成
+        num_particles = 40
+        for i in range(num_particles):
+            angle = (2 * math.pi * i) / num_particles
+            distance = random.uniform(10, 50)
+            speed = random.uniform(1, 3)
+            
+            self.particles.append({
+                'x': x + math.cos(angle) * distance,
+                'y': y + math.sin(angle) * distance,
+                'dx': math.cos(angle) * speed,
+                'dy': math.sin(angle) * speed,
+                'life': random.randint(60, 120),  # 各パーティクルの寿命
+                'size': random.uniform(2, 4)
+            })
+    
+    def update(self):
+        self.timer -= 1
+        
+        # パーティクルを更新
+        for particle in self.particles[:]:
+            particle['x'] += particle['dx']
+            particle['y'] += particle['dy']
+            particle['life'] -= 1
+            if particle['life'] <= 0:
+                self.particles.remove(particle)
+                
+        return self.timer > 0
+        
+    def draw(self, screen, camera_x=0, camera_y=0):
+        if self.timer <= 0:
+            return
+            
+        # 各パーティクルを描画
+        for particle in self.particles:
+            # 寿命に応じてアルファを変化
+            alpha = int(255 * (particle['life'] / 120))
+            alpha = max(0, min(255, alpha))
+            
+            # 赤いドットを描画
+            color = (120, 20, 255, alpha)
+            px = int(particle['x'] - camera_x)
+            py = int(particle['y'] - camera_y)
+            
+            # 半透明サーフェスを使って描画
+            size = int(particle['size'])
+            if size > 0:
+                try:
+                    dot_surface = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
+                    pygame.draw.circle(dot_surface, color, (size, size), size)
+                    screen.blit(dot_surface, (px - size, py - size))
+                except Exception:
+                    # フォールバック：通常の円描画
+                    pygame.draw.circle(screen, (255, 0, 0), (px, py), size)

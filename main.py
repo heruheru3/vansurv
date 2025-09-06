@@ -940,6 +940,14 @@ def main():
                                 for _ in range(4):  # 8から4に削減
                                     particles.append(DeathParticle(enemy.x, enemy.y, enemy.color))
 
+                                # ボス死亡時の特別エフェクト（赤いドット）
+                                if getattr(enemy, 'is_boss', False):
+                                    try:
+                                        from effects.particles import BossDeathEffect
+                                        particles.append(BossDeathEffect(enemy.x, enemy.y))
+                                    except Exception as e:
+                                        print(f"[WARNING] Failed to create boss death effect: {e}")
+
                                 # 撃破カウンターを増加
                                 enemies_killed_this_game += 1
                                 current_game_money += MONEY_PER_ENEMY_KILLED
