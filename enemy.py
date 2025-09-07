@@ -101,23 +101,24 @@ class Enemy:
     
     @classmethod
     def get_boss_config(cls, boss_level):
-        """指定されたレベルのボス設定を取得（旧版・互換性用）"""
-        cls.load_boss_stats()
-        key = (101, boss_level)  # ボスタイプは101固定
-        return cls._boss_stats.get(key, None)
-    
+        """（非推奨）指定されたレベルのボス設定を取得（旧版・互換性用）"""
+        # cls.load_boss_stats()
+        # key = (101, boss_level)  # ボスタイプは101固定
+        # return cls._boss_stats.get(key, None)
+        return None  # 今後は使わない
+
     @classmethod
     def get_boss_config_by_type(cls, boss_type):
-        """指定されたタイプのボス設定を取得（最初の行のみ）"""
-        cls.load_boss_stats()
-        # spawn_timeが最も小さいものを取得
-        min_spawn_time = float('inf')
-        result = None
-        for key, config in cls._boss_stats.items():
-            if key[0] == boss_type and config['spawn_time'] < min_spawn_time:
-                min_spawn_time = config['spawn_time']
-                result = config
-        return result
+        """（非推奨）指定されたタイプのボス設定を取得（最初の行のみ）"""
+        # cls.load_boss_stats()
+        # min_spawn_time = float('inf')
+        # result = None
+        # for key, config in cls._boss_stats.items():
+        #     if key[0] == boss_type and config['spawn_time'] < min_spawn_time:
+        #         min_spawn_time = config['spawn_time']
+        #         result = config
+        # return result
+        return None  # 今後は使わない
     
     @classmethod
     def get_all_boss_configs(cls):
