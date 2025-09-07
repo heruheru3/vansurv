@@ -544,8 +544,10 @@ def draw_minimap(screen, player, enemies, gems, items, camera_x=0, camera_y=0):
     for e in enemies:
         try:
             ex, ey = world_to_map(e.x, e.y)
-            # 画面外の大きなワールドでは重なるので小さく点で描く
-            pygame.draw.rect(screen, (200, 60, 60), (ex, ey, 3, 3))
+            if hasattr(e, 'is_boss') and e.is_boss:
+                pygame.draw.rect(screen, PINK, (ex, ey, 4, 4))  # ボスは大きめ&ピンク
+            else:
+                pygame.draw.rect(screen, (200, 60, 60), (ex, ey, 3, 3))
         except Exception:
             pass
 
