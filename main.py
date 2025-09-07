@@ -1041,7 +1041,8 @@ def main():
                             boss_y = max(50, min(WORLD_HEIGHT - 50, boss_y))
                             
                             # ボス生成（CSVの設定に基づき）
-                            boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type)
+                            boss_stats_key = (boss_type, level, spawn_time)
+                            boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type, boss_image_file=boss_config['image_file'], boss_stats_key=boss_stats_key)
                             enemies.append(boss)
                             
                             # この特定の行のボスを出現済みリストに追加

@@ -126,82 +126,64 @@ class Enemy:
         return cls._boss_stats.copy()
     
     @classmethod
-    def _load_enemy_image(cls, enemy_type, level_or_behavior):
+    def _load_enemy_image(cls, enemy_no, level_or_behavior, image_file_override=None):
         """敵の画像を読み込む（キャッシュ機能付き）"""
-        # ボスの場合はボス設定から読み込み
-        if enemy_type >= 101:
+        if enemy_no >= 101:
             cls.load_boss_stats()
-            # spawn_timeが最も小さいものを取得
             min_spawn_time = float('inf')
             boss_config = None
             for key, config in cls._boss_stats.items():
-                if key[0] == enemy_type and config['spawn_time'] < min_spawn_time:
+                if key[0] == enemy_no and config['spawn_time'] < min_spawn_time:
                     min_spawn_time = config['spawn_time']
                     boss_config = config
-            
+
             if boss_config:
-                # ボスCSVから画像ファイル名とサイズを取得
-                image_file = boss_config['image_file'] + '.png'
+                image_file = (image_file_override if image_file_override else boss_config['image_file']) + '.png'
                 image_size = boss_config['image_size']
-                cache_key = boss_config['image_file']
+                cache_key = f"{enemy_no}-{image_file_override if image_file_override else boss_config['image_file']}"
             else:
-                # フォールバック：従来の命名規則
                 cache_key = f"boss-{level_or_behavior:02d}"
                 image_file = f"{cache_key}.png"
-                image_size = 96  # デフォルトボスサイズ
+                image_size = 96
+
         else:
-            # 通常エネミーの場合はエネミー設定から読み込み
             cls.load_enemy_stats()
-            key = (enemy_type, level_or_behavior)
-            
+            key = (enemy_no, level_or_behavior)
             if key in cls._enemy_stats:
-                # CSVから画像ファイル名とサイズを取得
                 image_file = cls._enemy_stats[key]['image_file'] + '.png'
                 image_size = cls._enemy_stats[key]['image_size']
-                cache_key = cls._enemy_stats[key]['image_file']
+                cache_key = f"{enemy_no}-{cls._enemy_stats[key]['image_file']}"
             else:
-                # フォールバック：従来の命名規則
-                cache_key = f"{enemy_type:02d}-{level_or_behavior:02d}"
+                cache_key = f"{enemy_no:02d}-{level_or_behavior:02d}"
                 image_file = f"{cache_key}.png"
-                image_size = 32 + int((48 - 32) * (level_or_behavior - 1) / 4)  # デフォルトサイズ計算
-        
-        # キャッシュから画像を取得
+                image_size = 32 + int((48 - 32) * (level_or_behavior - 1) / 4)
+
         if cache_key in cls._image_cache:
+            print(f"[DEBUG] Cache hit for key: {cache_key}")
             return cls._image_cache[cache_key]
-        
-        # 画像ファイルパスを構築（PyInstaller対応）
+
         image_path = resource_path(os.path.join("assets", "character", "enemy", image_file))
-        
         try:
-            # ファイルの存在確認
             if not os.path.exists(image_path):
                 print(f"[WARNING] Enemy image file not found: {image_path}")
                 cls._image_cache[cache_key] = None
                 return None
-                
-            # 画像を読み込み
+
             image = pygame.image.load(image_path).convert_alpha()
-            
-            # CSVで指定されたサイズにスケール
             image = pygame.transform.scale(image, (image_size, image_size))
-            
-            # HSVを調整
             image = cls._adjust_hsv(image, ENEMY_IMAGE_HUE_SHIFT, ENEMY_IMAGE_SATURATION, ENEMY_IMAGE_VALUE)
-            
-            # 左右反転用の画像も作成
             flipped_image = pygame.transform.flip(image, True, False)
-            
-            # キャッシュに保存（通常版と反転版、サイズ情報も含む）
+
             cls._image_cache[cache_key] = {
-                'left': image,      # 左向き（元画像）
-                'right': flipped_image,  # 右向き（反転）
-                'size': image_size        # 実際のサイズ
+                'left': image,
+                'right': flipped_image,
+                'size': image_size
             }
-            
+
+            print(f"[DEBUG] Loaded image for key: {cache_key}, file: {image_file}")
             return cls._image_cache[cache_key]
-            
+
         except (pygame.error, FileNotFoundError) as e:
-            # 画像が見つからない場合はNoneを返す
             print(f"[WARNING] Failed to load enemy image {cache_key}: {e}")
             cls._image_cache[cache_key] = None
             return None
@@ -266,11 +248,13 @@ class Enemy:
         
         return adjusted_surface
     
-    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None):
+    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None, boss_image_file=None, boss_stats_key=None):
         self.screen = screen
         self.is_boss = is_boss  # ボス判定フラグ
         self.boss_level = boss_level if is_boss else 1  # ボスレベル（ボス以外は1）
         self.boss_type = boss_type if boss_type is not None else 101  # ボスタイプ（デフォルトは101）
+        self.boss_image_file = boss_image_file  # ボス画像ファイル名（mainから渡す）
+        self.boss_stats_key = boss_stats_key  # ボス設定キー（mainから渡す）
         
         # ヒット時のフラッシュ用タイマ（秒）
         self.hit_flash_timer = 0.0
@@ -490,7 +474,11 @@ class Enemy:
         # ボスの場合はボス設定から読み込み
         if self.is_boss:
             Enemy.load_boss_stats()
-            boss_config = Enemy.get_boss_config_by_type(self.boss_type)
+            boss_config = None
+            if self.boss_stats_key:
+                boss_config = Enemy._boss_stats.get(self.boss_stats_key)
+            if not boss_config:
+                boss_config = Enemy.get_boss_config_by_type(self.boss_type)
             if boss_config:
                 # ボス設定から直接ステータスを設定
                 self.hp = boss_config['base_hp']
@@ -524,14 +512,14 @@ class Enemy:
                 
                 # ボス画像の読み込み
                 try:
-                    self.images = self._load_enemy_image(self.enemy_type, self.level)  # レベル（1固定）を使用
+                    image_file_for_cache = self.boss_image_file if self.boss_image_file else boss_config['image_file']
+                    self.images = self._load_enemy_image(self.enemy_type, self.level, image_file_for_cache)
                     if self.images is None:
                         print(f"[WARNING] Failed to load boss image, using fallback")
                         self.images = None
                 except Exception as e:
                     print(f"[ERROR] Exception while loading boss image: {e}")
                     self.images = None
-                
                 return
         
         # 通常エネミーの場合はエネミー設定から読み込み
@@ -1459,6 +1447,8 @@ class EnemyProjectile:
         
         # 基本色から明度の異なるバリエーションを作成
         r_base, g_base, b_base = self.base_color
+        
+
         
         # 外側の光輪（基本色、透明度低め）
         outer_color = (r_base//2, g_base//2, b_base//2, 60)
