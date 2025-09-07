@@ -118,6 +118,14 @@ def main():
     # ゲーム状態の初期化
     player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
 
+    # パーティクルの並列update関数
+    def parallel_update_particles(particles):
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            results = list(executor.map(lambda p: p.update(), particles))
+        # update()がTrueのものだけ残す
+        return [p for p, alive in zip(particles, results) if alive]
+
     # お金関連の初期化
     current_game_money = 0  # 現在のゲームセッションで獲得したお金
     enemies_killed_this_game = 0  # 今回のゲームで倒した敵の数
@@ -1396,7 +1404,7 @@ def main():
                     except Exception:
                         # エフェクトの update で例外が出てもゲームを継続する
                         pass
-                particles = new_particles
+                particles = parallel_update_particles(particles)
 
             # カメラ目標を現在のプレイヤー位置から再計算（プレイヤー移動後）
             # 仮想画面サイズ（常に1280x720）を基準にカメラ計算
