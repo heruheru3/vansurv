@@ -364,7 +364,7 @@ class ItemBox:
             items = []
             # 経験値ジェムを複数
             for _ in range(3):
-                items.append(ExperienceGem(drop_x, drop_y, value=10))
+                items.append(ExperienceGem(drop_x, drop_y, value=50))
             # 高額のお金
             items.append(MoneyItem(drop_x, drop_y, amount=random.randint(MONEY4_AMOUNT_MIN, MONEY4_AMOUNT_MAX), box_type=4))
             # さらにレアアイテム（回復 or bomb or magnet のいずれか）を1つ

@@ -160,7 +160,7 @@ class Enemy:
                 image_size = 32 + int((48 - 32) * (level_or_behavior - 1) / 4)
 
         if cache_key in cls._image_cache:
-            print(f"[DEBUG] Cache hit for key: {cache_key}")
+            # print(f"[DEBUG] Cache hit for key: {cache_key}")
             return cls._image_cache[cache_key]
 
         image_path = resource_path(os.path.join("assets", "character", "enemy", image_file))
@@ -181,7 +181,7 @@ class Enemy:
                 'size': image_size
             }
 
-            print(f"[DEBUG] Loaded image for key: {cache_key}, file: {image_file}")
+            # print(f"[DEBUG] Loaded image for key: {cache_key}, file: {image_file}")
             return cls._image_cache[cache_key]
 
         except (pygame.error, FileNotFoundError) as e:
