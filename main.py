@@ -85,6 +85,20 @@ def main():
     preload_res = resources.preload_all(icon_size=16)
     ICONS = preload_res.get('icons', {})
 
+    # --- ボス設定のプリロード: ボス画像を事前に読み込んでおく（スポーン時のIO/変換を避ける）
+    try:
+        from enemy import Enemy
+        # get_all_boss_configs 内で load_boss_stats が呼ばれる
+        boss_configs = Enemy.get_all_boss_configs()
+        # 画像を一通りキャッシュしておく
+        for (boss_type, level, spawn_time), cfg in boss_configs.items():
+            try:
+                Enemy._load_enemy_image(boss_type, level, cfg.get('image_file'))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     # セーブシステムを初期化
     save_system = SaveSystem()
     print(f"[INFO] Save system initialized. Current money: {save_system.get_money()}G")
@@ -120,11 +134,15 @@ def main():
 
     # パーティクルの並列update関数
     def parallel_update_particles(particles):
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            results = list(executor.map(lambda p: p.update(), particles))
-        # update()がTrueのものだけ残す
-        return [p for p, alive in zip(particles, results) if alive]
+        # シンプル化: スレッドプールは毎フレーム作ると重いので逐次実行に戻す（多くのケースで高速）
+        new_particles = []
+        for p in particles:
+            try:
+                if p.update():
+                    new_particles.append(p)
+            except Exception:
+                pass
+        return new_particles
 
     # お金関連の初期化
     current_game_money = 0  # 現在のゲームセッションで獲得したお金
@@ -1057,9 +1075,9 @@ def main():
                             boss_key = (boss_type, level, spawn_time)
                             spawned_boss_types.add(boss_key)
                             
-                            # ボススポーンエフェクト（大きめ）
+                            # ボススポーンエフェクト（軽量化）
                             if len(particles) < 300:
-                                for _ in range(15):  # 通常より多めのエフェクト
+                                for _ in range(6):  # スパイクを抑える
                                     particles.append(SpawnParticle(boss_x, boss_y, (255, 215, 0)))  # 金色
                             
                             # 現在のボス数をログ出力
@@ -1152,13 +1170,46 @@ def main():
 
                 # 削除対象の敵を記録するリスト
                 enemies_to_remove = []
-                
+                # 画面外に出た通常エネミーを即時リポップするためのキュー
+                new_enemies_to_add = []
+
+                # --- ユニフォームグリッドによる近傍検索構築 ---
+                # 近傍探索の対象を隣接セルに限定して separation の計算コストを削減
+                try:
+                    # セルサイズは敵サイズや視界に合わせて調整可能
+                    GRID_CELL_SIZE = 128
+                    grid = {}
+                    for e in enemies:
+                        try:
+                            gx = int(e.x) // GRID_CELL_SIZE
+                            gy = int(e.y) // GRID_CELL_SIZE
+                        except Exception:
+                            gx, gy = 0, 0
+                        key = (gx, gy)
+                        grid.setdefault(key, []).append(e)
+                except Exception:
+                    grid = None
+
                 for enemy in enemies[:]:
                     # ノックバック更新処理
                     if hasattr(enemy, 'update_knockback'):
                         enemy.update_knockback()
-                    
-                    enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader, enemies=enemies)
+                    # 近傍リストを構築（現在のセルと周辺8セル）
+                    nearby = enemies
+                    if grid is not None:
+                        try:
+                            gx = int(enemy.x) // GRID_CELL_SIZE
+                            gy = int(enemy.y) // GRID_CELL_SIZE
+                            nearby_set = []
+                            for ox in (gx-1, gx, gx+1):
+                                for oy in (gy-1, gy, gy+1):
+                                    nearby_set.extend(grid.get((ox, oy), []))
+                            # 重複削除は不要だがループコスト削減のためリスト化
+                            nearby = nearby_set
+                        except Exception:
+                            nearby = enemies
+
+                    enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader, enemies=nearby)
                     
                     # ボスの画面外チェックとリスポーン処理
                     if hasattr(enemy, 'is_boss') and enemy.is_boss:
@@ -1175,6 +1226,49 @@ def main():
                     if not enemy.is_off_screen() or frame_count % 3 == 0:
                         enemy.update_attack(player)
                         enemy.update_projectiles(player)
+
+                    # --- 画面外リポップ仕様: ノーマルエネミーがカメラ外（マージン付き）に出たら削除して
+                    #     画面外からポップする形で再出現させる（ボスは除外） ---
+                    try:
+                        if not getattr(enemy, 'is_boss', False):
+                            # カメラ境界にマージンを追加して判定（縦横100px）
+                            MARGIN = 100
+                            cam_left = int(camera_x) - MARGIN
+                            cam_right = int(camera_x) + SCREEN_WIDTH + MARGIN
+                            cam_top = int(camera_y) - MARGIN
+                            cam_bottom = int(camera_y) + SCREEN_HEIGHT + MARGIN
+
+                            if (enemy.x < cam_left or enemy.x > cam_right or
+                                enemy.y < cam_top or enemy.y > cam_bottom):
+                                # 削除予定に入れる
+                                enemies_to_remove.append(enemy)
+
+                                # 画面外（カメラ端の外側）から出現するように生成位置を決定
+                                spawn_margin = 100
+                                side = random.randint(0, 3)  # 0:上,1:右,2:下,3:左
+                                if side == 0:  # 上
+                                    sx = random.randint(int(camera_x) - spawn_margin, int(camera_x) + SCREEN_WIDTH + spawn_margin)
+                                    sy = int(camera_y) - spawn_margin
+                                elif side == 1:  # 右
+                                    sx = int(camera_x) + SCREEN_WIDTH + spawn_margin
+                                    sy = random.randint(int(camera_y) - spawn_margin, int(camera_y) + SCREEN_HEIGHT + spawn_margin)
+                                elif side == 2:  # 下
+                                    sx = random.randint(int(camera_x) - spawn_margin, int(camera_x) + SCREEN_WIDTH + spawn_margin)
+                                    sy = int(camera_y) + SCREEN_HEIGHT + spawn_margin
+                                else:  # 左
+                                    sx = int(camera_x) - spawn_margin
+                                    sy = random.randint(int(camera_y) - spawn_margin, int(camera_y) + SCREEN_HEIGHT + spawn_margin)
+
+                                # ワールド境界をクランプ
+                                sx = max(50, min(WORLD_WIDTH - 50, sx))
+                                sy = max(50, min(WORLD_HEIGHT - 50, sy))
+
+                                # 生成は画面外から行うので spawn_x/spawn_y のみ渡す
+                                new_enemies_to_add.append(Enemy(screen, game_time, spawn_x=sx, spawn_y=sy))
+                                # この敵は以降の削除チェックをスキップ
+                                continue
+                    except Exception:
+                        pass
                     
                     # 削除条件チェック（ボス以外のみ）
                     if not getattr(enemy, 'is_boss', False):
@@ -1214,6 +1308,9 @@ def main():
                 for enemy in enemies_to_remove:
                     if enemy in enemies:
                         enemies.remove(enemy)
+                # キューされた新しい敵を追加
+                if new_enemies_to_add:
+                    enemies.extend(new_enemies_to_add)
                 
                 # 残った敵の当たり判定処理
                 for enemy in enemies:

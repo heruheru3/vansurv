@@ -181,6 +181,39 @@ class Enemy:
                 'size': image_size
             }
 
+            # ボス画像の場合、オーラ描画用のサーフェスを事前生成してキャッシュ
+            try:
+                if enemy_no >= 101:
+                    # 元画像のアルファマスクを作成
+                    alpha_mask = pygame.mask.from_surface(image)
+                    aura_thickness = 3
+                    aura_offset = 2
+                    aura_size = image_size + (aura_thickness + aura_offset) * 2
+                    aura_surface = pygame.Surface((aura_size, aura_size), pygame.SRCALPHA)
+                    red_color = (255, 50, 50, 180)
+                    center_offset = (aura_thickness + aura_offset)
+                    offsets = [
+                        (-aura_thickness, -aura_thickness),
+                        (0, -aura_thickness),
+                        (aura_thickness, -aura_thickness),
+                        (-aura_thickness, 0),
+                        (aura_thickness, 0),
+                        (-aura_thickness, aura_thickness),
+                        (0, aura_thickness),
+                        (aura_thickness, aura_thickness)
+                    ]
+                    for dx, dy in offsets:
+                        outline_pos = (center_offset + dx, center_offset + dy)
+                        for point in alpha_mask.outline():
+                            x, y = point
+                            # 小さい円でアウトラインを描画（1px）
+                            pygame.draw.circle(aura_surface, red_color, (x + outline_pos[0], y + outline_pos[1]), 1)
+
+                    cls._image_cache[cache_key]['aura'] = aura_surface
+            except Exception:
+                # オーラ生成に失敗しても読み込み自体は成功させる
+                pass
+
             # print(f"[DEBUG] Loaded image for key: {cache_key}, file: {image_file}")
             return cls._image_cache[cache_key]
 
@@ -688,70 +721,17 @@ class Enemy:
             new_y = self.y + math.sin(angle) * self.base_speed
             
         elif self.behavior_type == 2:
-            # 2. 跳ね返り直進タイプ（Stoneのような動き）
+            # 2. 直進タイプ（プレイヤー方向へ一直線に進み、画面外に出ていく）
+            # ここでは跳ね返りや地形反転を行わず、軽量に直進させる
             if self.initial_direction is None:
                 # 初回のみプレイヤー方向を計算して保存し、速度ベクトルを設定
                 self.initial_direction = math.atan2(player.y - self.y, player.x - self.x)
                 self.velocity_x = math.cos(self.initial_direction) * self.base_speed
                 self.velocity_y = math.sin(self.initial_direction) * self.base_speed
-            
-            # 速度ベクトルによる移動
+
+            # 速度ベクトルによる移動（反転処理は行わない）
             new_x = self.x + self.velocity_x
             new_y = self.y + self.velocity_y
-            
-            # 不可侵地形チェック（ステージマップまたはCSVマップ使用時）
-            try:
-                terrain_collision = False
-                
-                               
-                if USE_CSV_MAP and map_loader:
-                    # CSVマップでの地形判定
-                    half_size = self.size // 2
-                    check_points = [
-                        (new_x - half_size, new_y - half_size),  # 左上
-                        (new_x + half_size, new_y - half_size),  # 右上
-                        (new_x - half_size, new_y + half_size),  # 左下
-                        (new_x + half_size, new_y + half_size),  # 右下
-                        (new_x, new_y)                          # 中央
-                    ]
-                    
-                    for check_x, check_y in check_points:
-                        tile_id = map_loader.get_tile_at(check_x, check_y)
-                        # CSVマップのブロッカータイル: 5,7,8,9
-                        if tile_id in {5, 7, 8, 9}:  # CSVマップのブロッカー地形
-                            terrain_collision = True
-                            break
-                
-                if terrain_collision:
-                    # 不可侵地形に衝突する場合、速度を反転（跳ね返り）
-                    # print(f"[DEBUG] Enemy {self.enemy_type} bouncing at ({new_x:.1f}, {new_y:.1f}), velocity: ({self.velocity_x:.1f}, {self.velocity_y:.1f})")
-                    self.velocity_x *= -1
-                    self.velocity_y *= -1
-                    # 新しい方向で移動先を再計算
-                    new_x = self.x + self.velocity_x
-                    new_y = self.y + self.velocity_y
-                    # print(f"[DEBUG] After bounce: velocity: ({self.velocity_x:.1f}, {self.velocity_y:.1f}), new_pos: ({new_x:.1f}, {new_y:.1f})")
-                    
-            except Exception as e:
-                # デバッグ用：エラーログを出力
-                print(f"[DEBUG] Enemy terrain check error: {e}")
-                pass
-            
-            # カメラ範囲での跳ね返り処理
-            screen_left = camera_x
-            screen_right = camera_x + 1280  # SCREEN_WIDTH
-            screen_top = camera_y
-            screen_bottom = camera_y + 720  # SCREEN_HEIGHT
-            
-            # 左右の境界での跳ね返り
-            if new_x <= screen_left or new_x >= screen_right:
-                self.velocity_x *= -1
-                new_x = max(screen_left + 1, min(new_x, screen_right - 1))
-            
-            # 上下の境界での跳ね返り
-            if new_y <= screen_top or new_y >= screen_bottom:
-                self.velocity_y *= -1
-                new_y = max(screen_top + 1, min(new_y, screen_bottom - 1))
             
         elif self.behavior_type == 3:
             # 3. プレイヤーから一定の距離を保ち、魔法の杖のような弾を発射する
@@ -868,15 +848,18 @@ class Enemy:
                                 continue
                             dx_o = new_x - other.x
                             dy_o = new_y - other.y
-                            dist = math.hypot(dx_o, dy_o)
+                            # 距離の二乗で比較して sqrt を避ける
+                            dist2 = dx_o * dx_o + dy_o * dy_o
                             desired = (self.size + getattr(other, 'size', 0)) * factor
-                            if dist <= 0:
+                            desired2 = desired * desired
+                            if dist2 <= 0:
                                 # 完全一致のときは小さなランダム方向で押しのけ
                                 nx, ny = 1.0, 0.0
                                 overlap = desired
                             else:
-                                if dist >= desired:
+                                if dist2 >= desired2:
                                     continue
+                                dist = math.sqrt(dist2)
                                 nx = dx_o / dist
                                 ny = dy_o / dist
                                 overlap = (desired - dist)
