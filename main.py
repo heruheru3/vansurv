@@ -1158,7 +1158,7 @@ def main():
                     if hasattr(enemy, 'update_knockback'):
                         enemy.update_knockback()
                     
-                    enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader)
+                    enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader, enemies=enemies)
                     
                     # ボスの画面外チェックとリスポーン処理
                     if hasattr(enemy, 'is_boss') and enemy.is_boss:

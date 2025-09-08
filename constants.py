@@ -105,6 +105,21 @@ ENEMY_WALK_ROTATION_SPEED = 5.0  # 回転振動の速度
 # パフォーマンス設定
 ENABLE_ENEMY_WALK_ANIMATION = True  # エネミー歩行アニメーションの有効/無効
 
+# 敵同士の回避判定の係数
+# 1.0 = 半径和を閾値（重なり不可）
+# 0.5 = 中心距離が半分でも許容（半分程度の重なりを許す）
+# 値は 0.0（重なり無制限）～1.0（完全衝突回避）の間で設定
+ENEMY_COLLISION_SEPARATION_FACTOR = 0.5
+
+# 分離（separation）挙動の設定
+# 小さいほど押しのけ量が小さい。デフォルトは 0.6
+ENEMY_SEPARATION_STRENGTH = 0.6
+# ボス優先の重み（他がボスの場合に非ボスがより強く押しのける）
+ENEMY_SEPARATION_BOSS_PRIORITY = 1.5
+
+# 分離（separation）処理の有効/無効フラグ（重い場合は False に切り替え）
+ENABLE_ENEMY_SEPARATION = False
+
 # お金・経済システム設定
 MONEY_PER_ENEMY_KILLED = 10         # 敵1体撃破あたりの基本報酬
 MONEY_PER_LEVEL_BONUS = 50          # レベルアップボーナス

@@ -131,7 +131,7 @@ class EnemyAnimationViewer:
             enemy.y = center_y + math.sin(time_factor + enemy.enemy_type * 0.5) * radius
             
             # アニメーション更新
-            enemy.move(self.player)
+            enemy.move(self.player, enemies=self.enemies)
     
     def draw(self):
         """描画処理"""
