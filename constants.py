@@ -70,6 +70,11 @@ MAX_GEMS_ON_SCREEN = 100  # 150から100に削減
 NATURAL_HEAL_INTERVAL_MS = 2000  # 自然回復の間隔（ミリ秒）
 NATURAL_HEAL_AMOUNT = 0          # 自然回復時の基本回復量（HPサブアイテムレベル分が追加される）
 
+# --- オーディオ基本設定 ---
+# 効果音とBGMのデフォルト音量（0.0〜1.0）
+DEFAULT_SFX_VOLUME = 0.5
+DEFAULT_MUSIC_VOLUME = 0.5
+
 # ガーリック回復設定
 GARLIC_HEAL_INTERVAL_MS = 500    # ガーリック回復の間隔（ミリ秒）
 GARLIC_HEAL_AMOUNT = 1           # ガーリック回復時の基本回復量（HPサブアイテムレベル分が追加される）

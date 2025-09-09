@@ -32,6 +32,12 @@ def check_player_enemy_collision(player, enemies, particles, current_time):
             # ヒットエフェクト
             particles.append(PlayerHurtParticle(player.x, player.y))
             particles.append(HurtFlash())
+            # サウンド再生（プレイヤー被弾）
+            try:
+                from audio import audio
+                audio.play_sound('player_hurt')
+            except Exception:
+                pass
             
             break  # 1フレームに1回だけダメージ
     
@@ -72,6 +78,12 @@ def check_attack_enemy_collision(attacks, enemies, particles, damage_stats, play
                 
                 # ダメージ適用
                 enemy.hp -= damage
+                # サウンド再生（エネミー被弾）
+                try:
+                    from audio import audio
+                    audio.play_sound('enemy_hurt')
+                except Exception:
+                    pass
                 
                 # ダメージ統計更新
                 attack_type = getattr(attack, 'type', 'unknown')
@@ -90,12 +102,26 @@ def check_attack_enemy_collision(attacks, enemies, particles, damage_stats, play
                             attack.last_garlic_heal_time = 0
                         
                         if current_time - attack.last_garlic_heal_time > 3000:  # 3秒間隔
-                            if hasattr(player, 'hp'):
-                                player.hp = min(100, player.hp + 1)
-                            else:
-                                # 最終フォールバック
-                                player.hp = min(100, getattr(player, 'hp', 0) + 1)
+                            # Try to use player.heal if available so we get actual healed amount
+                            try:
+                                healed = player.heal(1, "garlic")
+                            except Exception:
+                                # Fallback: direct increment
+                                try:
+                                    old = getattr(player, 'hp', 0)
+                                    player.hp = min(100, old + 1)
+                                    healed = player.hp - old
+                                except Exception:
+                                    healed = 0
+
                             attack.last_garlic_heal_time = current_time
+                            # サウンド再生（回復が発生した場合のみ）
+                            try:
+                                if healed > 0:
+                                    from audio import audio
+                                    audio.play_sound('heal')
+                            except Exception:
+                                pass
                 except Exception:
                     pass
                 

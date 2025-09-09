@@ -85,6 +85,12 @@ def main():
     preload_res = resources.preload_all(icon_size=16)
     ICONS = preload_res.get('icons', {})
 
+    # デバッグ: 起動時にオーディオ初期化と簡易再生テストを行う（問題切り分け用）
+    try:
+        pass
+    except Exception:
+        pass
+
     # --- ボス設定のプリロード: ボス画像を事前に読み込んでおく（スポーン時のIO/変換を避ける）
     try:
         from enemy import Enemy
@@ -187,6 +193,12 @@ def main():
         if is_auto:
             particles.append(AutoHealEffect(x, y))
         particles.append(HealEffect(x, y, heal_amount))
+        # サウンド再生（回復）
+        try:
+            from audio import audio
+            audio.play_sound('heal', duration=0.2, fade_out=0.1)
+        except Exception:
+            pass
     
     player.heal_effect_callback = heal_effect_callback
 
@@ -876,6 +888,13 @@ def main():
                             hp_before = enemy.hp
                             enemy.hp -= dmg
 
+                            # サウンド: 敵被弾
+                            try:
+                                from audio import audio
+                                audio.play_sound('enemy_hurt')
+                            except Exception:
+                                pass
+
                             # ノックバック処理
                             try:
                                 # 武器ごとのノックバック量を定義（元の値に戻す）
@@ -924,7 +943,13 @@ def main():
                                         try:
                                             # HPサブアイテムのレベルに応じた回復量を使用
                                             garlic_heal_amount = player.get_garlic_heal_amount()
-                                            player.heal(garlic_heal_amount, "garlic")
+                                            healed = player.heal(garlic_heal_amount, "garlic")
+                                            try:
+                                                if healed > 0:
+                                                    from audio import audio
+                                                    audio.play_sound('heal')
+                                            except Exception:
+                                                pass
                                         except Exception:
                                             # 万が一何か問題があってもHPは最低限設定
                                             try:
@@ -1351,6 +1376,13 @@ def main():
                                 except Exception:
                                     pass
 
+                                # サウンド: プレイヤー被弾
+                                try:
+                                    from audio import audio
+                                    audio.play_sound('player_hurt')
+                                except Exception:
+                                    pass
+
                                 # この敵は処理済み（ボス以外は削除）
                                 if not getattr(enemy, 'is_boss', False):
                                     enemies.remove(enemy)
@@ -1396,6 +1428,13 @@ def main():
                                         # 被弾時刻を更新
                                         try:
                                             player.last_hit_time = now_ms
+                                        except Exception:
+                                            pass
+
+                                        # サウンド: プレイヤー被弾（弾）
+                                        try:
+                                            from audio import audio
+                                            audio.play_sound('player_hurt')
                                         except Exception:
                                             pass
 
@@ -1448,6 +1487,12 @@ def main():
                         # ジェムごとの価値を付与
                         player.add_exp(getattr(gem, 'value', 1))
                         experience_gems.remove(gem)
+                        # サウンド: ジェム取得
+                        try:
+                            from audio import audio
+                            audio.play_sound('gem_pickup')
+                        except Exception:
+                            pass
                         if player.level > prev_level:
                             particles.append(LevelUpEffect(player.x, player.y))
                             for _ in range(12):

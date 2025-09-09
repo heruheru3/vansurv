@@ -99,6 +99,11 @@ def handle_enemy_death(enemy, enemies, experience_gems, items, particles, damage
         rand = random.random()
         if rand < HEAL_ITEM_DROP_RATE:
             items.append(GameItem(enemy.x, enemy.y, "heal"))
+            try:
+                from audio import audio
+                audio.play_sound('item_drop')
+            except Exception:
+                pass
         elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE:
             items.append(GameItem(enemy.x, enemy.y, "bomb"))
         elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE + (player.get_magnet_drop_rate() if player else MAGNET_ITEM_DROP_RATE):
@@ -139,6 +144,12 @@ def handle_bomb_item_effect(enemies, experience_gems, particles, player_x, playe
     # 死亡した敵を削除
     for enemy in enemies_to_remove:
         enemies.remove(enemy)
+    # ボム発動のサウンド
+    try:
+        from audio import audio
+        audio.play_sound('bomb')
+    except Exception:
+        pass
 
 
 def update_difficulty(game_time, last_difficulty_increase, spawn_interval):
@@ -204,7 +215,13 @@ def collect_items(player, items, enemies, experience_gems, particles):
         if distance <= collection_range:
             if item.type == "heal":
                 # 体力回復（割合回復）
-                player.heal(HEAL_ITEM_AMOUNT, "item")
+                healed = player.heal(HEAL_ITEM_AMOUNT, "item")
+                try:
+                    if healed > 0:
+                        from audio import audio
+                        audio.play_sound('heal')
+                except Exception:
+                    pass
                         
             elif item.type == "bomb":
                 # ボム効果（画面揺れも含む）
