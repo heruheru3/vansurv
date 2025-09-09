@@ -196,7 +196,7 @@ def main():
         # サウンド再生（回復）
         try:
             from audio import audio
-            audio.play_sound('heal', duration=0.2, fade_out=0.1)
+            audio.play_sound('heal', duration=0.5, fade_out=0.1)
         except Exception:
             pass
     

@@ -472,6 +472,11 @@ class Player:
         self.last_subitem_choices = choices
         self.awaiting_subitem_choice = True
         self.selected_subitem_choice_index = 0
+        # Ensure the UI will play the powerup sound when this subitem choice UI is first drawn
+        try:
+            self._powerup_played_for_subitem_choice = False
+        except Exception:
+            pass
         if DEBUG:
             print(f"[DEBUG] Subitem choices prepared: {choices}")
 
@@ -680,6 +685,11 @@ class Player:
             self.last_level_choices = choices
             self.awaiting_weapon_choice = True
             self.selected_weapon_choice_index = 0
+            # Ensure the UI will play the powerup sound when this level-up UI is first drawn
+            try:
+                self._powerup_played_for_level_choice = False
+            except Exception:
+                pass
             if DEBUG:
                 print(f"[DEBUG] Mixed level choices prepared: {choices}")
             return choices

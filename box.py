@@ -282,6 +282,12 @@ class ItemBox:
             return
         
         self.destroyed = True
+        # Play box break sound (best-effort)
+        try:
+            from audio import audio
+            audio.play_sound('box_break')
+        except Exception:
+            pass
         self.drop_items(player)
 
     def drop_items(self, player=None):

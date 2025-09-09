@@ -43,6 +43,14 @@ class AudioManager:
         例: play_sound('heal', duration=1.0, fade_out=0.5)
         """
         try:
+            # Ensure mixer is initialized (some imports may occur before pygame.init())
+            try:
+                if not pygame.mixer.get_init():
+                    pygame.mixer.init()
+            except Exception:
+                # if init fails, continue and attempts to load/play will likely no-op
+                pass
+
             if self.muted:
                 return
 

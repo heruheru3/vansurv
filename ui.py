@@ -4,6 +4,7 @@ from constants import *
 import json
 import os
 from resources import get_font
+from audio import audio
 
 def resource_path(relative_path):
     """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
@@ -626,8 +627,21 @@ def draw_initial_weapon_grid(screen, player, icons):
     """初期武器選択用の3x3グリッドUIを描画する"""
     try:
         choices = getattr(player, 'last_level_choices', None)
+        # reset flag if no choices
         if not choices:
+            try:
+                player._powerup_played_for_level_choice = False
+            except Exception:
+                pass
             return
+
+        # Play powerup sound once when the level-up UI is first opened
+        try:
+            if not getattr(player, '_powerup_played_for_level_choice', False):
+                audio.play_sound('powerup')
+                player._powerup_played_for_level_choice = True
+        except Exception:
+            pass
 
         # 説明データの読み込み
         try:
@@ -800,6 +814,14 @@ def draw_level_choice(screen, player, icons):
         choices = getattr(player, 'last_level_choices', None)
         if not choices:
             return
+
+        # Play powerup sound once when the level-up UI is first opened (normal 3-choice UI)
+        try:
+            if not getattr(player, '_powerup_played_for_level_choice', False):
+                audio.play_sound('powerup')
+                player._powerup_played_for_level_choice = True
+        except Exception:
+            pass
 
         # 説明データの読み込み
         try:
@@ -1062,8 +1084,21 @@ def draw_subitem_choice(screen, player, icons=None):
     """サブアイテム選択 UI を描画する。player.last_subitem_choices を参照。"""
     try:
         choices = getattr(player, 'last_subitem_choices', None)
+        # reset flag if no choices
         if not choices:
+            try:
+                player._powerup_played_for_subitem_choice = False
+            except Exception:
+                pass
             return
+
+        # Play powerup sound once when the subitem selection UI is first opened
+        try:
+            if not getattr(player, '_powerup_played_for_subitem_choice', False):
+                audio.play_sound('powerup')
+                player._powerup_played_for_subitem_choice = True
+        except Exception:
+            pass
 
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 200))
