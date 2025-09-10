@@ -16,6 +16,13 @@ class ExperienceGem:
         self.collected = False
         # ジェムが持つ経験値量（デフォルト1）
         self.value = int(max(1, value))
+        # 引き寄せ状態フラグ（プレイヤーに向かって移動中かどうか）
+        self.being_attracted = False
+        # 生成時刻
+        self.spawn_time = pygame.time.get_ticks()
+        # 基本寿命（ミリ秒）- この値はピックアップ範囲に応じて延長される
+        self.base_lifetime = 30000  # 30秒
+        self.extended_lifetime = 0  # 延長された寿命
 
     def move_to_player(self, player):
         dx = player.x - self.x
@@ -29,17 +36,41 @@ class ExperienceGem:
             extra = 0.0
         attract_threshold = 100.0 + extra
         
-        # マグネット効果が有効な場合、全画面からの引き寄せ＋速度アップ
+        # ピックアップ範囲に応じて寿命を延長（範囲が広いほど到達時間が必要）
+        if extra > 0 and self.extended_lifetime == 0:
+            # 初回のみ延長（範囲100ピクセルあたり5秒延長）
+            extension_per_100px = 5000  # 5秒
+            self.extended_lifetime = int((extra / 100.0) * extension_per_100px)
+        
+        # ジェム回収速度をサブアイテム（projectile_speed）で向上
+        try:
+            gem_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
+        except Exception:
+            gem_speed_multiplier = 1.0
+        
+        # マグネット効果が有効な場合、全画面からの引き寄せ＋さらなる速度アップ
         if hasattr(player, 'is_magnet_active') and player.is_magnet_active():
             attract_threshold = float('inf')  # 距離制限なし
-            speed_multiplier = MAGNET_FORCE_MULTIPLIER
+            magnet_speed_multiplier = MAGNET_FORCE_MULTIPLIER
         else:
-            speed_multiplier = 1.0
+            magnet_speed_multiplier = 1.0
 
         if distance < attract_threshold and distance != 0:
-            move_speed = self.speed * speed_multiplier
+            # 引き寄せ状態フラグを立てる
+            self.being_attracted = True
+            # 基本速度 × ジェム回収速度倍率 × マグネット倍率
+            move_speed = self.speed * gem_speed_multiplier * magnet_speed_multiplier
             self.x += (dx / distance) * move_speed
             self.y += (dy / distance) * move_speed
+        else:
+            # 引き寄せ範囲外では引き寄せ状態を解除
+            self.being_attracted = False
+
+    def is_expired(self):
+        """ジェムが寿命切れかどうかを判定"""
+        current_time = pygame.time.get_ticks()
+        total_lifetime = self.base_lifetime + self.extended_lifetime
+        return (current_time - self.spawn_time) > total_lifetime
 
     def draw(self, screen, camera_x=0, camera_y=0):
         # ジェムの色を value に応じて変更する
@@ -131,10 +162,17 @@ class GameItem:
         except Exception:
             extra = 0.0
         attract_threshold = 100.0 + extra
+        
+        # ジェム回収速度をアイテム移動にも適用
+        try:
+            item_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
+        except Exception:
+            item_speed_multiplier = 1.0
 
         if distance < attract_threshold and distance != 0:
-            self.x += (dx / distance) * self.speed
-            self.y += (dy / distance) * self.speed
+            move_speed = self.speed * item_speed_multiplier
+            self.x += (dx / distance) * move_speed
+            self.y += (dy / distance) * move_speed
 
     def draw(self, screen, camera_x=0, camera_y=0):
         # 出現アニメーションのスケール計算
@@ -357,8 +395,14 @@ class MoneyItem:
         else:
             speed_multiplier = 1.0
 
+        # ジェム回収速度をお金の回収にも適用
+        try:
+            gem_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
+        except Exception:
+            gem_speed_multiplier = 1.0
+
         if distance < attract_threshold and distance != 0:
-            move_speed = self.speed * speed_multiplier
+            move_speed = self.speed * speed_multiplier * gem_speed_multiplier
             self.x += (dx / distance) * move_speed
             self.y += (dy / distance) * move_speed
 

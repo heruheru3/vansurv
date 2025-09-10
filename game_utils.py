@@ -11,22 +11,37 @@ from effects.items import ExperienceGem
 def enforce_experience_gems_limit(gems, max_gems=MAX_GEMS_ON_SCREEN, player_x=None, player_y=None):
     """上限を超えた場合、プレイヤーから遠いジェムから順に削除して
     その value を残った（近い）ジェムに加算して総EXPを維持する。
+    引き寄せ中のジェムは削除対象から除外する。
     player_x, player_yが指定されていない場合は従来通り古い順で削除。
     """
     try:
         while len(gems) > max_gems:
             if player_x is not None and player_y is not None:
-                # プレイヤーから最も遠いジェムを見つける
+                # プレイヤーから最も遠いジェムを見つける（引き寄せ中でないもの優先）
                 farthest_gem = None
                 max_distance = -1
                 farthest_index = 0
                 
+                # まず引き寄せ中でないジェムから最も遠いものを探す
                 for i, gem in enumerate(gems):
+                    # 引き寄せ中のジェムはスキップ
+                    if hasattr(gem, 'being_attracted') and gem.being_attracted:
+                        continue
+                    
                     distance = ((gem.x - player_x) ** 2 + (gem.y - player_y) ** 2) ** 0.5
                     if distance > max_distance:
                         max_distance = distance
                         farthest_gem = gem
                         farthest_index = i
+                
+                # 引き寄せ中でないジェムが見つからない場合は、全体から最も遠いものを選択
+                if farthest_gem is None:
+                    for i, gem in enumerate(gems):
+                        distance = ((gem.x - player_x) ** 2 + (gem.y - player_y) ** 2) ** 0.5
+                        if distance > max_distance:
+                            max_distance = distance
+                            farthest_gem = gem
+                            farthest_index = i
                 
                 # 最も遠いジェムを削除
                 removed_gem = gems.pop(farthest_index)

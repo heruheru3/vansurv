@@ -1488,6 +1488,11 @@ def main():
 
                 # 経験値ジェム処理（レスポンス重視で毎フレーム処理）
                 for gem in experience_gems[:]:
+                    # ジェムの寿命チェック（引き寄せ中でない場合のみ）
+                    if hasattr(gem, 'is_expired') and gem.is_expired() and not getattr(gem, 'being_attracted', False):
+                        experience_gems.remove(gem)
+                        continue
+                    
                     gem.move_to_player(player)
                     # 経験値ジェム取得の正方形判定（最高速化）
                     player_half = getattr(player, 'size', 0) // 2
