@@ -85,6 +85,13 @@ def main():
     preload_res = resources.preload_all(icon_size=16)
     ICONS = preload_res.get('icons', {})
 
+    # Start background music (level1) if available
+    try:
+        from audio import audio
+        audio.play_bgm('level1')
+    except Exception:
+        pass
+
     # デバッグ: 起動時にオーディオ初期化と簡易再生テストを行う（問題切り分け用）
     try:
         pass

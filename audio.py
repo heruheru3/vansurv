@@ -148,6 +148,33 @@ class AudioManager:
         except Exception:
             pass
 
+    def play_bgm(self, name, loops=-1, fade_ms=0, volume=None):
+        """Convenience method to play BGM files from assets/music.
+        Provide name without extension (e.g. 'level1')."""
+        try:
+            if self.muted:
+                return
+            # build path under assets/music
+            path = resource_path(os.path.join('assets', 'music', name))
+            for ext in ('.ogg', '.mp3', '.wav'):
+                p = path + ext
+                if os.path.exists(p):
+                    try:
+                        if not pygame.mixer.get_init():
+                            pygame.mixer.init()
+                    except Exception:
+                        pass
+                    try:
+                        pygame.mixer.music.load(p)
+                        vol = self.music_volume if volume is None else volume
+                        pygame.mixer.music.set_volume(max(0.0, min(1.0, vol)))
+                        pygame.mixer.music.play(loops=loops, fade_ms=fade_ms)
+                    except Exception:
+                        pass
+                    return
+        except Exception:
+            pass
+
     def stop_music(self, fade_ms=0):
         try:
             if fade_ms > 0:
