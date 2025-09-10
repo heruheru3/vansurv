@@ -37,10 +37,13 @@ class AudioManager:
 
     def play_sound(self, name, volume=None, duration=None, fade_in=0.0, fade_out=0.0):
         """効果音を再生。オプション:
+        - volume: 呼び出しごとの絶対音量 (0.0〜1.0)。None の場合は global sfx_volume を使用します。
+                  (従来のコードでは volume をグローバル音量の乗算として扱っていましたが、
+                   ここでは明示的な絶対値を優先します。既存呼び出しは影響を受けません。)
         - duration: 再生全体の秒数 (float)。指定すると duration 秒後に stop または fade_out を実行。
         - fade_in: フェードイン秒 (float)
         - fade_out: フェードアウト秒 (float)
-        例: play_sound('heal', duration=1.0, fade_out=0.5)
+        例: play_sound('heal', volume=0.6, duration=1.0, fade_out=0.5)
         """
         try:
             # Ensure mixer is initialized (some imports may occur before pygame.init())
@@ -62,8 +65,15 @@ class AudioManager:
             if not snd:
                 return
 
-            # effective volume: global sfx_volume * per-call volume (if specified)
-            eff_vol = self.sfx_volume if volume is None else (self.sfx_volume * float(volume))
+            # effective volume: if volume is None use global sfx_volume;
+            # if volume is provided treat it as absolute in [0.0, 1.0]
+            if volume is None:
+                eff_vol = self.sfx_volume
+            else:
+                try:
+                    eff_vol = float(volume)
+                except Exception:
+                    eff_vol = self.sfx_volume
             try:
                 eff_vol = max(0.0, min(1.0, eff_vol))
             except Exception:

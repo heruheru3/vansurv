@@ -1497,7 +1497,7 @@ def main():
                         # サウンド: ジェム取得
                         try:
                             from audio import audio
-                            audio.play_sound('gem_pickup')
+                            audio.play_sound('gem_pickup', volume=0.8)
                         except Exception:
                             pass
                         if player.level > prev_level:
