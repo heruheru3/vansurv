@@ -186,10 +186,10 @@ class Whip(Weapon):
 class Garlic(Weapon):
     def __init__(self):
         super().__init__()
-        self.cooldown = 1000
+        self.cooldown = 1300
         # 持続系なので1回あたりのダメージは小さめに設定
-        self.damage = 5
-        self.radius = 80
+        self.damage = 3
+        self.radius = 60
         self.duration = 1000
 
     def attack(self, player):
@@ -233,4 +233,5 @@ class Garlic(Weapon):
         """レベルアップ時の強化"""
         super().level_up()
         self.radius = int(self.radius * 1.2)  # 範囲20%増加
+        self.duration = int(self.duration * 1.1)  # 持続時間10%増加
         self.damage *= 1.3  # ダメージ30%増加

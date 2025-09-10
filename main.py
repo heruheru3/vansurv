@@ -807,7 +807,7 @@ def main():
                             else:
                                 # 持続系は最後にダメージを与えた時刻から0.2秒以上経過していれば再ダメージ
                                 last = attack.last_box_hit_times.get(id(box), -999)
-                                if game_time - last < 0.2:
+                                if game_time - last < 0.3:
                                     continue
                             
                             # ダメージを適用
