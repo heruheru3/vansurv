@@ -103,12 +103,15 @@ def main():
         from enemy import Enemy
         # get_all_boss_configs 内で load_boss_stats が呼ばれる
         boss_configs = Enemy.get_all_boss_configs()
-        # 画像を一通りキャッシュしておく
-        for (boss_type, level, spawn_time), cfg in boss_configs.items():
-            try:
-                Enemy._load_enemy_image(boss_type, level, cfg.get('image_file'))
-            except Exception:
-                pass
+        # 画像を一通りキャッシュしておく（Noベースのエントリのみ）
+        for key, cfg in boss_configs.items():
+            if isinstance(key, int):  # Noベースのエントリのみ処理
+                try:
+                    boss_no = key
+                    boss_type = cfg['type']
+                    Enemy._load_enemy_image(boss_type, 1, cfg.get('image_file'), boss_no=boss_no)
+                except Exception:
+                    pass
     except Exception:
         pass
 
@@ -1064,15 +1067,23 @@ def main():
                 # 全てのボス設定を取得
                 all_boss_configs = Enemy.get_all_boss_configs()
                 
-                for (boss_type, level, spawn_time), boss_config in all_boss_configs.items():
-                    spawn_time_frames = boss_config['spawn_time'] * 60  # 秒をフレームに変換
+                # Noベースでボス設定を処理（重複を避けるため）
+                for key, boss_config in all_boss_configs.items():
+                    # Noベースのエントリのみを処理（タプルキーは互換性用なのでスキップ）
+                    if not isinstance(key, int):
+                        continue
+                    
+                    boss_no = key
+                    boss_type = boss_config['type']
+                    level = boss_config['level']
+                    spawn_time = boss_config['spawn_time']
+                    spawn_time_frames = spawn_time * 60  # 秒をフレームに変換
                     
                     # 指定時間に達したら1回だけスポーン（既にスポーン済みでない場合）
                     should_spawn = False
                     if game_time * 60 >= spawn_time_frames:  # 指定時間を過ぎている
-                        # この特定の行のボスがまだスポーンしていない場合
-                        boss_key = (boss_type, level, spawn_time)  # タイプ+レベル+スポーン時間で識別
-                        if boss_key not in spawned_boss_types:
+                        # この特定のNoのボスがまだスポーンしていない場合
+                        if boss_no not in spawned_boss_types:
                             should_spawn = True
                     
                     if should_spawn:
@@ -1098,14 +1109,13 @@ def main():
                             boss_x = max(50, min(WORLD_WIDTH - 50, boss_x))
                             boss_y = max(50, min(WORLD_HEIGHT - 50, boss_y))
                             
-                            # ボス生成（CSVの設定に基づき）
-                            boss_stats_key = (boss_type, level, spawn_time)
-                            boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type, boss_image_file=boss_config['image_file'], boss_stats_key=boss_stats_key)
+                            # ボス生成（NoベースでCSVの設定に基づき）
+                            boss_stats_key = (boss_type, level, spawn_time)  # 互換性用
+                            boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type, boss_image_file=boss_config['image_file'], boss_stats_key=boss_stats_key, boss_no=boss_no)
                             enemies.append(boss)
                             
-                            # この特定の行のボスを出現済みリストに追加
-                            boss_key = (boss_type, level, spawn_time)
-                            spawned_boss_types.add(boss_key)
+                            # この特定のNoのボスを出現済みリストに追加
+                            spawned_boss_types.add(boss_no)
                             
                             # ボススポーンエフェクト（軽量化）
                             if len(particles) < 300:
@@ -1114,7 +1124,7 @@ def main():
                             
                             # 現在のボス数をログ出力
                             boss_count = sum(1 for enemy in enemies if getattr(enemy, 'is_boss', False))
-                            print(f"[INFO] Boss Type {boss_type} spawned at ({boss_x:.0f}, {boss_y:.0f}). Player at ({player.x:.0f}, {player.y:.0f}). Total bosses: {boss_count}")
+                            print(f"[INFO] Boss No.{boss_no} (Type {boss_type}) spawned at ({boss_x:.0f}, {boss_y:.0f}). Player at ({player.x:.0f}, {player.y:.0f}). Total bosses: {boss_count}")
 
                 # 敵の生成を爆発的に
                 spawn_timer += 1

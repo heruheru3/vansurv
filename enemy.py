@@ -74,11 +74,15 @@ class Enemy:
             with open(csv_path, 'r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
                 for row in reader:
+                    no = int(row['No'])  # 一意のNoをキーとして使用
                     type_id = int(row['type'])
                     level = int(row['level'])
                     spawn_time = int(row['spawn_time'])
-                    key = (type_id, level, spawn_time)  # spawn_timeも含めて重複を避ける
-                    cls._boss_stats[key] = {
+                    # Noをプライマリキー、(type, level, spawn_time)をセカンダリキーとして両方保存
+                    boss_config = {
+                        'no': no,
+                        'type': type_id,
+                        'level': level,
                         'base_hp': int(row['base_hp']),
                         'base_speed': float(row['base_speed']),
                         'base_damage': int(row['base_damage']),
@@ -90,8 +94,18 @@ class Enemy:
                         'projectile_speed': float(row['projectile_speed']) if row['projectile_speed'] else 2.0,
                         'description': row['description']
                     }
+                    # Noベースとキーベースの両方で保存
+                    cls._boss_stats[no] = boss_config  # Noベース（プライマリ）
+                    key = (type_id, level, spawn_time)
+                    cls._boss_stats[key] = boss_config  # 従来キーベース（互換性用）
             cls._boss_stats_loaded = True
-            print(f"[INFO] Loaded {len(cls._boss_stats)} boss configurations from {csv_path}")
+            total_entries = len([k for k in cls._boss_stats.keys() if isinstance(k, int)])
+            print(f"[INFO] Loaded {total_entries} boss configurations (No-based) from {csv_path}")
+            
+            # デバッグ: 読み込まれたボス設定を表示
+            for no, config in cls._boss_stats.items():
+                if isinstance(no, int):  # Noベースのエントリのみ表示
+                    print(f"[DEBUG] Boss No.{no}: type={config['type']}, image_file={config['image_file']}, image_size={config['image_size']}, spawn_time={config['spawn_time']}s")
         except FileNotFoundError:
             print(f"[ERROR] Boss stats file not found: {csv_path}")
             cls._boss_stats_loaded = False
@@ -109,16 +123,9 @@ class Enemy:
 
     @classmethod
     def get_boss_config_by_type(cls, boss_type):
-        """（非推奨）指定されたタイプのボス設定を取得（最初の行のみ）"""
-        # cls.load_boss_stats()
-        # min_spawn_time = float('inf')
-        # result = None
-        # for key, config in cls._boss_stats.items():
-        #     if key[0] == boss_type and config['spawn_time'] < min_spawn_time:
-        #         min_spawn_time = config['spawn_time']
-        #         result = config
-        # return result
-        return None  # 今後は使わない
+        """（削除済み）Typeベースのボス設定取得は廃止。Noベース検索を使用してください。"""
+        print(f"[WARNING] get_boss_config_by_type() is deprecated. Use No-based lookup instead.")
+        return None
     
     @classmethod
     def get_all_boss_configs(cls):
@@ -127,21 +134,34 @@ class Enemy:
         return cls._boss_stats.copy()
     
     @classmethod
-    def _load_enemy_image(cls, enemy_no, level_or_behavior, image_file_override=None):
+    def _load_enemy_image(cls, enemy_no, level_or_behavior, image_file_override=None, boss_no=None):
         """敵の画像を読み込む（キャッシュ機能付き）"""
         if enemy_no >= 101:
             cls.load_boss_stats()
-            min_spawn_time = float('inf')
             boss_config = None
-            for key, config in cls._boss_stats.items():
-                if key[0] == enemy_no and config['spawn_time'] < min_spawn_time:
-                    min_spawn_time = config['spawn_time']
-                    boss_config = config
+            
+            # boss_no（一意のNo）が指定されている場合はそれを優先
+            if boss_no is not None:
+                boss_config = cls._boss_stats.get(boss_no)
+                if boss_config:
+                    print(f"[DEBUG] Found boss config by No {boss_no}: image_size={boss_config['image_size']}")
+                else:
+                    print(f"[WARNING] Boss config not found for No {boss_no}")
+            
+            # フォールバック: エラー回避用のデフォルト設定
+            if boss_config is None:
+                print(f"[ERROR] Boss image config not found for boss_no={boss_no}, enemy_no={enemy_no}. Using default values.")
+                # デフォルト設定を使用
+                boss_config = {
+                    'image_file': 'boss-01',
+                    'image_size': 64
+                }
 
             if boss_config:
                 image_file = (image_file_override if image_file_override else boss_config['image_file']) + '.png'
                 image_size = boss_config['image_size']
-                cache_key = f"{enemy_no}-{image_file_override if image_file_override else boss_config['image_file']}"
+                # キャッシュキーをNoベースに変更（同じ画像でもサイズが異なる場合があるため）
+                cache_key = f"boss-{boss_no}-{image_file_override if image_file_override else boss_config['image_file']}" if boss_no is not None else f"boss-default-{image_file_override if image_file_override else boss_config['image_file']}"
             else:
                 cache_key = f"boss-{level_or_behavior:02d}"
                 image_file = f"{cache_key}.png"
@@ -282,17 +302,21 @@ class Enemy:
         
         return adjusted_surface
     
-    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None, boss_image_file=None, boss_stats_key=None):
+    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None, boss_image_file=None, boss_stats_key=None, boss_no=None):
         self.screen = screen
         self.is_boss = is_boss  # ボス判定フラグ
         self.boss_level = boss_level if is_boss else 1  # ボスレベル（ボス以外は1）
         self.boss_type = boss_type if boss_type is not None else 101  # ボスタイプ（デフォルトは101）
         self.boss_image_file = boss_image_file  # ボス画像ファイル名（mainから渡す）
         self.boss_stats_key = boss_stats_key  # ボス設定キー（mainから渡す）
+        self.boss_no = boss_no  # ボス番号（CSVのNoカラム）
         
         # ヒット時のフラッシュ用タイマ（秒）
         self.hit_flash_timer = 0.0
         self.hit_flash_duration = 0.25  # フェードイン+フェードアウトの合計時間
+        
+        # デバッグフラグ（サイズ情報の重複ログを防ぐ）
+        self._debug_size_logged = False
         
         # 全体的にやや遅めに調整
         # base_speed を導入して、プレイヤーの speed 変更の影響を受けないようにする
@@ -509,10 +533,36 @@ class Enemy:
         if self.is_boss:
             Enemy.load_boss_stats()
             boss_config = None
-            if self.boss_stats_key:
+            
+            # boss_no（一意のNo）が指定されている場合はそれを優先
+            if self.boss_no is not None:
+                boss_config = Enemy._boss_stats.get(self.boss_no)
+                if boss_config:
+                    print(f"[DEBUG] Found boss config by No {self.boss_no}: type={boss_config['type']}, image_size={boss_config['image_size']}")
+                else:
+                    print(f"[WARNING] Boss config not found for No {self.boss_no}")
+            
+            # フォールバック1: boss_stats_keyによる検索
+            if boss_config is None and self.boss_stats_key:
                 boss_config = Enemy._boss_stats.get(self.boss_stats_key)
-            if not boss_config:
-                boss_config = Enemy.get_boss_config_by_type(self.boss_type)
+                if boss_config:
+                    print(f"[DEBUG] Found boss config by stats_key {self.boss_stats_key}: image_size={boss_config['image_size']}")
+            
+            # フォールバック2: デフォルト設定（エラー回避用）
+            if boss_config is None:
+                print(f"[ERROR] Boss config not found for boss_no={self.boss_no}, boss_type={self.boss_type}. Using default values.")
+                # デフォルト設定を作成
+                boss_config = {
+                    'base_hp': 100,
+                    'base_speed': 1.0,
+                    'base_damage': 20,
+                    'speed_multiplier': 1.2,
+                    'attack_cooldown': 1000,
+                    'projectile_speed': 2.0,
+                    'image_size': 64,  # デフォルトサイズ
+                    'image_file': 'boss-01'  # デフォルト画像
+                }
+            
             if boss_config:
                 # ボス設定から直接ステータスを設定
                 self.hp = boss_config['base_hp']
@@ -547,10 +597,13 @@ class Enemy:
                 # ボス画像の読み込み
                 try:
                     image_file_for_cache = self.boss_image_file if self.boss_image_file else boss_config['image_file']
-                    self.images = self._load_enemy_image(self.enemy_type, self.level, image_file_for_cache)
+                    print(f"[DEBUG] Loading boss image: boss_no={self.boss_no}, boss_type={self.boss_type}, image_file={image_file_for_cache}, expected_size={boss_config['image_size']}")
+                    self.images = self._load_enemy_image(self.enemy_type, self.level, image_file_for_cache, boss_no=self.boss_no)
                     if self.images is None:
                         print(f"[WARNING] Failed to load boss image, using fallback")
                         self.images = None
+                    else:
+                        print(f"[DEBUG] Boss image loaded successfully: cached_size={self.images.get('size', 'unknown')}")
                 except Exception as e:
                     print(f"[ERROR] Exception while loading boss image: {e}")
                     self.images = None
@@ -1029,8 +1082,15 @@ class Enemy:
             
             # 画像が正常に取得できた場合のみ描画
             if image is not None:
-                # 画像のサイズを取得（レベルに応じて変化）
-                image_size = self.images.get('size', 32)
+                # 画像のサイズを取得（実際の画像サイズを優先、フォールバックとしてキャッシュのサイズ情報を使用）
+                actual_image_size = image.get_width()  # 実際にスケールされた画像のサイズ
+                cached_size = self.images.get('size', 32)
+                image_size = actual_image_size if actual_image_size > 0 else cached_size
+                
+                # デバッグ: ボスの場合はサイズ情報をログ出力
+                if hasattr(self, 'is_boss') and self.is_boss and hasattr(self, '_debug_size_logged') and not self._debug_size_logged:
+                    print(f"[DEBUG] Boss {self.boss_type}: actual_image_size={actual_image_size}, cached_size={cached_size}, using image_size={image_size}")
+                    self._debug_size_logged = True
                 
                 # 歩行アニメーション効果を計算
                 foot_offset_y = 0
