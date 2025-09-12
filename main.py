@@ -661,10 +661,7 @@ def main():
                             rects = get_end_button_rects()
                             # Continue はゲームオーバー時のみ有効
                             if game_over and rects.get('continue') and rects['continue'].collidepoint(mx, my):
-                                try:
-                                    player.hp = player.get_max_hp()
-                                except Exception:
-                                    player.hp = getattr(player, 'max_hp', 100)
+                                player.hp = player.get_max_hp()
                                 game_over = False
                                 for _ in range(8):
                                     particles.append(DeathParticle(player.x, player.y, CYAN))
@@ -887,47 +884,35 @@ def main():
                                     continue
 
                             # 攻撃のダメージを適用
-                            dmg = getattr(attack, 'damage', 0) or 0
-                            try:
-                                dmg = float(dmg)
-                            except Exception:
-                                dmg = 0.0
                             # ダメージにランダム性を追加（±10%の範囲）
-                            variance = random.uniform(-0.1, 0.1)
-                            dmg = max(0.0, dmg * (1.0 + variance))
+                            dmg = max(0.0, float(getattr(attack, 'damage', 0)) * random.uniform(0.9, 1.1))
                             hp_before = enemy.hp
                             enemy.hp -= dmg
 
                             # サウンド: 敵被弾
-                            try:
-                                from audio import audio
-                                audio.play_sound('enemy_hurt')
-                            except Exception:
-                                pass
+                            from audio import audio
+                            audio.play_sound('enemy_hurt')
 
                             # ノックバック処理
-                            try:
-                                # 武器ごとのノックバック量を定義（元の値に戻す）
-                                knockback_forces = {
-                                    "whip": 80.0,          # ムチ：強い
-                                    "magic_wand": 60.0,    # 魔法の杖：中程度
-                                    "axe": 120.0,          # 斧：非常に強い
-                                    "stone": 40.0,         # 石：弱い
-                                    "knife": 50.0,         # ナイフ：弱め
-                                    "rotating_book": 30.0, # 回転する本：弱い
-                                    "thunder": 100.0,      # 雷：強い
-                                    "garlic": 20.0,        # にんにく：很弱い
-                                    "holy_water": 25.0,    # 聖水：弱い
-                                }
-                                
-                                weapon_type = getattr(attack, 'type', '')
-                                knockback_force = knockback_forces.get(weapon_type, 50.0)  # デフォルト値
-                                
-                                # ノックバックを適用
-                                if hasattr(enemy, 'apply_knockback'):
-                                    enemy.apply_knockback(attack.x, attack.y, knockback_force)
-                            except Exception:
-                                pass
+                            # 武器ごとのノックバック量を定義（元の値に戻す）
+                            knockback_forces = {
+                                "whip": 80.0,          # ムチ：強い
+                                "magic_wand": 60.0,    # 魔法の杖：中程度
+                                "axe": 120.0,          # 斧：非常に強い
+                                "stone": 40.0,         # 石：弱い
+                                "knife": 50.0,         # ナイフ：弱め
+                                "rotating_book": 30.0, # 回転する本：弱い
+                                "thunder": 100.0,      # 雷：強い
+                                "garlic": 20.0,        # にんにく：很弱い
+                                "holy_water": 25.0,    # 聖水：弱い
+                            }
+                            
+                            weapon_type = getattr(attack, 'type', '')
+                            knockback_force = knockback_forces.get(weapon_type, 50.0)  # デフォルト値
+                            
+                            # ノックバックを適用
+                            if hasattr(enemy, 'apply_knockback'):
+                                enemy.apply_knockback(attack.x, attack.y, knockback_force)
 
                             # ヒット時の記録: 非持続系は hit_targets に追加、持続系は last_hit_times を更新
                             if is_persistent:
@@ -936,47 +921,27 @@ def main():
                                 attack.hit_targets.add(id(enemy))
 
                             # ダメージ集計: 武器(type)ごとに合計ダメージを記録
-                            try:
-                                atk_type = getattr(attack, 'type', 'unknown') or 'unknown'
-                                damage_stats[atk_type] = damage_stats.get(atk_type, 0) + dmg
-                            except Exception:
-                                pass
-
+                            atk_type = getattr(attack, 'type', 'unknown') or 'unknown'
+                            damage_stats[atk_type] = damage_stats.get(atk_type, 0) + dmg
+                            
                             # Garlic がヒットしたらプレイヤーを1回復する（クールダウン: 500ms）
-                            try:
-                                if getattr(attack, 'type', '') == 'garlic':
-                                    now = pygame.time.get_ticks()
-                                    # attack にクールダウン時刻を保持
-                                    if not hasattr(attack, 'last_garlic_heal_time'):
-                                        attack.last_garlic_heal_time = -999999
-                                    if now - attack.last_garlic_heal_time >= GARLIC_HEAL_INTERVAL_MS:
-                                        try:
-                                            # HPサブアイテムのレベルに応じた回復量を使用
-                                            garlic_heal_amount = player.get_garlic_heal_amount()
-                                            healed = player.heal(garlic_heal_amount, "garlic")
-                                            try:
-                                                if healed > 0:
-                                                    from audio import audio
-                                                    audio.play_sound('heal')
-                                            except Exception:
-                                                pass
-                                        except Exception:
-                                            # 万が一何か問題があってもHPは最低限設定
-                                            try:
-                                                player.hp = min(player.get_max_hp(), getattr(player, 'hp', 0) + 1)
-                                            except Exception:
-                                                # 最終フォールバック
-                                                player.hp = min(100, getattr(player, 'hp', 0) + 1)
-                                        attack.last_garlic_heal_time = now
-                            except Exception:
-                                pass
+                            if getattr(attack, 'type', '') == 'garlic':
+                                now = pygame.time.get_ticks()
+                                # attack にクールダウン時刻を保持
+                                if not hasattr(attack, 'last_garlic_heal_time'):
+                                    attack.last_garlic_heal_time = -999999
+                                if now - attack.last_garlic_heal_time >= GARLIC_HEAL_INTERVAL_MS:
+                                    # HPサブアイテムのレベルに応じた回復量を使用
+                                    garlic_heal_amount = player.get_garlic_heal_amount()
+                                    healed = player.heal(garlic_heal_amount, "garlic")
+                                    if healed > 0:
+                                        from audio import audio
+                                        audio.play_sound('heal')
+                                    attack.last_garlic_heal_time = now
 
                             # ヒット時の小エフェクト
-                            try:
-                                if hasattr(enemy, 'on_hit') and callable(enemy.on_hit):
-                                    enemy.on_hit()
-                            except Exception:
-                                pass
+                            if hasattr(enemy, 'on_hit') and callable(enemy.on_hit):
+                                enemy.on_hit()
 
                             for _ in range(2):  # 4から2に削減
                                 particles.append(DeathParticle(enemy.x, enemy.y, enemy.color))
@@ -1498,10 +1463,7 @@ def main():
                     player_half = getattr(player, 'size', 0) // 2
                     gem_half = getattr(gem, 'size', 0) // 2
                     # サブアイテムから追加される取得範囲を取得
-                    try:
-                        extra_range = int(getattr(player, 'get_gem_pickup_range', lambda: 0.0)())
-                    except Exception:
-                        extra_range = 0
+                    extra_range = int(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0
                     total_range = player_half + gem_half + extra_range
                     if (abs(player.x - gem.x) < total_range and 
                         abs(player.y - gem.y) < total_range):

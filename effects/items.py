@@ -30,10 +30,7 @@ class ExperienceGem:
         distance = math.sqrt(dx**2 + dy**2)
         
         # 引き寄せ開始距離をサブアイテムで拡張可能にする
-        try:
-            extra = float(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0.0
-        except Exception:
-            extra = 0.0
+        extra = float(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0.0
         attract_threshold = 100.0 + extra
         
         # ピックアップ範囲に応じて寿命を延長（範囲が広いほど到達時間が必要）
@@ -43,10 +40,7 @@ class ExperienceGem:
             self.extended_lifetime = int((extra / 100.0) * extension_per_100px)
         
         # ジェム回収速度をサブアイテム（projectile_speed）で向上
-        try:
-            gem_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
-        except Exception:
-            gem_speed_multiplier = 1.0
+        gem_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
         
         # マグネット効果が有効な場合、全画面からの引き寄せ＋さらなる速度アップ
         if hasattr(player, 'is_magnet_active') and player.is_magnet_active():
@@ -157,17 +151,11 @@ class GameItem:
         distance = math.sqrt(dx**2 + dy**2)
         
         # アイテムの引き寄せも同様にサブアイテムで拡張
-        try:
-            extra = float(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0.0
-        except Exception:
-            extra = 0.0
+        extra = float(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0.0
         attract_threshold = 100.0 + extra
         
         # ジェム回収速度をアイテム移動にも適用
-        try:
-            item_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
-        except Exception:
-            item_speed_multiplier = 1.0
+        item_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
 
         if distance < attract_threshold and distance != 0:
             move_speed = self.speed * item_speed_multiplier
@@ -396,10 +384,7 @@ class MoneyItem:
             speed_multiplier = 1.0
 
         # ジェム回収速度をお金の回収にも適用
-        try:
-            gem_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
-        except Exception:
-            gem_speed_multiplier = 1.0
+        gem_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
 
         if distance < attract_threshold and distance != 0:
             move_speed = self.speed * speed_multiplier * gem_speed_multiplier

@@ -810,28 +810,22 @@ class Enemy:
         
         # 敵同士の衝突回避ヘルパー
         def _would_collide_with_others(px, py, enemies_list):
-            try:
-                if not enemies_list:
-                    return False
-                for other in enemies_list:
-                    if other is self:
-                        continue
-                    # 同期的に削除対象や無効なエネミーは無視
-                    if not hasattr(other, 'x') or not hasattr(other, 'y'):
-                        continue
-                    # 距離で単純判定（中心間距離 < 半径和 * factor）
-                    try:
-                        from constants import ENEMY_COLLISION_SEPARATION_FACTOR
-                        factor = float(ENEMY_COLLISION_SEPARATION_FACTOR)
-                    except Exception:
-                        factor = 1.0
-                    min_dist = (self.size + getattr(other, 'size', 0)) * factor
-                    dx = px - other.x
-                    dy = py - other.y
-                    if dx * dx + dy * dy < (min_dist * min_dist):
-                        return True
-            except Exception:
+            if not enemies_list:
                 return False
+            for other in enemies_list:
+                if other is self:
+                    continue
+                # 同期的に削除対象や無効なエネミーは無視
+                if not hasattr(other, 'x') or not hasattr(other, 'y'):
+                    continue
+                # 距離で単純判定（中心間距離 < 半径和 * factor）
+                from constants import ENEMY_COLLISION_SEPARATION_FACTOR
+                factor = float(ENEMY_COLLISION_SEPARATION_FACTOR)
+                min_dist = (self.size + getattr(other, 'size', 0)) * factor
+                dx = px - other.x
+                dy = py - other.y
+                if dx * dx + dy * dy < (min_dist * min_dist):
+                    return True
             return False
 
         # 障害物との衝突判定（CSVマップまたはステージマップが有効な場合）
@@ -858,11 +852,8 @@ class Enemy:
                 if not collision:
                     # 分離処理の可否を確認。無効なら古いフォールバック処理のみ実行する
                     separation_skipped = False
-                    try:
-                        from constants import ENABLE_ENEMY_SEPARATION
-                        separation_enabled = bool(ENABLE_ENEMY_SEPARATION)
-                    except Exception:
-                        separation_enabled = True
+                    from constants import ENABLE_ENEMY_SEPARATION
+                    separation_enabled = bool(ENABLE_ENEMY_SEPARATION)
 
                     if not separation_enabled:
                         # フォールバックのみ実行
@@ -880,42 +871,37 @@ class Enemy:
 
                     # 分離ベクトルによるやさしい押しのけ処理
                     if not separation_skipped:
-                        try:
-                            from constants import ENEMY_SEPARATION_STRENGTH, ENEMY_SEPARATION_BOSS_PRIORITY, ENEMY_COLLISION_SEPARATION_FACTOR
-                            sep_strength = float(ENEMY_SEPARATION_STRENGTH)
-                            boss_priority = float(ENEMY_SEPARATION_BOSS_PRIORITY)
-                            factor = float(ENEMY_COLLISION_SEPARATION_FACTOR)
-                        except Exception:
-                            sep_strength = 0.6
-                            boss_priority = 1.5
-                            factor = 1.0
+                        from constants import ENEMY_SEPARATION_STRENGTH, ENEMY_SEPARATION_BOSS_PRIORITY, ENEMY_COLLISION_SEPARATION_FACTOR
+                        sep_strength = float(ENEMY_SEPARATION_STRENGTH)
+                        boss_priority = float(ENEMY_SEPARATION_BOSS_PRIORITY)
+                        factor = float(ENEMY_COLLISION_SEPARATION_FACTOR)
 
-                    sep_x = 0.0
-                    sep_y = 0.0
-                    total_w = 0.0
-                    if enemies:
-                        for other in enemies:
-                            if other is self:
-                                continue
-                            if not hasattr(other, 'x') or not hasattr(other, 'y'):
-                                continue
-                            dx_o = new_x - other.x
-                            dy_o = new_y - other.y
-                            # 距離の二乗で比較して sqrt を避ける
-                            dist2 = dx_o * dx_o + dy_o * dy_o
-                            desired = (self.size + getattr(other, 'size', 0)) * factor
-                            desired2 = desired * desired
-                            if dist2 <= 0:
-                                # 完全一致のときは小さなランダム方向で押しのけ
-                                nx, ny = 1.0, 0.0
-                                overlap = desired
-                            else:
-                                if dist2 >= desired2:
+                        sep_x = 0.0
+                        sep_y = 0.0
+                        total_w = 0.0
+                        if enemies:
+                            for other in enemies:
+                                if other is self:
                                     continue
-                                dist = math.sqrt(dist2)
-                                nx = dx_o / dist
-                                ny = dy_o / dist
-                                overlap = (desired - dist)
+                                if not hasattr(other, 'x') or not hasattr(other, 'y'):
+                                    continue
+                                dx_o = new_x - other.x
+                                dy_o = new_y - other.y
+                                # 距離の二乗で比較して sqrt を避ける
+                                dist2 = dx_o * dx_o + dy_o * dy_o
+                                desired = (self.size + getattr(other, 'size', 0)) * factor
+                                desired2 = desired * desired
+                                if dist2 <= 0:
+                                    # 完全一致のときは小さなランダム方向で押しのけ
+                                    nx, ny = 1.0, 0.0
+                                    overlap = desired
+                                else:
+                                    if dist2 >= desired2:
+                                        continue
+                                    dist = math.sqrt(dist2)
+                                    nx = dx_o / dist
+                                    ny = dy_o / dist
+                                    overlap = (desired - dist)
 
                             # 重み: 重なりの割合
                             w = (overlap / max(1.0, desired))
@@ -943,28 +929,24 @@ class Enemy:
 
                             # 候補位置が地形・他エネミーと衝突しないか確認
                             valid_candidate = True
-                            try:
-                                if USE_CSV_MAP:
-                                    from stage import get_stage_map
-                                    stage_map = get_stage_map()
-                                    half_size = self.size // 2
-                                    check_points = [
-                                        (cand_x - half_size, cand_y - half_size),
-                                        (cand_x + half_size, cand_y - half_size),
-                                        (cand_x - half_size, cand_y + half_size),
-                                        (cand_x + half_size, cand_y + half_size),
-                                        (cand_x, cand_y)
-                                    ]
-                                    for cx, cy in check_points:
-                                        tile_id = map_loader.get_tile_at(cx, cy) if map_loader else stage_map.get_tile_at(cx, cy)
-                                        if tile_id in {5,7,8,9}:
-                                            valid_candidate = False
-                                            break
-                                # 他エネミーとの衝突
-                                if valid_candidate and _would_collide_with_others(cand_x, cand_y, enemies):
-                                    valid_candidate = False
-                            except Exception:
-                                # 検証に失敗したら候補を無効にする
+                            if USE_CSV_MAP:
+                                from stage import get_stage_map
+                                stage_map = get_stage_map()
+                                half_size = self.size // 2
+                                check_points = [
+                                    (cand_x - half_size, cand_y - half_size),
+                                    (cand_x + half_size, cand_y - half_size),
+                                    (cand_x - half_size, cand_y + half_size),
+                                    (cand_x + half_size, cand_y + half_size),
+                                    (cand_x, cand_y)
+                                ]
+                                for cx, cy in check_points:
+                                    tile_id = map_loader.get_tile_at(cx, cy) if map_loader else stage_map.get_tile_at(cx, cy)
+                                    if tile_id in {5,7,8,9}:
+                                        valid_candidate = False
+                                        break
+                            # 他エネミーとの衝突
+                            if valid_candidate and _would_collide_with_others(cand_x, cand_y, enemies):
                                 valid_candidate = False
 
                             if valid_candidate:

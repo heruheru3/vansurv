@@ -777,23 +777,17 @@ class Player:
             return 1.0
 
     def get_gem_pickup_range(self):
-        try:
-            if 'gem_pickup_range' in self.subitems:
-                return float(self.subitems.get('gem_pickup_range').value())
-            return 0.0
-        except Exception:
-            return 0.0
+        if 'gem_pickup_range' in self.subitems:
+            return float(self.subitems.get('gem_pickup_range').value())
+        return 0.0
 
     def get_gem_collection_speed(self):
         """ジェムの回収速度倍率を取得（projectile_speedサブアイテムレベルに基づく）"""
-        try:
-            if 'projectile_speed' in self.subitems:
-                # projectile_speedサブアイテムのレベルに応じてジェム回収速度も向上
-                # レベル1で20%アップ、レベル2で40%アップ、レベル3で60%アップ
-                return 1.0 + float(self.subitems.get('projectile_speed').value())
-            return 1.0
-        except Exception:
-            return 1.0
+        if 'projectile_speed' in self.subitems:
+            # projectile_speedサブアイテムのレベルに応じてジェム回収速度も向上
+            # レベル1で20%アップ、レベル2で40%アップ、レベル3で60%アップ
+            return 1.0 + float(self.subitems.get('projectile_speed').value())
+        return 1.0
 
     def get_magnet_level(self):
         """マグネットサブアイテム（gem_pickup_range）のレベルを取得"""
