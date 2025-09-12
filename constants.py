@@ -37,6 +37,11 @@ MAX_SUBITEM_LEVEL = 3
 DEBUG = False   # デバッグ用ログ出力のON/OFF
 SHOW_FPS = True  # FPS表示のON/OFF
 
+# パフォーマンス計測設定
+ENABLE_PERFORMANCE_LOGGING = True  # パフォーマンス計測ログの有効/無効
+PERFORMANCE_LOG_INTERVAL = 1000    # ログ出力間隔（ミリ秒）
+PERFORMANCE_THRESHOLD_MS = 5.0     # しきい値：この値以上の処理時間でログ出力（ミリ秒）
+
 # マップ・ステージ設定
 USE_CSV_MAP = True    # True: CSVマップ使用, False: ランダム生成背景
 TEST_TILE_SIZE = 64    # テスト用背景の市松模様のタイルサイズ

@@ -5,6 +5,7 @@ import os
 import sys
 import colorsys
 import csv
+import time
 from constants import *
 
 def resource_path(relative_path):
@@ -1069,11 +1070,6 @@ class Enemy:
                 cached_size = self.images.get('size', 32)
                 image_size = actual_image_size if actual_image_size > 0 else cached_size
                 
-                # デバッグ: ボスの場合はサイズ情報をログ出力
-                if hasattr(self, 'is_boss') and self.is_boss and hasattr(self, '_debug_size_logged') and not self._debug_size_logged:
-                    print(f"[DEBUG] Boss {self.boss_type}: actual_image_size={actual_image_size}, cached_size={cached_size}, using image_size={image_size}")
-                    self._debug_size_logged = True
-                
                 # 歩行アニメーション効果を計算
                 foot_offset_y = 0
                 
@@ -1484,47 +1480,77 @@ class Enemy:
         )
 
     def _draw_boss_aura(self, screen, base_x, base_y, image, image_size):
-        """ボス用の赤いオーラ効果を描画（アルファチャンネル対応）"""
-        # オーラの厚さとオフセット
-        aura_thickness = 3
-        aura_offset = 2
+        """ボス用の赤いオーラ効果を描画（最適化版、画像ベース）"""
+        # オーラキャッシュの確認（画像と向きごとにキャッシュ）
+        cache_key = f"{image_size}_{self.facing_right}_{id(image)}"
+        if not hasattr(self, '_aura_cache'):
+            self._aura_cache = {}
         
-        # 元画像のアルファマスクを作成
-        alpha_mask = pygame.mask.from_surface(image)
+        # キャッシュされたオーラサーフェースを使用
+        if cache_key not in self._aura_cache:
+            # 画像の輪郭に基づいたオーラを作成（初回のみ）
+            aura_thickness = 3
+            aura_size = image_size + aura_thickness * 4
+            aura_surface = pygame.Surface((aura_size, aura_size), pygame.SRCALPHA)
+            
+            # 元画像のアルファマスクを作成（初回のみ）
+            try:
+                alpha_mask = pygame.mask.from_surface(image)
+                outline_points = alpha_mask.outline()
+                
+                if outline_points:
+                    # アウトライン効果を作成（複数層で厚みを表現）
+                    center_offset = aura_thickness * 2
+                    red_colors = [
+                        (255, 100, 100, 80),   # 外側（薄い）
+                        (255, 80, 80, 120),    # 中間
+                        (255, 60, 60, 160)     # 内側（濃い）
+                    ]
+                    
+                    # 複数の厚さでアウトラインを描画
+                    for thickness_idx in range(aura_thickness):
+                        color = red_colors[min(thickness_idx, len(red_colors) - 1)]
+                        offset_distance = aura_thickness - thickness_idx
+                        
+                        # 8方向にオフセットして描画
+                        offsets = [
+                            (-offset_distance, -offset_distance),
+                            (0, -offset_distance),
+                            (offset_distance, -offset_distance),
+                            (-offset_distance, 0),
+                            (offset_distance, 0),
+                            (-offset_distance, offset_distance),
+                            (0, offset_distance),
+                            (offset_distance, offset_distance)
+                        ]
+                        
+                        for dx, dy in offsets:
+                            for point in outline_points:
+                                x, y = point
+                                pygame.draw.circle(aura_surface, color, 
+                                                 (x + center_offset + dx, y + center_offset + dy), 1)
+                else:
+                    # アウトラインが取得できない場合は円形フォールバック
+                    center = aura_size // 2
+                    radius = image_size // 2 + aura_thickness
+                    red_color = (255, 80, 80, 120)
+                    for i in range(aura_thickness):
+                        pygame.draw.circle(aura_surface, red_color, (center, center), radius - i, 1)
+                        
+            except Exception:
+                # マスク作成に失敗した場合は円形フォールバック
+                center = aura_size // 2
+                radius = image_size // 2 + aura_thickness
+                red_color = (255, 80, 80, 120)
+                for i in range(aura_thickness):
+                    pygame.draw.circle(aura_surface, red_color, (center, center), radius - i, 1)
+            
+            self._aura_cache[cache_key] = aura_surface
         
-        # オーラ描画用のサーフェースを作成（元画像より大きく）
-        aura_size = image_size + (aura_thickness + aura_offset) * 2
-        aura_surface = pygame.Surface((aura_size, aura_size), pygame.SRCALPHA)
-        
-        # 複数のオフセットでアルファマスクを描画してアウトライン効果を作成
-        red_color = (255, 50, 50, 180)  # 赤色、やや透明
-        
-        center_offset = (aura_thickness + aura_offset)
-        
-        # 8方向にオフセットして描画
-        offsets = [
-            (-aura_thickness, -aura_thickness),
-            (0, -aura_thickness),
-            (aura_thickness, -aura_thickness),
-            (-aura_thickness, 0),
-            (aura_thickness, 0),
-            (-aura_thickness, aura_thickness),
-            (0, aura_thickness),
-            (aura_thickness, aura_thickness)
-        ]
-        
-        for dx, dy in offsets:
-            # マスクを使って赤いアウトラインを描画
-            outline_pos = (center_offset + dx, center_offset + dy)
-            for point in alpha_mask.outline():
-                x, y = point
-                pygame.draw.circle(aura_surface, red_color, 
-                                 (x + outline_pos[0], y + outline_pos[1]), 1)
-        
-        # オーラを画面に描画（画像の下に）
-        aura_x = base_x - (aura_thickness + aura_offset)
-        aura_y = base_y - (aura_thickness + aura_offset)
-        screen.blit(aura_surface, (aura_x, aura_y))
+        # キャッシュされたオーラを描画
+        aura_surface = self._aura_cache[cache_key]
+        aura_offset = (aura_surface.get_width() - image_size) // 2
+        screen.blit(aura_surface, (base_x - aura_offset, base_y - aura_offset))
 
     def _draw_boss_hp_bar(self, screen, center_x, center_y, entity_size):
         """ボス用のHPバーを描画（小型版、文字なし）"""
