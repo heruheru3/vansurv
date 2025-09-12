@@ -37,7 +37,7 @@ class AudioManager:
             self._sfx_cache[name] = None
             return None
 
-    def play_sound(self, name, volume=None, duration=None, fade_in=0.0, fade_out=0.0, min_interval=0.05):
+    def play_sound(self, name, volume=None, duration=None, fade_in=0.0, fade_out=0.0, min_interval=0.1):
         """効果音を再生。オプション:
         - volume: 呼び出しごとの絶対音量 (0.0〜1.0)。None の場合は global sfx_volume を使用します。
                   (従来のコードでは volume をグローバル音量の乗算として扱っていましたが、

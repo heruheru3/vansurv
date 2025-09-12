@@ -395,8 +395,8 @@ class RotatingBook(Weapon):
         self.num_books = 1
         self.duration = 5000
         # 本の描画サイズ（幅・高さ）をプロパティ化してレベルアップで拡大可能にする
-        self.book_w = 36
-        self.book_h = 36
+        self.book_w = 24
+        self.book_h = 24
 
     def attack(self, player):
         if not self.can_attack():
@@ -455,10 +455,10 @@ class RotatingBook(Weapon):
         self.cooldown = min(int(self.cooldown * 0.95), 5000)
         # 本のサイズと回転速度も強化して、視覚的に派手にする
         try:
-            self.book_w = min(60, int(self.book_w * 1.2))
-            self.book_h = min(60, int(self.book_h * 1.2))
+            self.book_w = min(60, int(self.book_w * 1.1))
+            self.book_h = min(60, int(self.book_h * 1.1))
             # 回転速度は積算的に高める（一定の上限を設ける）
-            self.rotation_speed = min(1.5, self.rotation_speed * 1.15)
+            self.rotation_speed = min(1.5, self.rotation_speed * 1.1)
         except Exception:
             pass
 
