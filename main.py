@@ -1232,7 +1232,9 @@ def main():
                     # 敵の攻撃処理（射撃タイプのみ、画面外は頻度制限）
                     if not enemy.is_off_screen() or frame_count % 3 == 0:
                         enemy.update_attack(player)
-                        enemy.update_projectiles(player)
+                        # 弾丸更新は軽量化のため頻度を下げる（ボスは除外）
+                        if getattr(enemy, 'is_boss', False) or frame_count % 2 == 0:
+                            enemy.update_projectiles(player)
 
                     # --- 画面外リポップ仕様: ノーマルエネミーがカメラ外（マージン付き）に出たら削除して
                     #     画面外からポップする形で再出現させる（ボスは除外） ---
@@ -1378,9 +1380,17 @@ def main():
                                 except Exception:
                                     pass
 
-                # 敵の弾丸とプレイヤーの衝突判定（敵数制限で負荷軽減）
-                for enemy in enemies[:max(1, len(enemies) * 2 // 3)]:  # 敵の2/3だけ処理して負荷軽減
-                    for projectile in enemy.get_projectiles()[:]:
+                # 敵の弾丸とプレイヤーの衝突判定（負荷軽減）
+                total_projectiles = sum(len(enemy.get_projectiles()) for enemy in enemies)
+                # 弾丸数が多い場合は処理を制限
+                enemy_limit = max(1, len(enemies) * 2 // 3) if total_projectiles > 50 else len(enemies)
+                
+                for enemy in enemies[:enemy_limit]:
+                    projectiles = enemy.get_projectiles()
+                    # 弾丸が多い場合は一部のみ処理
+                    projectile_limit = len(projectiles) if total_projectiles <= 100 else min(10, len(projectiles))
+                    
+                    for projectile in projectiles[:projectile_limit]:
                         # プレイヤーとの正方形衝突判定（最高速化）
                         player_half = getattr(player, 'size', 0) // 2
                         proj_half = projectile.size // 2

@@ -72,8 +72,8 @@ NATURAL_HEAL_AMOUNT = 0          # 自然回復時の基本回復量（HPサブ�
 
 # --- オーディオ基本設定 ---
 # 効果音とBGMのデフォルト音量（0.0〜1.0）
-DEFAULT_SFX_VOLUME = 0.5
-DEFAULT_MUSIC_VOLUME = 0.5
+DEFAULT_SFX_VOLUME = 0.3
+DEFAULT_MUSIC_VOLUME = 0.3
 
 # ガーリック回復設定
 GARLIC_HEAL_INTERVAL_MS = 500    # ガーリック回復の間隔（ミリ秒）
@@ -183,9 +183,9 @@ BOX_SPAWN_INTERVAL_MIN = 1000       # ボックス出現の最小間隔（ミリ
 BOX_SPAWN_INTERVAL_MAX = 5000       # ボックス出現の最大間隔（ミリ秒）- 5秒に変更
 
 # ボックス種類別出現率
-BOX1_SPAWN_RATE = 0.6               # box1の出現率（60%）
+BOX1_SPAWN_RATE = 0.65               # box1の出現率（65%）
 BOX2_SPAWN_RATE = 0.3              # box2の出現率（30%）
-BOX3_SPAWN_RATE = 0.1              # box3の出現率（10%）
+BOX3_SPAWN_RATE = 0.05              # box3の出現率（5%）
 
 # ボックス1の中身（コイン系のみ）
 BOX1_COIN_RATE = 1.0                # コイン100%

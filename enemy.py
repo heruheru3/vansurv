@@ -1291,6 +1291,12 @@ class Enemy:
             angle = math.atan2(player.y - self.y, player.x - self.x)
             # ボスの弾かどうかを判定
             is_boss = hasattr(self, 'enemy_type') and self.enemy_type >= 101
+            
+            # 通常エネミーの弾丸数制限（ボスは制限なし）
+            if not is_boss and len(self.projectiles) >= 5:
+                # 古い弾丸を削除
+                self.projectiles.pop(0)
+            
             projectile = EnemyProjectile(self.x, self.y, angle, self.damage // 2, self.behavior_type, self.enemy_type, is_boss_bullet=is_boss, projectile_speed=self.projectile_speed)
             self.projectiles.append(projectile)
             self.last_attack_time = current_time
@@ -1303,11 +1309,14 @@ class Enemy:
             if p.is_expired() or not p.is_on_screen():
                 continue
             
-            # プレイヤーから非常に遠い弾丸も削除（パフォーマンス向上）
-            if player is not None:
+            # プレイヤーから遠い弾丸も削除（パフォーマンス向上、ボスの弾は除外）
+            if player is not None and not p.is_boss_bullet:
                 dx = p.x - player.x
                 dy = p.y - player.y
-                if dx * dx + dy * dy > 1000000:  # 1000ピクセル以上離れたら削除
+                # 通常の弾は600ピクセル、ボスの弾は制限なし
+                max_distance_sq = 360000  # 600ピクセルの二乗
+                if dx * dx + dy * dy > max_distance_sq:
+                    continue
                     continue
             
             valid_projectiles.append(p)
@@ -1542,6 +1551,9 @@ class Enemy:
 
 class EnemyProjectile:
     """敵が発射する弾丸クラス"""
+    # 描画用のキャッシュサーフェス（クラス変数）
+    _draw_cache = {}
+    
     def __init__(self, x, y, angle, damage, behavior_type=3, enemy_level=1, is_boss_bullet=False, projectile_speed=2.0):
         self.x = x
         self.y = y
@@ -1551,9 +1563,13 @@ class EnemyProjectile:
         self.enemy_level = enemy_level  # 敵のレベルを記録
         self.is_boss_bullet = is_boss_bullet  # ボスの弾かどうか
         self.speed = projectile_speed  # 弾丸の速度（CSVから設定）
-        self.size = 18  # 弾丸のサイズ（1.5倍に拡大：12 * 1.5 = 18）
+        self.size = 18 if not is_boss_bullet else 18  # ボスの弾は変更しない
         self.lifetime = 3000  # 3秒で消滅（ミリ秒）
         self.created_time = pygame.time.get_ticks()
+        
+        # 通常の弾丸のみサイズを小さくして軽量化
+        if not is_boss_bullet:
+            self.size = 12  # 18から12に縮小
         
         # 速度ベクトルを計算
         self.vx = math.cos(angle) * self.speed
@@ -1601,31 +1617,63 @@ class EnemyProjectile:
         )
 
     def update(self):
-        """弾丸の移動処理"""
-        new_x = self.x + self.vx
-        new_y = self.y + self.vy
+        """弾丸の移動処理（最適化版）"""
+        self.x += self.vx
+        self.y += self.vy
         
-        # 障害物との衝突判定（CSVマップまたはステージマップが有効な場合）
-        if USE_CSV_MAP:
-            try:
-                from stage import get_stage_map
-                stage_map = get_stage_map()
-                
-                # 弾丸の中心位置で障害物チェック
-                if stage_map.is_obstacle_at_world_pos(new_x, new_y):
-                    # 障害物に当たった弾丸は削除対象にする（期限切れにする）
-                    self.created_time = pygame.time.get_ticks() - self.lifetime
-                    return
-                
-            except Exception:
-                # エラーが発生した場合は通常の移動
-                pass
-        
-        self.x = new_x
-        self.y = new_y
+        # 障害物との衝突判定（ボスの弾のみ、通常の弾は軽量化のためスキップ）
+        if self.is_boss_bullet and USE_CSV_MAP:
+            from stage import get_stage_map
+            stage_map = get_stage_map()
+            
+            # 弾丸の中心位置で障害物チェック
+            if stage_map.is_obstacle_at_world_pos(self.x, self.y):
+                # 障害物に当たった弾丸は削除対象にする（期限切れにする）
+                self.created_time = pygame.time.get_ticks() - self.lifetime
+                return
 
     def draw(self, screen, camera_x=0, camera_y=0):
-        """弾丸の描画（彩度ベースの色設定）"""
+        """弾丸の描画（キャッシュシステムで最適化）"""
+        # ボスの弾は従来通りの描画（手を加えない）
+        if self.is_boss_bullet:
+            self._draw_boss_bullet(screen, camera_x, camera_y)
+            return
+            
+        sx = int(self.x - camera_x)
+        sy = int(self.y - camera_y)
+        
+        # キャッシュキーを生成（色ベース）
+        cache_key = (self.base_color, self.size)
+        
+        # キャッシュされたサーフェスを使用
+        if cache_key not in self._draw_cache:
+            self._create_cached_surface(cache_key)
+        
+        surf = self._draw_cache[cache_key]
+        r = self.size // 2
+        screen.blit(surf, (sx - r, sy - r))
+
+    def _create_cached_surface(self, cache_key):
+        """描画用のサーフェスをキャッシュに作成"""
+        color, size = cache_key
+        r = size // 2
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        
+        r_base, g_base, b_base = color
+        
+        # シンプルな描画（軽量化）
+        # 外側の薄い円
+        outer_color = (r_base//3, g_base//3, b_base//3, 80)
+        pygame.draw.circle(surf, outer_color, (r, r), r)
+        
+        # 内側のコア
+        core_color = (r_base, g_base, b_base)
+        pygame.draw.circle(surf, core_color, (r, r), r//2)
+        
+        self._draw_cache[cache_key] = surf
+
+    def _draw_boss_bullet(self, screen, camera_x, camera_y):
+        """ボスの弾丸の描画（従来通り、変更なし）"""
         sx = int(self.x - camera_x)
         sy = int(self.y - camera_y)
         
@@ -1634,8 +1682,6 @@ class EnemyProjectile:
         
         # 基本色から明度の異なるバリエーションを作成
         r_base, g_base, b_base = self.base_color
-        
-
         
         # 外側の光輪（基本色、透明度低め）
         outer_color = (r_base//2, g_base//2, b_base//2, 60)
