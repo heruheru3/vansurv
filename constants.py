@@ -36,6 +36,7 @@ MAX_SUBITEM_LEVEL = 3
 # デバッグ・表示設定
 DEBUG = False   # デバッグ用ログ出力のON/OFF
 SHOW_FPS = True  # FPS表示のON/OFF
+SHOW_PICKUP_RANGE = False  # ジェム回収範囲の可視化（デバッグ用）
 
 # パフォーマンス計測設定
 ENABLE_PERFORMANCE_LOGGING = True  # パフォーマンス計測ログの有効/無効
@@ -74,6 +75,9 @@ MAX_GEMS_ON_SCREEN = 100  # 150から100に削減
 # HP自然回復設定
 NATURAL_HEAL_INTERVAL_MS = 2000  # 自然回復の間隔（ミリ秒）
 NATURAL_HEAL_AMOUNT = 0          # 自然回復時の基本回復量（HPサブアイテムレベル分が追加される）
+
+# アイテム回収設定
+BASE_ATTRACTION_DISTANCE = 100   # アイテム・ジェムの基本引き寄せ距離（ピクセル）
 
 # --- オーディオ基本設定 ---
 # 効果音とBGMのデフォルト音量（0.0〜1.0）

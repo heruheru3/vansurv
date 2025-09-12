@@ -49,16 +49,16 @@ class ExperienceGem:
         else:
             magnet_speed_multiplier = 1.0
 
-        if distance < attract_threshold and distance != 0:
-            # 引き寄せ状態フラグを立てる
-            self.being_attracted = True
+        # being_attractedフラグがTrueの場合のみ引き寄せ（main.pyで管理）
+        # ただし、マグネット効果が有効な場合は距離に関係なく引き寄せ
+        should_attract = (getattr(self, 'being_attracted', False) or 
+                         (hasattr(player, 'is_magnet_active') and player.is_magnet_active()))
+        
+        if should_attract and distance != 0:
             # 基本速度 × ジェム回収速度倍率 × マグネット倍率
             move_speed = self.speed * gem_speed_multiplier * magnet_speed_multiplier
             self.x += (dx / distance) * move_speed
             self.y += (dy / distance) * move_speed
-        else:
-            # 引き寄せ範囲外では引き寄せ状態を解除
-            self.being_attracted = False
 
     def is_expired(self):
         """ジェムが寿命切れかどうかを判定"""
@@ -157,8 +157,19 @@ class GameItem:
         # ジェム回収速度をアイテム移動にも適用
         item_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
 
-        if distance < attract_threshold and distance != 0:
-            move_speed = self.speed * item_speed_multiplier
+        # マグネット効果が有効な場合の速度アップ
+        if hasattr(player, 'is_magnet_active') and player.is_magnet_active():
+            magnet_speed_multiplier = MAGNET_FORCE_MULTIPLIER
+        else:
+            magnet_speed_multiplier = 1.0
+
+        # being_attractedフラグがTrueの場合のみ引き寄せ（main.pyで管理）
+        # ただし、マグネット効果が有効な場合は距離に関係なく引き寄せ
+        should_attract = (getattr(self, 'being_attracted', False) or 
+                         (hasattr(player, 'is_magnet_active') and player.is_magnet_active()))
+        
+        if should_attract and distance != 0:
+            move_speed = self.speed * item_speed_multiplier * magnet_speed_multiplier
             self.x += (dx / distance) * move_speed
             self.y += (dy / distance) * move_speed
 
@@ -386,7 +397,12 @@ class MoneyItem:
         # ジェム回収速度をお金の回収にも適用
         gem_speed_multiplier = float(player.get_gem_collection_speed()) if hasattr(player, 'get_gem_collection_speed') else 1.0
 
-        if distance < attract_threshold and distance != 0:
+        # being_attractedフラグがTrueの場合のみ引き寄せ（main.pyで管理）
+        # ただし、マグネット効果が有効な場合は距離に関係なく引き寄せ
+        should_attract = (getattr(self, 'being_attracted', False) or 
+                         (hasattr(player, 'is_magnet_active') and player.is_magnet_active()))
+        
+        if should_attract and distance != 0:
             move_speed = self.speed * speed_multiplier * gem_speed_multiplier
             self.x += (dx / distance) * move_speed
             self.y += (dy / distance) * move_speed

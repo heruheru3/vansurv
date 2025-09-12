@@ -298,6 +298,12 @@ def main():
                         print(f"[INFO] SHOW_FPS set to {SHOW_FPS}")
                         continue
 
+                    if event.key == pygame.K_F7:
+                        global SHOW_PICKUP_RANGE
+                        SHOW_PICKUP_RANGE = not SHOW_PICKUP_RANGE
+                        print(f"[INFO] SHOW_PICKUP_RANGE set to {SHOW_PICKUP_RANGE}")
+                        continue
+
                     # ESCキーでゲーム途中でも強制終了
                     if event.key == pygame.K_ESCAPE and not game_over and not game_clear:
                         print("[INFO] Game forcibly ended by ESC key")
@@ -1470,14 +1476,31 @@ def main():
                         continue
                     
                     gem.move_to_player(player)
-                    # 経験値ジェム取得の正方形判定（最高速化）
+                    
+                    # 回収範囲の計算
                     player_half = getattr(player, 'size', 0) // 2
                     gem_half = getattr(gem, 'size', 0) // 2
-                    # サブアイテムから追加される取得範囲を取得
                     extra_range = int(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0
-                    total_range = player_half + gem_half + extra_range
-                    if (abs(player.x - gem.x) < total_range and 
-                        abs(player.y - gem.y) < total_range):
+                    
+                    # 引き寄せ範囲（基本引き寄せ距離 + サブアイテム回収範囲）
+                    attraction_range = BASE_ATTRACTION_DISTANCE + extra_range
+                    # 実際の取得範囲（プレイヤーのサイズのみ）
+                    pickup_range = player_half + gem_half
+                    
+                    # 距離計算（平方根なしの近似ユークリッド距離で円形に近似）
+                    dx = player.x - gem.x
+                    dy = player.y - gem.y
+                    distance_squared = dx * dx + dy * dy
+                    
+                    # 引き寄せ範囲に入ったら引き寄せ開始
+                    attraction_range_squared = attraction_range * attraction_range
+                    if distance_squared < attraction_range_squared:
+                        if not getattr(gem, 'being_attracted', False):
+                            gem.being_attracted = True
+                    
+                    # 実際の取得範囲（プレイヤーアイコンサイズ）に到達したら取得完了
+                    pickup_range_squared = pickup_range * pickup_range
+                    if distance_squared < pickup_range_squared:
                         prev_level = player.level
                         # ジェムごとの価値を付与
                         player.add_exp(getattr(gem, 'value', 1))
@@ -1503,11 +1526,31 @@ def main():
 
                 for item in items[:]:
                     item.move_to_player(player)
-                    # アイテム取得の正方形判定（最高速化）
+                    
+                    # 回収範囲と取得範囲の計算
                     player_half = getattr(player, 'size', 0) // 2
                     item_half = getattr(item, 'size', 0) // 2
-                    if (abs(player.x - item.x) < player_half + item_half and 
-                        abs(player.y - item.y) < player_half + item_half):
+                    extra_range = int(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0
+                    
+                    # 引き寄せ範囲（基本引き寄せ距離 + サブアイテム回収範囲）
+                    attraction_range = BASE_ATTRACTION_DISTANCE + extra_range
+                    # 実際の取得範囲（プレイヤーのサイズのみ）
+                    pickup_range = player_half + item_half
+                    
+                    # 距離計算（平方根なしの近似ユークリッド距離で円形に近似）
+                    dx = player.x - item.x
+                    dy = player.y - item.y
+                    distance_squared = dx * dx + dy * dy
+                    
+                    # 引き寄せ範囲に入ったら引き寄せ開始
+                    attraction_range_squared = attraction_range * attraction_range
+                    if distance_squared < attraction_range_squared:
+                        if not getattr(item, 'being_attracted', False):
+                            item.being_attracted = True
+                    
+                    # 実際の取得範囲に到達したら取得完了
+                    pickup_range_squared = pickup_range * pickup_range
+                    if distance_squared < pickup_range_squared:
                         if item.type == "heal":
                             # 体力回復（割合回復）
                             player.heal(HEAL_ITEM_AMOUNT, "item")
@@ -1612,6 +1655,32 @@ def main():
 
             # プレイヤー本体は武器エフェクトより手前に表示する
             player.draw(world_surf, int_cam_x, int_cam_y)
+
+            # ジェム回収範囲の可視化（デバッグ用）
+            if SHOW_PICKUP_RANGE:
+                try:
+                    pickup_range = player.get_gem_pickup_range() if hasattr(player, 'get_gem_pickup_range') else 0
+                    player_screen_x = int(player.x - int_cam_x)
+                    player_screen_y = int(player.y - int_cam_y)
+                    
+                    # 基本引き寄せ範囲（100ピクセル + サブアイテム範囲）
+                    total_attraction_range = int(BASE_ATTRACTION_DISTANCE + pickup_range)
+                    
+                    # 実際の取得範囲（プレイヤーサイズ）
+                    player_size = getattr(player, 'size', 0) // 2
+                    actual_pickup_range = player_size + 4  # ジェムのサイズ考慮
+                    
+                    # 引き寄せ範囲を薄い緑色の円で表示（ユークリッド距離に対応）
+                    pygame.draw.circle(world_surf, (0, 255, 0, 80), 
+                                     (player_screen_x, player_screen_y), 
+                                     total_attraction_range, 2)
+                    
+                    # 実際の取得範囲を濃い緑色の円で表示
+                    pygame.draw.circle(world_surf, (0, 200, 0, 120), 
+                                     (player_screen_x, player_screen_y), 
+                                     actual_pickup_range, 1)
+                except Exception:
+                    pass
 
             # デバッグ表示: 攻撃範囲と敵の当たり判定の可視化（world_surf に描画）
             if show_debug_visuals:
@@ -1724,8 +1793,12 @@ def main():
                 # 弾丸数をカウント
                 total_projectiles = sum(len(enemy.get_projectiles()) for enemy in enemies)
                 
+                # 回収範囲情報を取得
+                pickup_range = player.get_gem_pickup_range() if hasattr(player, 'get_gem_pickup_range') else 0
+                pickup_level = player.get_magnet_level() if hasattr(player, 'get_magnet_level') else 0
+                
                 # 統計情報をまとめて表示
-                fps_text = fps_font.render(f"FPS: {avg_fps:.1f} | Enemies: {len(enemies)} | Bullets: {total_projectiles} | Gems: {len(experience_gems)} | Particles: {len(particles)}", True, (255, 255, 255))
+                fps_text = fps_font.render(f"FPS: {avg_fps:.1f} | Enemies: {len(enemies)} | Bullets: {total_projectiles} | Gems: {len(experience_gems)} | Particles: {len(particles)} | Range: {pickup_range:.1f}px (Lv{pickup_level})", True, (255, 255, 255))
                 fps_rect = fps_text.get_rect()
                 fps_rect.bottomleft = (10, screen.get_height() - 10)
                 
