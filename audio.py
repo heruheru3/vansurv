@@ -18,6 +18,8 @@ class AudioManager:
 
         # キャッシュ: name -> Sound or None
         self._sfx_cache = {}
+        # 音声重複防止用タイマー: sound_name -> last_played_time
+        self._sound_timers = {}
         # 初期音量は constants.py のデフォルトを使用
         self.music_volume = DEFAULT_MUSIC_VOLUME
         self.sfx_volume = DEFAULT_SFX_VOLUME
@@ -35,7 +37,7 @@ class AudioManager:
             self._sfx_cache[name] = None
             return None
 
-    def play_sound(self, name, volume=None, duration=None, fade_in=0.0, fade_out=0.0):
+    def play_sound(self, name, volume=None, duration=None, fade_in=0.0, fade_out=0.0, min_interval=0.05):
         """効果音を再生。オプション:
         - volume: 呼び出しごとの絶対音量 (0.0〜1.0)。None の場合は global sfx_volume を使用します。
                   (従来のコードでは volume をグローバル音量の乗算として扱っていましたが、
@@ -43,9 +45,17 @@ class AudioManager:
         - duration: 再生全体の秒数 (float)。指定すると duration 秒後に stop または fade_out を実行。
         - fade_in: フェードイン秒 (float)
         - fade_out: フェードアウト秒 (float)
+        - min_interval: 同じ音声の最小再生間隔（秒）。デフォルトは0.05秒
         例: play_sound('heal', volume=0.6, duration=1.0, fade_out=0.5)
         """
         try:
+            # 音声重複防止チェック
+            current_time = time.time()
+            if name in self._sound_timers:
+                time_since_last = current_time - self._sound_timers[name]
+                if time_since_last < min_interval:
+                    return  # 間隔が短すぎる場合はスキップ
+            
             # Ensure mixer is initialized (some imports may occur before pygame.init())
             try:
                 if not pygame.mixer.get_init():
@@ -94,6 +104,8 @@ class AudioManager:
             # play and get Channel
             try:
                 ch = snd.play(fade_ms=fade_in_ms)
+                # 再生成功時にタイマーを更新
+                self._sound_timers[name] = current_time
             except Exception:
                 ch = None
 

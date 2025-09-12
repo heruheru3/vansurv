@@ -1462,6 +1462,7 @@ def main():
                             enemy.projectiles.remove(projectile)
 
                 # 経験値ジェム処理（レスポンス重視で毎フレーム処理）
+                gems_collected_this_frame = 0  # このフレームで取得したジェム数
                 for gem in experience_gems[:]:
                     # ジェムの寿命チェック（引き寄せ中でない場合のみ）
                     if hasattr(gem, 'is_expired') and gem.is_expired() and not getattr(gem, 'being_attracted', False):
@@ -1481,18 +1482,24 @@ def main():
                         # ジェムごとの価値を付与
                         player.add_exp(getattr(gem, 'value', 1))
                         experience_gems.remove(gem)
-                        # サウンド: ジェム取得
-                        try:
-                            from audio import audio
-                            audio.play_sound('gem_pickup', volume=0.8)
-                        except Exception:
-                            pass
+                        gems_collected_this_frame += 1  # 取得数をカウント
                         if player.level > prev_level:
                             particles.append(LevelUpEffect(player.x, player.y))
                             for _ in range(12):
                                 particles.append(DeathParticle(player.x, player.y, CYAN))
                             # レベルアップボーナス
                             current_game_money += MONEY_PER_LEVEL_BONUS
+                
+                # ジェム取得音声（このフレームで1つ以上取得した場合のみ1回再生）
+                if gems_collected_this_frame > 0:
+                    try:
+                        from audio import audio
+                        # 複数ジェム取得時は音量を少し上げる（最大1.0）
+                        volume = min(1.0, 0.6 + gems_collected_this_frame * 0.1)
+                        # min_intervalを短めに設定してレスポンスを良くする
+                        audio.play_sound('gem_pickup', volume=volume, min_interval=0.1)
+                    except Exception:
+                        pass
 
                 for item in items[:]:
                     item.move_to_player(player)

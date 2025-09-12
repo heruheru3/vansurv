@@ -27,7 +27,7 @@ class Player:
         self.y = WORLD_HEIGHT // 2
         self.speed = 3
         self.base_speed = 3
-        self.size = 24
+        self.size = 32
         
         # 安全な開始位置を見つける
         self._adjust_spawn_position()
