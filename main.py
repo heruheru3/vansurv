@@ -1818,14 +1818,14 @@ def main():
             draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money)
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
             if game_over or game_clear:
-                from ui import draw_end_buttons
+                from ui.ui import draw_end_buttons
                 draw_end_buttons(virtual_screen, game_over, game_clear)
             
             # レベルアップ候補がある場合はポップアップを ui.draw_level_choice に任せる
             # サブアイテム選択 UI を優先して表示
             if getattr(player, 'awaiting_subitem_choice', False) and getattr(player, 'last_subitem_choices', None):
                 # サブアイテム選択は ui.draw_subitem_choice を使う
-                from ui import draw_subitem_choice
+                from ui.ui import draw_subitem_choice
                 draw_subitem_choice(virtual_screen, player, ICONS)
             elif getattr(player, 'awaiting_weapon_choice', False) and getattr(player, 'last_level_choices', None):
                 draw_level_choice(virtual_screen, player, ICONS)

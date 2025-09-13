@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('constants.py', '.'), ('enemy.py', '.'), ('player.py', '.'), ('resources.py', '.'), ('stage.py', '.'), ('subitems.py', '.'), ('ui.py', '.'), ('collision.py', '.'), ('game_logic.py', '.'), ('game_utils.py', '.'), ('box.py', '.'), ('save_system.py', '.'), ('performance_config.py', '.'), ('weapons', 'weapons/'), ('effects', 'effects/'), ('assets', 'assets/'), ('data', 'data/'), ('map', 'map/'), ('save', 'save/')],
+    datas=[('constants.py', '.'), ('core', 'core/'), ('systems', 'systems/'), ('ui', 'ui/'), ('tools', 'tools/'), ('weapons', 'weapons/'), ('effects', 'effects/'), ('assets', 'assets/'), ('data', 'data/'), ('map', 'map/'), ('save', 'save/')],
     hiddenimports=['colorsys', 'math', 'random', 'json', 'os', 'sys', 'datetime'],
     hookspath=[],
     hooksconfig={},

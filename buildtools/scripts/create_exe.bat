@@ -22,18 +22,10 @@ pyinstaller --noconfirm --onefile --windowed --clean --name heruheru3_vansurv ^
 --hidden-import=datetime ^
 --icon "assets\favicon.ico" ^
 --add-data "constants.py;." ^
---add-data "enemy.py;." ^
---add-data "player.py;." ^
---add-data "resources.py;." ^
---add-data "stage.py;." ^
---add-data "subitems.py;." ^
---add-data "ui.py;." ^
---add-data "collision.py;." ^
---add-data "game_logic.py;." ^
---add-data "game_utils.py;." ^
---add-data "box.py;." ^
---add-data "save_system.py;." ^
---add-data "performance_config.py;." ^
+--add-data "core;core/" ^
+--add-data "systems;systems/" ^
+--add-data "ui;ui/" ^
+--add-data "tools;tools/" ^
 --add-data "weapons;weapons/" ^
 --add-data "effects;effects/" ^
 --add-data "assets;assets/" ^

@@ -189,7 +189,7 @@ class ItemBox:
             return
         
         try:
-            from stage import get_stage_map
+            from ui.stage import get_stage_map
             stage_map = get_stage_map()
             
             # 現在位置をチェック
@@ -666,7 +666,7 @@ class BoxManager:
             return False
         
         try:
-            from stage import get_stage_map
+            from ui.stage import get_stage_map
             stage_map = get_stage_map()
             
             # ボックスサイズの半分だけ余裕を持たせてチェック

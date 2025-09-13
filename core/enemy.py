@@ -413,7 +413,7 @@ class Enemy:
             return
         
         try:
-            from stage import get_stage_map
+            from ui.stage import get_stage_map
             stage_map = get_stage_map()
             
             # 現在位置をチェック
@@ -734,7 +734,7 @@ class Enemy:
             blocked = False
             if USE_CSV_MAP:
                 try:
-                    from stage import get_stage_map
+                    from ui.stage import get_stage_map
                     stage_map = get_stage_map()
                     blocked = self._is_position_blocked(potential_x, potential_y, stage_map)
                 except Exception:
@@ -832,7 +832,7 @@ class Enemy:
         # 障害物との衝突判定（CSVマップまたはステージマップが有効な場合）
         if USE_CSV_MAP and (new_x != self.x or new_y != self.y):
             try:
-                from stage import get_stage_map
+                from ui.stage import get_stage_map
                 stage_map = get_stage_map()
                 
                 # 敵の四隅をチェック
@@ -931,7 +931,7 @@ class Enemy:
                             # 候補位置が地形・他エネミーと衝突しないか確認
                             valid_candidate = True
                             if USE_CSV_MAP:
-                                from stage import get_stage_map
+                                from ui.stage import get_stage_map
                                 stage_map = get_stage_map()
                                 half_size = self.size // 2
                                 check_points = [
@@ -1654,7 +1654,7 @@ class EnemyProjectile:
         
         # 障害物との衝突判定（ボスの弾のみ、通常の弾は軽量化のためスキップ）
         if self.is_boss_bullet and USE_CSV_MAP:
-            from stage import get_stage_map
+            from ui.stage import get_stage_map
             stage_map = get_stage_map()
             
             # 弾丸の中心位置で障害物チェック

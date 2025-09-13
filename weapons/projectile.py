@@ -188,7 +188,7 @@ class MagicWand(Weapon):
         stage = None
         try:
             if USE_CSV_MAP:
-                from stage import get_stage_map
+                from ui.stage import get_stage_map
                 stage = get_stage_map()
         except Exception:
             pass
@@ -271,7 +271,7 @@ class Axe(Weapon):
         stage = None
         try:
             if USE_CSV_MAP:
-                from stage import get_stage_map
+                from ui.stage import get_stage_map
                 stage = get_stage_map()
         except Exception:
             pass
@@ -359,7 +359,7 @@ class Stone(Weapon):
         stage = None
         try:
             if USE_CSV_MAP:
-                from stage import get_stage_map
+                from ui.stage import get_stage_map
                 stage = get_stage_map()
         except Exception:
             pass
@@ -578,7 +578,7 @@ class Knife(Weapon):
         stage = None
         try:
             if USE_CSV_MAP:
-                from stage import get_stage_map
+                from ui.stage import get_stage_map
                 stage = get_stage_map()
         except Exception:
             pass
