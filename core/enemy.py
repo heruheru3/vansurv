@@ -52,7 +52,7 @@ class Enemy:
                         'attack_cooldown': int(row['attack_cooldown']),
                         'image_file': row['image_file'],
                         'image_size': int(row['image_size']),
-                        'projectile_speed': float(row['projectile_speed']) if row['projectile_speed'] else 2.0,
+                        'projectile_speed': float(row['projectile_speed']) if row['projectile_speed'] else 3.0,
                         'description': row['description']
                     }
             cls._stats_loaded = True
@@ -92,7 +92,7 @@ class Enemy:
                         'spawn_time': spawn_time,  # 出現時間（秒）
                         'image_file': row['image_file'],
                         'image_size': int(row['image_size']),
-                        'projectile_speed': float(row['projectile_speed']) if row['projectile_speed'] else 2.0,
+                        'projectile_speed': float(row['projectile_speed']) if row['projectile_speed'] else 3.0,
                         'description': row['description']
                     }
                     # Noベースとキーベースの両方で保存
