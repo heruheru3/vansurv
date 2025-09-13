@@ -36,7 +36,7 @@ class Enemy:
         if cls._stats_loaded:
             return
             
-        csv_path = resource_path("enemy_stats.csv")
+        csv_path = resource_path("data/enemy_stats.csv")
         try:
             with open(csv_path, 'r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
@@ -70,7 +70,7 @@ class Enemy:
         if cls._boss_stats_loaded:
             return
             
-        csv_path = resource_path("boss_stats.csv")
+        csv_path = resource_path("data/boss_stats.csv")
         try:
             with open(csv_path, 'r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)

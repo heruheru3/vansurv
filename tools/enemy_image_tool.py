@@ -147,8 +147,8 @@ class EnemyImageTool:
         # 状態を読み込んでソートキーを作成
         state_data = {}
         try:
-            if os.path.exists('enemy_image_state.json'):
-                with open('enemy_image_state.json', 'r', encoding='utf-8') as f:
+            if os.path.exists('data/enemy_image_state.json'):
+                with open('data/enemy_image_state.json', 'r', encoding='utf-8') as f:
                     state_data = json.load(f)
         except Exception:
             pass
@@ -382,7 +382,7 @@ class EnemyImageTool:
                     'enabled': image_info['enabled_var'].get()
                 }
             
-            with open('enemy_image_state.json', 'w', encoding='utf-8') as f:
+            with open('data/enemy_image_state.json', 'w', encoding='utf-8') as f:
                 json.dump(state_data, f, ensure_ascii=False, indent=2)
                 
         except Exception:
@@ -507,10 +507,10 @@ class EnemyImageTool:
     def auto_load_state(self):
         """起動時に自動で状態を読み込み"""
         try:
-            if not os.path.exists('enemy_image_state.json'):
+            if not os.path.exists('data/enemy_image_state.json'):
                 return
             
-            with open('enemy_image_state.json', 'r', encoding='utf-8') as f:
+            with open('data/enemy_image_state.json', 'r', encoding='utf-8') as f:
                 state_data = json.load(f)
             
             for image_info in self.image_data:
@@ -536,20 +536,20 @@ class EnemyImageTool:
             }
         
         try:
-            with open('enemy_image_state.json', 'w', encoding='utf-8') as f:
+            with open('data/enemy_image_state.json', 'w', encoding='utf-8') as f:
                 json.dump(state_data, f, ensure_ascii=False, indent=2)
-            messagebox.showinfo("保存完了", "状態を enemy_image_state.json に保存しました")
+            messagebox.showinfo("保存完了", "状態を data/enemy_image_state.json に保存しました")
         except Exception as e:
             messagebox.showerror("保存エラー", f"状態の保存に失敗しました: {str(e)}")
     
     def load_state(self):
         """JSONファイルから状態を読み込み"""
         try:
-            if not os.path.exists('enemy_image_state.json'):
-                messagebox.showwarning("ファイルなし", "enemy_image_state.json が見つかりません")
+            if not os.path.exists('data/enemy_image_state.json'):
+                messagebox.showwarning("ファイルなし", "data/enemy_image_state.json が見つかりません")
                 return
             
-            with open('enemy_image_state.json', 'r', encoding='utf-8') as f:
+            with open('data/enemy_image_state.json', 'r', encoding='utf-8') as f:
                 state_data = json.load(f)
             
             loaded_count = 0
