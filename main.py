@@ -1391,18 +1391,19 @@ def main():
                                 except Exception:
                                     pass
 
-                                # この敵は処理済み（ボス以外は削除）
-                                if not getattr(enemy, 'is_boss', False):
-                                    enemies.remove(enemy)
+                                # エネミーは削除しない（継続して存在）
+                                # if not getattr(enemy, 'is_boss', False):
+                                #     enemies.remove(enemy)
                                 if player.hp <= 0:
                                     game_over = True
                             else:
-                                # 無敵中はノーダメージ、敵だけ消す（多段ヒット防止、ボス以外）
-                                try:
-                                    if not getattr(enemy, 'is_boss', False):
-                                        enemies.remove(enemy)
-                                except Exception:
-                                    pass
+                                # 無敵中はノーダメージ、エネミーも削除しない
+                                pass
+                                # try:
+                                #     if not getattr(enemy, 'is_boss', False):
+                                #         enemies.remove(enemy)
+                                # except Exception:
+                                #     pass
 
                 # 敵の弾丸とプレイヤーの衝突判定（負荷軽減）
                 # エネミー弾丸処理（効率化：事前計算）
