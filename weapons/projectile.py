@@ -262,7 +262,7 @@ class Axe(Weapon):
         except Exception:
             extra = 0
 
-        effective_size = max(1, int(self.size * range_mult))
+        effective_size = min(100, int(self.size * range_mult))
         effective_duration = max(100, int(3000 * time_mult))
         effective_damage = self.damage * base_mult
         effective_num = min(5, int(1 + extra))
@@ -306,7 +306,11 @@ class Axe(Weapon):
         self.size = int(self.size * 1.3)  # 範囲20%増加
         self.throw_speed += 1  # 投げる速度増加
         self.damage *= 1.2  # ダメージ15%増加
-        self.cooldown = max(self.cooldown * 0.95, 1000)  # クールダウン減少（最小1000ms）
+        # 奇数レベルで数を増やす
+        if self.level % 2 == 1:
+            self.num_projectiles += 1
+        else:
+            self.cooldown = max(self.cooldown * 0.95, 1000)  # クールダウン減少（最小1000ms）
 
 class Stone(Weapon):
     def __init__(self):
@@ -469,7 +473,7 @@ class Knife(Weapon):
     """
     def __init__(self):
         super().__init__()
-        self.cooldown = 500
+        self.cooldown = 700
         self.damage = 18
         self.speed = 12
         self.size = 10
