@@ -760,7 +760,7 @@ class Enemy:
             if self.knockback_cooldown < 0:
                 self.knockback_cooldown = 0
 
-    def move(self, player, camera_x=0, camera_y=0, map_loader=None, enemies=None):
+    def move(self, player, camera_x=0, camera_y=0, map_loader=None, enemies=None, delta_time=1.0):
         """行動パターンに応じた移動処理"""
         # ノックバック中のみ通常の移動を無効にする（クールダウン中は移動可能）
         if self.knockback_timer > 0:
@@ -771,8 +771,8 @@ class Enemy:
         if self.behavior_type == 1:
             # 1. プレイヤーに寄ってくる（追跡）
             angle = math.atan2(player.y - self.y, player.x - self.x)
-            new_x = self.x + math.cos(angle) * self.base_speed
-            new_y = self.y + math.sin(angle) * self.base_speed
+            new_x = self.x + math.cos(angle) * self.base_speed * delta_time
+            new_y = self.y + math.sin(angle) * self.base_speed * delta_time
             
         elif self.behavior_type == 2:
             # 2. 直進タイプ（プレイヤー方向へ一直線に進み、画面外に出ていく）
@@ -783,9 +783,9 @@ class Enemy:
                 self.velocity_x = math.cos(self.initial_direction) * self.base_speed
                 self.velocity_y = math.sin(self.initial_direction) * self.base_speed
 
-            # 速度ベクトルによる移動（反転処理は行わない）
-            new_x = self.x + self.velocity_x
-            new_y = self.y + self.velocity_y
+            # 速度ベクトルによる移動（反転処理は行わない）（delta_timeを適用）
+            new_x = self.x + self.velocity_x * delta_time
+            new_y = self.y + self.velocity_y * delta_time
             
         elif self.behavior_type == 3:
             # 3. プレイヤーから一定の距離を保ち、魔法の杖のような弾を発射する
@@ -794,20 +794,20 @@ class Enemy:
             if distance_to_player < self.target_distance - 20:
                 # プレイヤーに近すぎる場合は離れる（許容範囲も倍に）
                 angle = math.atan2(self.y - player.y, self.x - player.x)  # プレイヤーから離れる方向
-                new_x = self.x + math.cos(angle) * self.base_speed
-                new_y = self.y + math.sin(angle) * self.base_speed
+                new_x = self.x + math.cos(angle) * self.base_speed * delta_time
+                new_y = self.y + math.sin(angle) * self.base_speed * delta_time
             elif distance_to_player > self.target_distance + 20:
                 # プレイヤーから遠すぎる場合は近づく（許容範囲も倍に）
                 angle = math.atan2(player.y - self.y, player.x - self.x)  # プレイヤーに向かう方向
-                new_x = self.x + math.cos(angle) * self.base_speed
-                new_y = self.y + math.sin(angle) * self.base_speed
+                new_x = self.x + math.cos(angle) * self.base_speed * delta_time
+                new_y = self.y + math.sin(angle) * self.base_speed * delta_time
             # 適切な距離の場合は移動しない
             
         elif self.behavior_type == 4:
             # 4. プレイヤーに近づきながら射撃攻撃
             angle = math.atan2(player.y - self.y, player.x - self.x)
-            new_x = self.x + math.cos(angle) * self.base_speed
-            new_y = self.y + math.sin(angle) * self.base_speed
+            new_x = self.x + math.cos(angle) * self.base_speed * delta_time
+            new_y = self.y + math.sin(angle) * self.base_speed * delta_time
         
         # 敵同士の衝突回避ヘルパー
         def _would_collide_with_others(px, py, enemies_list):
@@ -1297,7 +1297,7 @@ class Enemy:
             self.projectiles.append(projectile)
             self.last_attack_time = current_time
 
-    def update_projectiles(self, player=None):
+    def update_projectiles(self, player=None, delta_time=1.0):
         """弾丸の更新処理"""
         # 有効期限切れや画面外の弾丸を削除
         valid_projectiles = []
@@ -1319,9 +1319,9 @@ class Enemy:
         
         self.projectiles = valid_projectiles
         
-        # 弾丸の移動
+        # 弾丸の移動（delta_timeを渡す）
         for projectile in self.projectiles:
-            projectile.update()
+            projectile.update(delta_time)
 
     def draw_projectiles(self, screen, camera_x=0, camera_y=0):
         """弾丸の描画"""
@@ -1643,10 +1643,10 @@ class EnemyProjectile:
             max(0, min(255, int(b * 255)))
         )
 
-    def update(self):
+    def update(self, delta_time=1.0):
         """弾丸の移動処理（最適化版）"""
-        self.x += self.vx
-        self.y += self.vy
+        self.x += self.vx * delta_time
+        self.y += self.vy * delta_time
         
         # 時間ベースの脈動エフェクト（軽量）
         current_time = pygame.time.get_ticks()

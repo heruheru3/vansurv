@@ -153,7 +153,7 @@ class Player:
         except Exception:
             pass
 
-    def move(self, camera_x=0, camera_y=0, get_virtual_mouse_pos=None):
+    def move(self, camera_x=0, camera_y=0, get_virtual_mouse_pos=None, delta_time=1.0):
         dx = 0.0
         dy = 0.0
         keys = pygame.key.get_pressed()
@@ -222,9 +222,9 @@ class Player:
             nx = dx / length
             ny = dy / length
             
-            # 新しい位置を計算
-            new_x = self.x + nx * sp
-            new_y = self.y + ny * sp
+            # 新しい位置を計算（delta_timeを適用）
+            new_x = self.x + nx * sp * delta_time
+            new_y = self.y + ny * sp * delta_time
             
             # 障害物との衝突判定（マップが有効な場合のみ）
             if USE_CSV_MAP:
@@ -242,7 +242,7 @@ class Player:
                     
                     # X軸方向の移動をチェック
                     x_blocked = False
-                    test_x = self.x + nx * sp
+                    test_x = self.x + nx * sp * delta_time
                     for corner_x, corner_y in [(test_x - self.size//2, self.y - self.size//2), 
                                                (test_x + self.size//2, self.y - self.size//2),
                                                (test_x - self.size//2, self.y + self.size//2),
@@ -253,7 +253,7 @@ class Player:
                     
                     # Y軸方向の移動をチェック
                     y_blocked = False
-                    test_y = self.y + ny * sp
+                    test_y = self.y + ny * sp * delta_time
                     for corner_x, corner_y in [(self.x - self.size//2, test_y - self.size//2),
                                                (self.x + self.size//2, test_y - self.size//2),
                                                (self.x - self.size//2, test_y + self.size//2),
@@ -277,8 +277,8 @@ class Player:
                 self.x = new_x
                 self.y = new_y
             
-            self.vx = nx * sp
-            self.vy = ny * sp
+            self.vx = nx * sp * delta_time
+            self.vy = ny * sp * delta_time
         else:
             self.vx = 0.0
             self.vy = 0.0
@@ -803,7 +803,7 @@ class Player:
             return random_upgrade(self.subitems, count=count)
         except Exception:
             return []
-    def update_regen(self):
+    def update_regen(self, delta_time=1.0):
         """自然回復（HPサブアイテム所持時のみ有効）。2秒ごとに1回復。"""
         try:
             now = pygame.time.get_ticks()
@@ -812,8 +812,9 @@ class Player:
                 self.last_regen_ms = now
                 return
             if 'hp' in self.subitems and self.hp < self.get_max_hp():
-                # 自然回復：設定された間隔で回復
-                if now - getattr(self, 'last_regen_ms', 0) >= NATURAL_HEAL_INTERVAL_MS:
+                # 自然回復：設定された間隔で回復（delta_timeで間隔を調整）
+                required_interval = NATURAL_HEAL_INTERVAL_MS / delta_time
+                if now - getattr(self, 'last_regen_ms', 0) >= required_interval:
                     # HPサブアイテムのレベルに応じた回復量を取得
                     natural_heal_amount = self.get_natural_heal_amount()
                     heal_amount = self.heal(natural_heal_amount, "auto")

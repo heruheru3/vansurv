@@ -4,6 +4,14 @@ SCREEN_HEIGHT = 720
 FPS = 60
 SURVIVAL_TIME = 180
 
+# フレームスキップ・デルタタイム設定
+ENABLE_FRAME_SKIP = True        # フレームスキップの有効/無効
+TARGET_FRAME_TIME = 1000.0 / FPS  # 目標フレーム時間（ミリ秒）
+MAX_FRAME_SKIP = 5              # 最大フレームスキップ数
+MIN_FPS_THRESHOLD = 45          # この値を下回ったら描画最適化を開始
+DELTA_TIME_CAP = 50.0           # デルタタイムの上限（ミリ秒、約3フレーム相当）
+DELTA_TIME_SMOOTHING = 0.1      # デルタタイムスムージング係数（0.0-1.0、小さいほど滑らか）
+
 # ワールドサイズ（画面の4倍）
 WORLD_WIDTH = SCREEN_WIDTH * 4
 WORLD_HEIGHT = SCREEN_HEIGHT * 4
@@ -73,7 +81,7 @@ PARTICLE_TRIM_TO = 300      # 切るときに残す数（80から300に大幅増
 MAX_GEMS_ON_SCREEN = 100    # 100から500に大幅増加
 
 # 敵の最大数（8コア並列処理で高負荷に対応）
-MAX_ENEMIES_ON_SCREEN = 200  # 300から500に増加（8コアCPU使用率向上のため）
+MAX_ENEMIES_ON_SCREEN = 300  # 300から500に増加（8コアCPU使用率向上のため）
 
 # 並列処理ON/OFF切り替え設定
 PARALLEL_PROCESSING_ENABLED = True  # 並列処理の有効/無効（F8で切り替え可能）

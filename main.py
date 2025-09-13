@@ -305,7 +305,7 @@ def main():
             
             # 複数の処理を並列実行
             with ProcessPoolExecutor(max_workers=num_processes) as executor:
-                def process_enemy_batch_intensive(batch):
+                def process_enemy_batch_intensive(batch, dt):
                     """CPU集約的なエネミー処理"""
                     for enemy in batch:
                         try:
@@ -320,13 +320,13 @@ def main():
                             
                             # ノックバック処理
                             if hasattr(enemy, 'update_knockback'):
-                                enemy.update_knockback()
+                                enemy.update_knockback(dt * (1.0/60.0))
                         except Exception:
                             pass
                     return batch
                 
-                # 並列実行でCPU使用率を最大化
-                futures = [executor.submit(process_enemy_batch_intensive, batch) for batch in enemy_batches]
+                # 並列実行でCPU使用率を最大化（delta_timeを渡す）
+                futures = [executor.submit(process_enemy_batch_intensive, batch, delta_time) for batch in enemy_batches]
                 results = [future.result() for future in futures]
                 
                 # 結果をマージ
@@ -526,9 +526,57 @@ def main():
     # メインゲームループ
     running = True
     frame_count = 0  # フレームカウンターを初期化
-    print("[INFO] Entering main loop")
+    
+    # デルタタイム管理の初期化
+    last_time = time.perf_counter() * 1000.0  # ミリ秒に変換
+    accumulator = 0.0  # フレーム更新の蓄積時間
+    game_time_accumulator = 0.0  # ゲーム時間の蓄積
+    
+    print("[INFO] Entering main loop with delta time system")
     while running:
         try:
+            # デルタタイム計算（エクスポネンシャル・スムージング）
+            current_time = time.perf_counter() * 1000.0  # ミリ秒に変換
+            delta_time_ms = current_time - last_time
+            last_time = current_time
+            
+            # エクスポネンシャル・スムージングの初期化
+            if not hasattr(main, 'smoothed_delta_time_ms'):
+                main.smoothed_delta_time_ms = delta_time_ms
+            
+            # エクスポネンシャル・スムージング（より滑らかな補間）
+            main.smoothed_delta_time_ms = (
+                DELTA_TIME_SMOOTHING * delta_time_ms + 
+                (1.0 - DELTA_TIME_SMOOTHING) * main.smoothed_delta_time_ms
+            )
+            
+            # デルタタイムのキャップ（異常な値を防ぐ）
+            if main.smoothed_delta_time_ms > DELTA_TIME_CAP:
+                main.smoothed_delta_time_ms = DELTA_TIME_CAP
+            
+            # デルタタイムを60FPS基準で正規化（1.0 = 60FPSでの1フレーム）
+            delta_time = main.smoothed_delta_time_ms / TARGET_FRAME_TIME
+            
+            # デバッグ：delta_time値を定期的に表示（10フレームごと）
+            if hasattr(main, 'debug_frame_counter'):
+                main.debug_frame_counter += 1
+            else:
+                main.debug_frame_counter = 1
+            
+            if main.debug_frame_counter % 180 == 0:  # 約3秒ごと（60FPS基準）
+                current_fps = 1000.0 / main.smoothed_delta_time_ms if main.smoothed_delta_time_ms > 0 else 0
+                raw_fps = 1000.0 / delta_time_ms if delta_time_ms > 0 else 0
+                print(f"[DEBUG] Raw FPS: {raw_fps:.1f}, Smoothed FPS: {current_fps:.1f}, delta_time: {delta_time:.3f}")
+            
+            # フレームスキップ判定
+            frame_skip_count = 0
+            if ENABLE_FRAME_SKIP and main.smoothed_delta_time_ms > TARGET_FRAME_TIME:
+                # FPSが低下している場合のフレームスキップ計算
+                frame_skip_count = min(int(main.smoothed_delta_time_ms / TARGET_FRAME_TIME) - 1, MAX_FRAME_SKIP)
+            
+            # ゲーム更新の蓄積時間に追加
+            accumulator += delta_time
+            
             # フレーム開始時間を記録（高精度）
             frame_start_time = time.perf_counter()
             
@@ -1112,14 +1160,14 @@ def main():
                     return int(virtual_x), int(virtual_y)
                 
                 # プレイヤーの移動（現在のカメラ位置と仮想マウス座標を渡す）
-                player.move(int(camera_x), int(camera_y), get_virtual_mouse_pos)
+                player.move(int(camera_x), int(camera_y), get_virtual_mouse_pos, delta_time)
 
                 # 自動攻撃の更新（仮想マウス座標も渡す）
                 player.update_attacks(enemies, camera_x=int(camera_x), camera_y=int(camera_y), get_virtual_mouse_pos=get_virtual_mouse_pos)
 
-                # 自然回復（HPサブアイテム所持時のみ、2秒で1回復）
+                # 自然回復（HPサブアイテム所持時のみ、2秒で1回復）（delta_timeを渡す）
                 try:
-                    player.update_regen()
+                    player.update_regen(delta_time)
                 except Exception:
                     pass
 
@@ -1385,8 +1433,16 @@ def main():
                             if getattr(attack, 'type', '') not in penetrating_types:
                                 break
 
-                # ゲーム時間の更新（60FPSを想定）
-                game_time += 1/60
+                # ゲーム時間の更新（デルタタイムベース）
+                # フレームスキップが発生してもゲーム時間は正確に進む
+                frame_time_seconds = TARGET_FRAME_TIME / 1000.0
+                game_time_accumulator += main.smoothed_delta_time_ms / 1000.0  # ミリ秒を秒に変換
+                
+                # 固定タイムステップでゲーム進行（フレームスキップ対応）
+                updates_needed = int(game_time_accumulator / frame_time_seconds)
+                if updates_needed > 0:
+                    game_time += updates_needed * frame_time_seconds
+                    game_time_accumulator -= updates_needed * frame_time_seconds
 
                 # クリア判定
                 if game_time >= SURVIVAL_TIME:
@@ -1624,11 +1680,12 @@ def main():
                                     try:
                                         # ノックバック更新処理
                                         if hasattr(enemy, 'update_knockback'):
-                                            enemy.update_knockback()
+                                            # delta_timeをframe_timeとして渡す（1/60秒を基準としたframe time）
+                                            enemy.update_knockback(delta_time * (1.0/60.0))
                                         
                                         # 簡素化された近傍処理
                                         nearby = enemies if len(enemies) <= 50 else enemy_batch
-                                        enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader, enemies=nearby)
+                                        enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader, enemies=nearby, delta_time=delta_time)
                                         
                                         # ボスの画面外チェック
                                         if hasattr(enemy, 'is_boss') and enemy.is_boss:
@@ -1646,15 +1703,15 @@ def main():
                         # 並列処理エラー時は逐次処理にフォールバック
                         for enemy in enemies[:]:
                             if hasattr(enemy, 'update_knockback'):
-                                enemy.update_knockback()
+                                enemy.update_knockback(delta_time * (1.0/60.0))
                             nearby = enemies
-                            enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader, enemies=nearby)
+                            enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader, enemies=nearby, delta_time=delta_time)
                 else:
                     # 少数のエネミーまたは並列処理無効の場合は従来の処理
                     for enemy in enemies[:]:
                         # ノックバック更新処理
                         if hasattr(enemy, 'update_knockback'):
-                            enemy.update_knockback()
+                            enemy.update_knockback(delta_time * (1.0/60.0))
                         # 近傍リスト構築の大幅軽量化（動作は維持）
                         nearby = enemies  # デフォルトは全エネミー
                         if grid is not None and len(enemies) > 50:  # 閾値を下げて早期適用
@@ -1672,7 +1729,7 @@ def main():
                             except Exception:
                                 nearby = enemies
 
-                        enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader, enemies=nearby)
+                        enemy.move(player, camera_x=int(camera_x), camera_y=int(camera_y), map_loader=map_loader, enemies=nearby, delta_time=delta_time)
                 
                 # ボスの画面外チェックとリスポーン処理（全エネミーをチェック）
                 for enemy in enemies[:]:
@@ -1723,7 +1780,7 @@ def main():
                         enemy.update_attack(player)
                     
                     # 弾丸更新は常に実行（ゲームプレイの重要な要素なので軽量化対象から除外）
-                    enemy.update_projectiles(player)
+                    enemy.update_projectiles(player, delta_time)
 
                     # --- 画面外リポップ仕様: ノーマルエネミーがカメラ外（マージン付き）に出たら削除して
                     #     画面外からポップする形で再出現させる（ボスは除外） ---
@@ -2490,9 +2547,26 @@ def main():
                 except Exception as e:
                     print(f"[WARNING] Failed to log performance: {e}")
             
-            # パフォーマンス最適化：大きなスケーリング時はFPSを調整
-            target_fps = FULLSCREEN_FPS if scale_factor > FULLSCREEN_FPS_THRESHOLD else NORMAL_FPS
-            clock.tick(target_fps)
+            # フレームスキップ対応のフレームレート制御
+            if ENABLE_FRAME_SKIP:
+                # デルタタイムベースでフレームレートを制御
+                target_fps = FPS  # constants.pyからインポートされたFPSを使用
+                current_fps = clock.get_fps() if hasattr(clock, 'get_fps') else target_fps
+                if current_fps >= MIN_FPS_THRESHOLD:
+                    # FPSが十分な場合は通常通り制御（delta_time補間は常に有効）
+                    clock.tick(target_fps)
+                else:
+                    # FPS低下時は描画最適化でフレームレート向上を図る
+                    # delta_time補間により、ゲーム進行速度は既に維持されている
+                    target_frame_time_ms = 1000.0 / target_fps
+                    actual_frame_time = clock.get_time()
+                    if actual_frame_time < target_frame_time_ms:
+                        # まだ時間に余裕がある場合は少し待機
+                        pygame.time.wait(int(target_frame_time_ms - actual_frame_time))
+                    clock.tick(max(MIN_FPS_THRESHOLD, target_fps // 2))  # 最低限のフレームレート保証
+            else:
+                # 従来のフレームレート制御
+                clock.tick(target_fps)
             
             # フレームカウンターをインクリメント（最適化処理で使用）
             frame_count += 1
