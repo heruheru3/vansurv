@@ -186,10 +186,10 @@ class Whip(Weapon):
 class Garlic(Weapon):
     def __init__(self):
         super().__init__()
-        self.cooldown = 1000
+        self.cooldown = 1300
         # 持続系なので1回あたりのダメージは小さめに設定
-        self.damage = 5
-        self.radius = 80
+        self.damage = 3
+        self.radius = 60
         self.duration = 1000
 
     def attack(self, player):
@@ -216,10 +216,14 @@ class Garlic(Weapon):
         effective_duration = int(self.duration * time_mult)
         effective_damage = self.damage + base_bonus
 
+        # ガーリックの当たり判定を適切に設定
+        # Attack内で // 2 される分を考慮して、実際の効果範囲の2倍で設定
+        garlic_size = effective_radius * 2
+
         return [Attack(x=player.x,
                       y=player.y,
-                      size_x=effective_radius * 2,  # 直径を指定
-                      size_y=effective_radius * 2,
+                      size_x=garlic_size,  # 当たり判定を適切に設定
+                      size_y=garlic_size,
                       type_="garlic",
                       duration=effective_duration,
                       follow_player=player,
@@ -228,5 +232,6 @@ class Garlic(Weapon):
     def level_up(self):
         """レベルアップ時の強化"""
         super().level_up()
-        self.radius = int(self.radius * 1.1)  # 範囲10%増加
-        self.damage *= 1.2  # ダメージ20%増加
+        self.radius = int(self.radius * 1.2)  # 範囲20%増加
+        self.duration = int(self.duration * 1.1)  # 持続時間10%増加
+        self.damage *= 1.3  # ダメージ30%増加

@@ -1,0 +1,10 @@
+{
+  "bosses": [],
+  "version": "1.0",
+  "settings": {
+    "boss_spawn_announcement_duration": 3000,
+    "boss_defeat_reward_multiplier": 5.0,
+    "boss_music_enabled": true,
+    "boss_screen_shake_intensity": 15
+  }
+}

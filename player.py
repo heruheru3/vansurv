@@ -2,10 +2,21 @@ import pygame
 import math
 import random
 import os
+import sys
 from constants import *
 from weapons.melee import Whip, Garlic
 from weapons.projectile import HolyWater, MagicWand, Axe, Stone, RotatingBook, Knife, Thunder
 from subitems import get_default_subitems, random_upgrade
+
+def resource_path(relative_path):
+    """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
+    try:
+        # PyInstallerで実行されている場合
+        base_path = sys._MEIPASS
+    except Exception:
+        # 通常のPythonで実行されている場合
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 
 class Player:
@@ -14,8 +25,8 @@ class Player:
         # 位置・移動（初期位置は後で安全な場所に調整）
         self.x = WORLD_WIDTH // 2
         self.y = WORLD_HEIGHT // 2
-        self.speed = 3
-        self.base_speed = 3
+        # self.speed = 3
+        self.base_speed = 2.5
         self.size = 24
         
         # 安全な開始位置を見つける
@@ -100,7 +111,7 @@ class Player:
 
         # スプライト
         try:
-            chip_path = os.path.join(os.path.dirname(__file__), 'assets', 'character', 'player_chip.png')
+            chip_path = resource_path(os.path.join('assets', 'character', 'player_chip.png'))
             sheet = pygame.image.load(chip_path).convert_alpha()
             sheet_w = sheet.get_width()
             sheet_h = sheet.get_height()
@@ -216,7 +227,7 @@ class Player:
             new_y = self.y + ny * sp
             
             # 障害物との衝突判定（マップが有効な場合のみ）
-            if USE_STAGE_MAP:
+            if USE_CSV_MAP:
                 try:
                     from stage import get_stage_map
                     stage_map = get_stage_map()
@@ -461,10 +472,22 @@ class Player:
         self.last_subitem_choices = choices
         self.awaiting_subitem_choice = True
         self.selected_subitem_choice_index = 0
+        # Ensure the UI will play the powerup sound when this subitem choice UI is first drawn
+        try:
+            self._powerup_played_for_subitem_choice = False
+        except Exception:
+            pass
         if DEBUG:
             print(f"[DEBUG] Subitem choices prepared: {choices}")
 
     def apply_subitem_choice(self, chosen_key):
+        # セーブシステムに記録
+        if hasattr(self, 'save_system') and self.save_system:
+            try:
+                self.save_system.record_subitem_selection(chosen_key)
+            except Exception:
+                pass
+        
         try:
             old_bonus = 0.0
             if chosen_key in self.subitems:
@@ -537,6 +560,16 @@ class Player:
         self.last_subitem_choices = []
 
     def apply_level_choice(self, chosen):
+        # セーブシステムに記録
+        if hasattr(self, 'save_system') and self.save_system:
+            try:
+                if isinstance(chosen, str) and ':' in chosen:
+                    parts = chosen.split(':', 1)
+                    if len(parts) == 2 and parts[0] == 'weapon':
+                        self.save_system.record_weapon_selection(parts[1])
+            except Exception:
+                pass
+                
         try:
             typ = 'weapon'
             key = chosen
@@ -652,6 +685,11 @@ class Player:
             self.last_level_choices = choices
             self.awaiting_weapon_choice = True
             self.selected_weapon_choice_index = 0
+            # Ensure the UI will play the powerup sound when this level-up UI is first drawn
+            try:
+                self._powerup_played_for_level_choice = False
+            except Exception:
+                pass
             if DEBUG:
                 print(f"[DEBUG] Mixed level choices prepared: {choices}")
             return choices
@@ -739,12 +777,26 @@ class Player:
             return 1.0
 
     def get_gem_pickup_range(self):
+        if 'gem_pickup_range' in self.subitems:
+            return float(self.subitems.get('gem_pickup_range').value())
+        return 0.0
+
+    def get_gem_collection_speed(self):
+        """ジェムの回収速度倍率を取得（projectile_speedサブアイテムレベルに基づく）"""
+        if 'projectile_speed' in self.subitems:
+            # projectile_speedサブアイテムのレベルに応じてジェム回収速度も向上
+            # レベル1で20%アップ、レベル2で40%アップ、レベル3で60%アップ
+            return 1.0 + float(self.subitems.get('projectile_speed').value())
+        return 1.0
+
+    def get_magnet_level(self):
+        """マグネットサブアイテム（gem_pickup_range）のレベルを取得"""
         try:
             if 'gem_pickup_range' in self.subitems:
-                return float(self.subitems.get('gem_pickup_range').value())
-            return 0.0
+                return int(self.subitems.get('gem_pickup_range').level)
+            return 0
         except Exception:
-            return 0.0
+            return 0
 
     def upgrade_subitems(self, count=1):
         try:
@@ -881,7 +933,7 @@ class Player:
     
     def _adjust_spawn_position(self):
         """障害物のない安全な開始位置に調整（マップが有効な場合のみ）"""
-        if not USE_STAGE_MAP:
+        if not USE_CSV_MAP:
             return  # マップが無効な場合は何もしない
             
         try:

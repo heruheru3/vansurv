@@ -11,22 +11,37 @@ from effects.items import ExperienceGem
 def enforce_experience_gems_limit(gems, max_gems=MAX_GEMS_ON_SCREEN, player_x=None, player_y=None):
     """上限を超えた場合、プレイヤーから遠いジェムから順に削除して
     その value を残った（近い）ジェムに加算して総EXPを維持する。
+    引き寄せ中のジェムは削除対象から除外する。
     player_x, player_yが指定されていない場合は従来通り古い順で削除。
     """
     try:
         while len(gems) > max_gems:
             if player_x is not None and player_y is not None:
-                # プレイヤーから最も遠いジェムを見つける
+                # プレイヤーから最も遠いジェムを見つける（引き寄せ中でないもの優先）
                 farthest_gem = None
                 max_distance = -1
                 farthest_index = 0
                 
+                # まず引き寄せ中でないジェムから最も遠いものを探す
                 for i, gem in enumerate(gems):
+                    # 引き寄せ中のジェムはスキップ
+                    if hasattr(gem, 'being_attracted') and gem.being_attracted:
+                        continue
+                    
                     distance = ((gem.x - player_x) ** 2 + (gem.y - player_y) ** 2) ** 0.5
                     if distance > max_distance:
                         max_distance = distance
                         farthest_gem = gem
                         farthest_index = i
+                
+                # 引き寄せ中でないジェムが見つからない場合は、全体から最も遠いものを選択
+                if farthest_gem is None:
+                    for i, gem in enumerate(gems):
+                        distance = ((gem.x - player_x) ** 2 + (gem.y - player_y) ** 2) ** 0.5
+                        if distance > max_distance:
+                            max_distance = distance
+                            farthest_gem = gem
+                            farthest_index = i
                 
                 # 最も遠いジェムを削除
                 removed_gem = gems.pop(farthest_index)
@@ -63,11 +78,14 @@ def enforce_experience_gems_limit(gems, max_gems=MAX_GEMS_ON_SCREEN, player_x=No
         pass
 
 
-def init_game_state(screen):
+def init_game_state(screen, save_system=None):
     """ゲームの初期状態を設定する関数"""
     from player import Player
     
     player = Player(screen)
+    # セーブシステムへの参照を設定
+    if save_system:
+        player.save_system = save_system
     # 初期武器選択：すべての武器を3x3グリッドで表示
     player.awaiting_subitem_choice = False
     player.last_subitem_choices = []
@@ -101,6 +119,8 @@ def init_game_state(screen):
     game_over = False
     game_clear = False
     spawn_timer = 0
+    boss_spawn_timer = 0  # ボススポーン用タイマー
+    spawned_boss_types = set()  # 一度出現したボスタイプを記録
     spawn_interval = 60
     game_time = 0
     last_difficulty_increase = 0
@@ -113,7 +133,7 @@ def init_game_state(screen):
     except Exception:
         pass
     
-    return player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats
+    return player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types
 
 
 def clamp_to_world(x, y, world_width, world_height, margin=50):

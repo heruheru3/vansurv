@@ -47,10 +47,15 @@ class HolyWater(Weapon):
         
         # レベルに応じた攻撃数で生成
         # 複数発生する場合は短い遅延を挟んで順次発生させる
-        delay_step = 120  # ms の単位で短い遅延
+        delay_step = 100  # ms の単位で短い遅延
+        
+        # 重ならないように配置するための位置生成
+        positions = self._generate_non_overlapping_positions(
+            player.x, player.y, effective_count, effective_radius
+        )
+        
         for i in range(effective_count):
-            x = player.x + random.randint(-150, 150)  # 散布範囲を広げる
-            y = player.y + random.randint(-150, 150)
+            x, y = positions[i]
             atk = Attack(x=x,
                          y=y,
                          size_x=effective_radius * 2,  # 直径を指定
@@ -69,6 +74,68 @@ class HolyWater(Weapon):
         
         return attacks
 
+    def _generate_non_overlapping_positions(self, center_x, center_y, count, radius):
+        """重ならないように聖水の投擲位置を生成する"""
+        positions = []
+        
+        if count == 1:
+            # 1個だけならプレイヤー前方に投擲
+            positions.append((center_x + random.randint(-50, 50), center_y + random.randint(-50, 50)))
+            return positions
+        
+        # 複数個の場合は円形配置を基本に、重複を避けながら配置
+        base_distance = radius * 2  # 効果範囲の2倍の距離を基準にする
+        max_attempts = 3  # 最大試行回数
+        
+        for i in range(count):
+            attempts = 0
+            while attempts < max_attempts:
+                if i == 0:
+                    # 最初の1個はプレイヤー近辺のランダム位置
+                    x = center_x + random.randint(-80, 80)
+                    y = center_y + random.randint(-80, 80)
+                else:
+                    # 2個目以降は既存の位置から適切な距離を保って配置
+                    if count <= 6:
+                        # 6個以下なら円形配置
+                        angle = (2 * math.pi * i) / count + random.uniform(-0.3, 0.3)  # 少しランダム性を加える
+                        distance = base_distance + random.uniform(-20, 40)
+                        x = center_x + math.cos(angle) * distance
+                        y = center_y + math.sin(angle) * distance
+                    else:
+                        # 7個以上なら螺旋配置
+                        angle = (i * 2.4) + random.uniform(-0.2, 0.2)  # 螺旋角度
+                        distance = base_distance * 0.7 + (i * 15) + random.uniform(-15, 15)
+                        x = center_x + math.cos(angle) * distance
+                        y = center_y + math.sin(angle) * distance
+                
+                # 既存の位置と重複しないかチェック
+                valid = True
+                min_distance = radius * 2.2  # 最小距離（効果範囲の2.2倍）
+                
+                for existing_x, existing_y in positions:
+                    distance = math.sqrt((x - existing_x)**2 + (y - existing_y)**2)
+                    if distance < min_distance:
+                        valid = False
+                        break
+                
+                if valid:
+                    positions.append((x, y))
+                    break
+                
+                attempts += 1
+            
+            # 最大試行回数を超えた場合は強制的に位置を決定
+            if len(positions) <= i:
+                # フォールバック：より遠くにランダム配置
+                angle = random.uniform(0, 2 * math.pi)
+                distance = base_distance + (i * 30) + random.randint(-20, 40)
+                x = center_x + math.cos(angle) * distance
+                y = center_y + math.sin(angle) * distance
+                positions.append((x, y))
+        
+        return positions
+
     def level_up(self):
         """レベルアップ時の強化"""
         super().level_up()
@@ -76,7 +143,7 @@ class HolyWater(Weapon):
             self.radius = int(self.radius * 1.2)  # 範囲20%増加
         else:  # 奇数レベルで攻撃個数増加
             self.num_attacks += 1  # 攻撃個数+1
-        self.damage *= 1.1  # ダメージ10%増加
+        self.damage *= 1.2  # ダメージ20%増加
 
 class MagicWand(Weapon):
     def __init__(self):
@@ -117,6 +184,15 @@ class MagicWand(Weapon):
                               key=lambda e: math.sqrt((e.x - player.x)**2 + (e.y - player.y)**2))
         targets = sorted_enemies[:effective_num]
         
+        # ステージマップ参照を取得
+        stage = None
+        try:
+            if USE_CSV_MAP:
+                from stage import get_stage_map
+                stage = get_stage_map()
+        except Exception:
+            pass
+        
         for target in targets:
             attacks.append(
                 Attack(x=player.x, 
@@ -126,7 +202,8 @@ class MagicWand(Weapon):
                       type_="magic_wand", 
                       target=target, 
                       speed=effective_speed,
-                      damage=effective_damage)
+                      damage=effective_damage,
+                      stage=stage)
             )
         
         return attacks
@@ -151,12 +228,12 @@ class MagicWand(Weapon):
 class Axe(Weapon):
     def __init__(self):
         super().__init__()
-        self.cooldown = 1000
+        self.cooldown = 1500
         # 投擲武器: 中程度のダメージ
         self.damage = 25
         self.size = 50  # 攻撃範囲
         self.throw_speed = 6  # 投げる速度
-        self.rotation_speed = 0.3  # 回転速度
+        self.rotation_speed = 0.2  # 回転速度（遅く調整）
 
     def attack(self, player):
         if not self.can_attack():
@@ -185,10 +262,19 @@ class Axe(Weapon):
         except Exception:
             extra = 0
 
-        effective_size = max(1, int(self.size * range_mult))
+        effective_size = min(100, int(self.size * range_mult))
         effective_duration = max(100, int(3000 * time_mult))
         effective_damage = self.damage * base_mult
-        effective_num = max(1, int(1 + extra))
+        effective_num = min(5, int(1 + extra))
+        
+        # ステージマップ参照を取得
+        stage = None
+        try:
+            if USE_CSV_MAP:
+                from stage import get_stage_map
+                stage = get_stage_map()
+        except Exception:
+            pass
         
         attacks = []
         for i in range(effective_num):
@@ -209,7 +295,8 @@ class Axe(Weapon):
                                   velocity_x=vx,
                                   velocity_y=vy,
                                   rotation_speed=self.rotation_speed,
-                                  damage=effective_damage))
+                                  damage=effective_damage,
+                                  stage=stage))
         
         return attacks
 
@@ -219,7 +306,11 @@ class Axe(Weapon):
         self.size = int(self.size * 1.3)  # 範囲20%増加
         self.throw_speed += 1  # 投げる速度増加
         self.damage *= 1.2  # ダメージ15%増加
-        self.cooldown = max(self.cooldown * 0.95, 800)  # クールダウン減少（最小800ms）
+        # 奇数レベルで数を増やす
+        if self.level % 2 == 1:
+            self.num_projectiles += 1
+        else:
+            self.cooldown = max(self.cooldown * 0.95, 1000)  # クールダウン減少（最小1000ms）
 
 class Stone(Weapon):
     def __init__(self):
@@ -264,6 +355,15 @@ class Stone(Weapon):
         except Exception:
             extra = 0
 
+        # ステージマップ参照を取得
+        stage = None
+        try:
+            if USE_CSV_MAP:
+                from stage import get_stage_map
+                stage = get_stage_map()
+        except Exception:
+            pass
+
         return [Attack(
             x=player.x, 
             y=player.y, 
@@ -275,7 +375,8 @@ class Stone(Weapon):
             bounces=self.bounces + extra,
             velocity_x=math.cos(angle) * spd,
             velocity_y=math.sin(angle) * spd,
-            damage=self.damage * base_mult
+            damage=self.damage * base_mult,
+            stage=stage
         )]
 
     def level_up(self):
@@ -299,7 +400,7 @@ class RotatingBook(Weapon):
         self.duration = 5000
         # 本の描画サイズ（幅・高さ）をプロパティ化してレベルアップで拡大可能にする
         self.book_w = 24
-        self.book_h = 16
+        self.book_h = 24
 
     def attack(self, player):
         if not self.can_attack():
@@ -358,10 +459,10 @@ class RotatingBook(Weapon):
         self.cooldown = min(int(self.cooldown * 0.95), 5000)
         # 本のサイズと回転速度も強化して、視覚的に派手にする
         try:
-            self.book_w = min(60, int(self.book_w * 1.2))
-            self.book_h = min(40, int(self.book_h * 1.2))
+            self.book_w = min(60, int(self.book_w * 1.1))
+            self.book_h = min(60, int(self.book_h * 1.1))
             # 回転速度は積算的に高める（一定の上限を設ける）
-            self.rotation_speed = min(1.5, self.rotation_speed * 1.15)
+            self.rotation_speed = min(1.5, self.rotation_speed * 1.1)
         except Exception:
             pass
 
@@ -372,7 +473,7 @@ class Knife(Weapon):
     """
     def __init__(self):
         super().__init__()
-        self.cooldown = 500
+        self.cooldown = 700
         self.damage = 18
         self.speed = 12
         self.size = 10
@@ -472,6 +573,16 @@ class Knife(Weapon):
             extra = 0
         effective_knives = max(1, int(self.num_knives + extra))
         mid = (effective_knives - 1) / 2.0
+        
+        # ステージマップ参照を取得
+        stage = None
+        try:
+            if USE_CSV_MAP:
+                from stage import get_stage_map
+                stage = get_stage_map()
+        except Exception:
+            pass
+        
         # 発射遅延（ms）: 中央は0、周辺ほど遅らせる
         delay_step = 100
         for i in range(effective_knives):
@@ -487,7 +598,8 @@ class Knife(Weapon):
                          duration=1500,
                          velocity_x=vx,
                          velocity_y=vy,
-                         damage=self.damage)
+                         damage=self.damage,
+                         stage=stage)
             # 追加: 中央からの距離に応じて発射を遅延させる
             try:
                 import math as _math

@@ -13,10 +13,34 @@ from game_utils import enforce_experience_gems_limit
 
 
 def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval, 
-                 player_x, player_y, camera_x, camera_y):
+                 player_x, player_y, camera_x, camera_y, boss_spawn_timer=0):
     """敵の生成処理"""
     new_spawn_timer = spawn_timer + 1
+    new_boss_spawn_timer = boss_spawn_timer + 1
     
+    # ボス出現チェック（1分=3600フレーム間隔）
+    boss_spawn_interval = 3600  # 60秒 * 60FPS
+    if new_boss_spawn_timer >= boss_spawn_interval and game_time >= 60:
+        new_boss_spawn_timer = 0
+        
+        # ボスを画面中央付近にスポーン
+        boss_x = camera_x + SCREEN_WIDTH // 2 + random.randint(-100, 100)
+        boss_y = camera_y + SCREEN_HEIGHT // 2 + random.randint(-100, 100)
+        
+        # ワールド境界をクランプ
+        boss_x = max(100, min(WORLD_WIDTH - 100, boss_x))
+        boss_y = max(100, min(WORLD_HEIGHT - 100, boss_y))
+        
+        # ボス生成
+        boss = Enemy(None, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True)
+        enemies.append(boss)
+        
+        # ボススポーンエフェクト（大きめ）
+        if len(particles) < 300:
+            for _ in range(15):  # 通常より多めのエフェクト
+                particles.append(SpawnParticle(boss_x, boss_y, size=3))
+    
+    # 通常の敵スポーン処理
     if new_spawn_timer >= spawn_interval:
         new_spawn_timer = 0
         
@@ -53,14 +77,14 @@ def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval,
             x = max(50, min(WORLD_WIDTH - 50, x))
             y = max(50, min(WORLD_HEIGHT - 50, y))
             
-            enemy = Enemy(x, y)
+            enemy = Enemy(None, game_time, spawn_x=x, spawn_y=y)
             enemies.append(enemy)
             
             # スポーンエフェクト
             if len(particles) < 300:  # パーティクル制限
                 particles.append(SpawnParticle(x, y))
     
-    return new_spawn_timer
+    return new_spawn_timer, new_boss_spawn_timer
 
 
 def handle_enemy_death(enemy, enemies, experience_gems, items, particles, damage_stats, 
@@ -75,6 +99,11 @@ def handle_enemy_death(enemy, enemies, experience_gems, items, particles, damage
         rand = random.random()
         if rand < HEAL_ITEM_DROP_RATE:
             items.append(GameItem(enemy.x, enemy.y, "heal"))
+            try:
+                from audio import audio
+                audio.play_sound('item_drop')
+            except Exception:
+                pass
         elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE:
             items.append(GameItem(enemy.x, enemy.y, "bomb"))
         elif rand < HEAL_ITEM_DROP_RATE + BOMB_ITEM_DROP_RATE + (player.get_magnet_drop_rate() if player else MAGNET_ITEM_DROP_RATE):
@@ -97,13 +126,30 @@ def handle_bomb_item_effect(enemies, experience_gems, particles, player_x, playe
     if player and hasattr(player, 'activate_screen_shake'):
         player.activate_screen_shake()
     
-    # 全敵を経験値ジェムに変換
-    for enemy in enemies[:]:
-        experience_gems.append(ExperienceGem(enemy.x, enemy.y))
-        # 各追加ごとに上限をチェックしてプレイヤーから遠いものを削除しつつ価値を集約
-        enforce_experience_gems_limit(experience_gems, player_x=player_x, player_y=player_y)
+    # 全敵に100ダメージを与える
+    bomb_damage = 100
+    enemies_to_remove = []
     
-    enemies.clear()
+    for enemy in enemies:
+        enemy.hp -= bomb_damage
+        
+        # HPが0以下になった敵を処理
+        if enemy.hp <= 0:
+            # 経験値ジェムを生成
+            experience_gems.append(ExperienceGem(enemy.x, enemy.y))
+            # 各追加ごとに上限をチェックしてプレイヤーから遠いものを削除しつつ価値を集約
+            enforce_experience_gems_limit(experience_gems, player_x=player_x, player_y=player_y)
+            enemies_to_remove.append(enemy)
+    
+    # 死亡した敵を削除
+    for enemy in enemies_to_remove:
+        enemies.remove(enemy)
+    # ボム発動のサウンド
+    try:
+        from audio import audio
+        audio.play_sound('bomb')
+    except Exception:
+        pass
 
 
 def update_difficulty(game_time, last_difficulty_increase, spawn_interval):
@@ -169,7 +215,13 @@ def collect_items(player, items, enemies, experience_gems, particles):
         if distance <= collection_range:
             if item.type == "heal":
                 # 体力回復（割合回復）
-                player.heal(HEAL_ITEM_AMOUNT, "item")
+                healed = player.heal(HEAL_ITEM_AMOUNT, "item")
+                try:
+                    if healed > 0:
+                        from audio import audio
+                        audio.play_sound('heal')
+                except Exception:
+                    pass
                         
             elif item.type == "bomb":
                 # ボム効果（画面揺れも含む）

@@ -1,8 +1,20 @@
 import pygame
+import sys
 from constants import *
 import json
 import os
 from resources import get_font
+from audio import audio
+
+def resource_path(relative_path):
+    """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
+    try:
+        # PyInstallerで実行されている場合
+        base_path = sys._MEIPASS
+    except Exception:
+        # 通常のPythonで実行されている場合
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 # 軽量キャッシュ: サーフェスを使い回す（フォントは resources.get_font に一本化）
 _surf_cache = {}
@@ -112,7 +124,7 @@ def get_minimap_surf(map_w, map_h, alpha=128, bg=(20,20,20)):
         _surf_cache[key] = s
     return s
 
-def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True):
+def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True, money=0, game_money=0):
     # メイン画面のフォントをやや小さく（約70%）にする
     font = get_font(18)
     
@@ -121,7 +133,7 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
     meter_h = 24
     pad = 12
     panel_w = meter_w + pad * 2
-    panel_h = meter_h * 2 + pad * 3
+    panel_h = meter_h * 2 + pad * 3  # 元の2バー分に戻す
     # パネル背景（半透明）
     panel_surf = get_panel_surf(panel_w, panel_h, radius=8, alpha=160)
     screen.blit(panel_surf, (8, 8))
@@ -150,6 +162,14 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
     exp_text = font.render(f"LV{getattr(player,'level',1)} EXP {getattr(player,'exp',0)}/{exp_to}", True, WHITE)
     exp_rect = exp_text.get_rect(midleft=(bar_x + 8, exp_y + meter_h // 2))
     screen.blit(exp_text, exp_rect.topleft)
+
+    # 獲得金額をHPパネルの右側に表示（パネルの外側）
+    panel_right = 8 + panel_w  # パネルの右端
+    money_text = font.render(f"Money: {game_money}G", True, YELLOW)
+    money_x = panel_right + 20  # パネルから20px右
+    money_y = 8 + pad + meter_h // 2  # HPバーと同じ高さ
+    money_rect = money_text.get_rect(midleft=(money_x, money_y))
+    screen.blit(money_text, money_rect.topleft)
 
     # # 時間表示
     # time_text = font.render(f"Time: {int(game_time)}s", True, WHITE)
@@ -525,8 +545,10 @@ def draw_minimap(screen, player, enemies, gems, items, camera_x=0, camera_y=0):
     for e in enemies:
         try:
             ex, ey = world_to_map(e.x, e.y)
-            # 画面外の大きなワールドでは重なるので小さく点で描く
-            pygame.draw.rect(screen, (200, 60, 60), (ex, ey, 3, 3))
+            if hasattr(e, 'is_boss') and e.is_boss:
+                pygame.draw.rect(screen, PINK, (ex, ey, 4, 4))  # ボスは大きめ&ピンク
+            else:
+                pygame.draw.rect(screen, (200, 60, 60), (ex, ey, 3, 3))
         except Exception:
             pass
 
@@ -605,12 +627,25 @@ def draw_initial_weapon_grid(screen, player, icons):
     """初期武器選択用の3x3グリッドUIを描画する"""
     try:
         choices = getattr(player, 'last_level_choices', None)
+        # reset flag if no choices
         if not choices:
+            try:
+                player._powerup_played_for_level_choice = False
+            except Exception:
+                pass
             return
+
+        # Play powerup sound once when the level-up UI is first opened
+        try:
+            if not getattr(player, '_powerup_played_for_level_choice', False):
+                audio.play_sound('powerup')
+                player._powerup_played_for_level_choice = True
+        except Exception:
+            pass
 
         # 説明データの読み込み
         try:
-            data_path = os.path.join(os.path.dirname(__file__), 'data', 'descriptions.json')
+            data_path = resource_path(os.path.join('data', 'descriptions.json'))
             with open(data_path, 'r', encoding='utf-8') as f:
                 desc_data = json.load(f)
         except Exception:
@@ -780,9 +815,17 @@ def draw_level_choice(screen, player, icons):
         if not choices:
             return
 
+        # Play powerup sound once when the level-up UI is first opened (normal 3-choice UI)
+        try:
+            if not getattr(player, '_powerup_played_for_level_choice', False):
+                audio.play_sound('powerup')
+                player._powerup_played_for_level_choice = True
+        except Exception:
+            pass
+
         # 説明データの読み込み
         try:
-            data_path = os.path.join(os.path.dirname(__file__), 'data', 'descriptions.json')
+            data_path = resource_path(os.path.join('data', 'descriptions.json'))
             with open(data_path, 'r', encoding='utf-8') as f:
                 desc_data = json.load(f)
         except Exception:
@@ -1041,8 +1084,21 @@ def draw_subitem_choice(screen, player, icons=None):
     """サブアイテム選択 UI を描画する。player.last_subitem_choices を参照。"""
     try:
         choices = getattr(player, 'last_subitem_choices', None)
+        # reset flag if no choices
         if not choices:
+            try:
+                player._powerup_played_for_subitem_choice = False
+            except Exception:
+                pass
             return
+
+        # Play powerup sound once when the subitem selection UI is first opened
+        try:
+            if not getattr(player, '_powerup_played_for_subitem_choice', False):
+                audio.play_sound('powerup')
+                player._powerup_played_for_subitem_choice = True
+        except Exception:
+            pass
 
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 200))
@@ -1124,7 +1180,7 @@ def draw_subitem_choice(screen, player, icons=None):
             display_name = key.replace('_', ' ').title()  # デフォルト名
             long_desc = ''
             try:
-                data_path = os.path.join(os.path.dirname(__file__), 'data', 'descriptions.json')
+                data_path = resource_path(os.path.join('data', 'descriptions.json'))
                 with open(data_path, 'r', encoding='utf-8') as f:
                     sub_desc_data = json.load(f).get('subitems', {})
                 item_data = sub_desc_data.get(key, {})
