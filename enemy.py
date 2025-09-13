@@ -1589,13 +1589,14 @@ class EnemyProjectile:
         self.enemy_level = enemy_level  # 敵のレベルを記録
         self.is_boss_bullet = is_boss_bullet  # ボスの弾かどうか
         self.speed = projectile_speed  # 弾丸の速度（CSVから設定）
-        self.size = 18 if not is_boss_bullet else 18  # ボスの弾は変更しない
+        self.size = 20 if not is_boss_bullet else 24  # 通常弾とボス弾のサイズ調整
         self.lifetime = 3000  # 3秒で消滅（ミリ秒）
         self.created_time = pygame.time.get_ticks()
+        self.pulse_alpha = 200  # 脈動エフェクト用のアルファ値（初期化）
         
-        # 通常の弾丸のみサイズを小さくして軽量化
+        # 通常の弾丸のサイズを視認性重視で調整
         if not is_boss_bullet:
-            self.size = 12  # 18から12に縮小
+            self.size = 22  # 18から22に拡大（より見やすく）
         
         # 速度ベクトルを計算
         self.vx = math.cos(angle) * self.speed
@@ -1647,6 +1648,10 @@ class EnemyProjectile:
         self.x += self.vx
         self.y += self.vy
         
+        # 時間ベースの脈動エフェクト（軽量）
+        current_time = pygame.time.get_ticks()
+        self.pulse_alpha = int(150 + 50 * math.sin(current_time * 0.008))  # 軽いサイン計算
+        
         # 障害物との衝突判定（ボスの弾のみ、通常の弾は軽量化のためスキップ）
         if self.is_boss_bullet and USE_CSV_MAP:
             from stage import get_stage_map
@@ -1680,21 +1685,32 @@ class EnemyProjectile:
         screen.blit(surf, (sx - r, sy - r))
 
     def _create_cached_surface(self, cache_key):
-        """描画用のサーフェスをキャッシュに作成"""
+        """描画用のサーフェスをキャッシュに作成（視認性向上エフェクト付き）"""
         color, size = cache_key
         r = size // 2
         surf = pygame.Surface((size, size), pygame.SRCALPHA)
         
         r_base, g_base, b_base = color
         
-        # シンプルな描画（軽量化）
-        # 外側の薄い円
-        outer_color = (r_base//3, g_base//3, b_base//3, 80)
-        pygame.draw.circle(surf, outer_color, (r, r), r)
+        # 視認性向上のための多層エフェクト
+        # 最外層：太い白い輪郭（強調）
+        pygame.draw.circle(surf, (255, 255, 255, 80), (r, r), r, 3)  # 太くして強調
         
-        # 内側のコア
-        core_color = (r_base, g_base, b_base)
-        pygame.draw.circle(surf, core_color, (r, r), r//2)
+        # 外側の発光エフェクト（大きく）
+        outer_color = (min(255, r_base + 80), min(255, g_base + 80), min(255, b_base + 80), 80)
+        pygame.draw.circle(surf, outer_color, (r, r), r - 1)
+        
+        # 中間層：元の色（濃く）
+        mid_color = (r_base, g_base, b_base, 200)
+        pygame.draw.circle(surf, mid_color, (r, r), r - 2)
+        
+        # 内側のコア（明るく）
+        core_color = (min(255, r_base + 40), min(255, g_base + 40), min(255, b_base + 40))
+        pygame.draw.circle(surf, core_color, (r, r), r // 2)
+        
+        # 中心のハイライト（明るく）
+        highlight_color = (255, 255, 255, 200)
+        pygame.draw.circle(surf, highlight_color, (r, r), max(2, r // 3))  # 少し大きく
         
         self._draw_cache[cache_key] = surf
 

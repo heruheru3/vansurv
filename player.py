@@ -25,8 +25,8 @@ class Player:
         # 位置・移動（初期位置は後で安全な場所に調整）
         self.x = WORLD_WIDTH // 2
         self.y = WORLD_HEIGHT // 2
-        self.speed = 3
-        self.base_speed = 2
+        # self.speed = 3
+        self.base_speed = 2.5
         self.size = 24
         
         # 安全な開始位置を見つける
