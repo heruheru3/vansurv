@@ -623,7 +623,7 @@ def draw_background(screen, camera_x=0, camera_y=0):
                 pygame.draw.rect(screen, dark, rect)
     # ビネットなどの余計な効果はここでは付けない（シンプルに）
 
-def draw_initial_weapon_grid(screen, player, icons):
+def draw_initial_weapon_grid(screen, player, icons, virtual_mouse_pos=None):
     """初期武器選択用の3x3グリッドUIを描画する"""
     try:
         choices = getattr(player, 'last_level_choices', None)
@@ -687,7 +687,11 @@ def draw_initial_weapon_grid(screen, player, icons):
         screen.blit(title_font.render('最初の武器を選ぼう！', True, WHITE), (panel_rect.x + 24, panel_rect.y + 10))
 
         # グリッドセル描画（レベルアップと同じレイアウト）
-        mouse_x, mouse_y = pygame.mouse.get_pos()
+        # 仮想マウス座標を使用（全画面対応）
+        if virtual_mouse_pos:
+            mouse_x, mouse_y = virtual_mouse_pos
+        else:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
         selected_index = getattr(player, 'selected_weapon_choice_index', 0)
         
         title_font = get_font(24)
@@ -803,12 +807,12 @@ def draw_initial_weapon_grid(screen, player, icons):
     except Exception:
         pass
 
-def draw_level_choice(screen, player, icons):
+def draw_level_choice(screen, player, icons, virtual_mouse_pos=None):
     """レベルアップ（または開始時）の3択オーバーレイを描画する。"""
     try:
         # 初期武器選択の場合はグリッドUIを使用
         if getattr(player, 'is_initial_weapon_selection', False):
-            draw_initial_weapon_grid(screen, player, icons)
+            draw_initial_weapon_grid(screen, player, icons, virtual_mouse_pos)
             return
 
         choices = getattr(player, 'last_level_choices', None)
@@ -857,7 +861,12 @@ def draw_level_choice(screen, player, icons):
 
         option_w = (cw - 40) // max(1, len(choices))
         option_h = ch - 78
-        mouse_x, mouse_y = pygame.mouse.get_pos()
+        
+        # 仮想マウス座標を使用（全画面対応）
+        if virtual_mouse_pos:
+            mouse_x, mouse_y = virtual_mouse_pos
+        else:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
 
         for i, raw in enumerate(choices):
             typ, key = ('weapon', raw)
@@ -1080,7 +1089,7 @@ def draw_end_buttons(screen, is_game_over, is_game_clear):
         pass
     return rects
 
-def draw_subitem_choice(screen, player, icons=None):
+def draw_subitem_choice(screen, player, icons=None, virtual_mouse_pos=None):
     """サブアイテム選択 UI を描画する。player.last_subitem_choices を参照。"""
     try:
         choices = getattr(player, 'last_subitem_choices', None)
@@ -1121,7 +1130,12 @@ def draw_subitem_choice(screen, player, icons=None):
 
         option_w = (cw - 40) // max(1, len(choices))
         option_h = ch - 60
-        mx, my = pygame.mouse.get_pos()
+        
+        # 仮想マウス座標を使用（全画面対応）
+        if virtual_mouse_pos:
+            mx, my = virtual_mouse_pos
+        else:
+            mx, my = pygame.mouse.get_pos()
 
         for i, key in enumerate(choices):
             rect = pygame.Rect(panel_rect.x + 20 + i * option_w, panel_rect.y + 48, option_w - 8, option_h)

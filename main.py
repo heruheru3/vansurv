@@ -954,20 +954,16 @@ def main():
                     player.heal_effect_callback = heal_effect_callback
                 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # マウス座標を仮想画面座標に変換
-                    def convert_mouse_pos(mouse_x, mouse_y):
-                        # オフセットを引いてからスケールで割る
-                        virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
-                        virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
-                        # 仮想画面の範囲内にクランプ
-                        virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
-                        virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
-                        return int(virtual_x), int(virtual_y)
-                    
                     # マウスで選択可能ならクリック位置を判定
                     if getattr(player, 'awaiting_weapon_choice', False) and event.button == 1:
                         player.set_input_method("mouse")
-                        mx, my = convert_mouse_pos(*event.pos)
+                        # マウス座標を仮想画面座標に変換
+                        mouse_x, mouse_y = event.pos
+                        virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                        virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                        virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
+                        virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
+                        mx, my = int(virtual_x), int(virtual_y)
                         
                         choices = getattr(player, 'last_level_choices', [])
                         if choices:
@@ -1037,7 +1033,13 @@ def main():
                     # サブアイテム選択のマウスクリック判定
                     if getattr(player, 'awaiting_subitem_choice', False) and event.button == 1:
                         player.set_input_method("mouse")
-                        mx, my = convert_mouse_pos(*event.pos)
+                        # マウス座標を仮想画面座標に変換
+                        mouse_x, mouse_y = event.pos
+                        virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                        virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                        virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
+                        virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
+                        mx, my = int(virtual_x), int(virtual_y)
                         choices = getattr(player, 'last_subitem_choices', [])
                         if choices:
                             cw = min(700, SCREEN_WIDTH - 200)
@@ -1066,7 +1068,13 @@ def main():
 
                     # エンド画面のボタン処理（GAME OVER / CLEAR）
                     if (game_over or game_clear) and event.button == 1:
-                        mx, my = convert_mouse_pos(*event.pos)
+                        # マウス座標を仮想画面座標に変換
+                        mouse_x, mouse_y = event.pos
+                        virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                        virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                        virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
+                        virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
+                        mx, my = int(virtual_x), int(virtual_y)
                         try:
                             rects = get_end_button_rects()
                             # Continue はゲームオーバー時のみ有効
@@ -2394,11 +2402,23 @@ def main():
             # レベルアップ候補がある場合はポップアップを ui.draw_level_choice に任せる
             # サブアイテム選択 UI を優先して表示
             if getattr(player, 'awaiting_subitem_choice', False) and getattr(player, 'last_subitem_choices', None):
+                # マウス座標を仮想画面座標に変換してUI描画に渡す
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                virtual_mouse_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                virtual_mouse_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                virtual_mouse_x = max(0, min(SCREEN_WIDTH, virtual_mouse_x))
+                virtual_mouse_y = max(0, min(SCREEN_HEIGHT, virtual_mouse_y))
                 # サブアイテム選択は ui.draw_subitem_choice を使う
                 from ui.ui import draw_subitem_choice
-                draw_subitem_choice(virtual_screen, player, ICONS)
+                draw_subitem_choice(virtual_screen, player, ICONS, virtual_mouse_pos=(int(virtual_mouse_x), int(virtual_mouse_y)))
             elif getattr(player, 'awaiting_weapon_choice', False) and getattr(player, 'last_level_choices', None):
-                draw_level_choice(virtual_screen, player, ICONS)
+                # マウス座標を仮想画面座標に変換してUI描画に渡す
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                virtual_mouse_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                virtual_mouse_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                virtual_mouse_x = max(0, min(SCREEN_WIDTH, virtual_mouse_x))
+                virtual_mouse_y = max(0, min(SCREEN_HEIGHT, virtual_mouse_y))
+                draw_level_choice(virtual_screen, player, ICONS, virtual_mouse_pos=(int(virtual_mouse_x), int(virtual_mouse_y)))
 
             # 仮想画面を実際の画面にスケールして転送
             screen.fill((0, 0, 0))  # レターボックス部分を黒で塗りつぶし
