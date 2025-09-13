@@ -148,8 +148,14 @@ def main():
     # ゲーム状態の初期化
     player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
 
-    # パーティクルの並列update関数
+    # パーティクルの並列update関数（制限付き）
     def parallel_update_particles(particles):
+        # パーティクル数制限でパフォーマンス向上
+        max_particles = 200  # 最大パーティクル数
+        if len(particles) > max_particles:
+            # 古いパーティクルを削除（新しいものを優先）
+            particles = particles[-max_particles:]
+        
         # シンプル化: スレッドプールは毎フレーム作ると重いので逐次実行に戻す（多くのケースで高速）
         new_particles = []
         for p in particles:
@@ -1203,22 +1209,25 @@ def main():
                 except Exception:
                     grid = None
 
+                # エネミー移動処理（全エネミー動作継続、軽量化は別手法で実現）
                 for enemy in enemies[:]:
                     # ノックバック更新処理
                     if hasattr(enemy, 'update_knockback'):
                         enemy.update_knockback()
-                    # 近傍リストを構築（現在のセルと周辺8セル）
-                    nearby = enemies
-                    if grid is not None:
+                    # 近傍リスト構築の大幅軽量化（動作は維持）
+                    nearby = enemies  # デフォルトは全エネミー
+                    if grid is not None and len(enemies) > 50:  # 閾値を下げて早期適用
                         try:
                             gx = int(enemy.x) // GRID_CELL_SIZE
                             gy = int(enemy.y) // GRID_CELL_SIZE
+                            # より効率的なグリッド検索（計算量削減）
                             nearby_set = []
-                            for ox in (gx-1, gx, gx+1):
-                                for oy in (gy-1, gy, gy+1):
+                            nearby_set.extend(grid.get((gx, gy), []))  # 中心セルのみ
+                            # エネミー数が多い場合のみ周辺セルを追加
+                            if len(enemies) > 100:
+                                for ox, oy in [(gx-1, gy), (gx+1, gy), (gx, gy-1), (gx, gy+1)]:  # 十字のみ
                                     nearby_set.extend(grid.get((ox, oy), []))
-                            # 重複削除は不要だがループコスト削減のためリスト化
-                            nearby = nearby_set
+                            nearby = nearby_set if len(nearby_set) < len(enemies) // 2 else enemies
                         except Exception:
                             nearby = enemies
 
@@ -1235,8 +1244,17 @@ def main():
                                 for _ in range(10):
                                     particles.append(SpawnParticle(enemy.x, enemy.y, (255, 215, 0)))  # 金色
                     
-                    # 敵の攻撃処理（射撃タイプのみ、画面外は頻度制限）
-                    if not enemy.is_off_screen() or frame_count % 3 == 0:
+                    # 敵の攻撃処理（動作継続、頻度調整で軽量化）
+                    # 画面外エネミーの攻撃頻度を調整（完全停止せず、間引きのみ）
+                    attack_should_update = True
+                    if enemy.is_off_screen():
+                        # 画面外は頻度を下げるが完全停止はしない
+                        if len(enemies) > 100:
+                            attack_should_update = (frame_count % 8 == 0)  # 1/8頻度
+                        else:
+                            attack_should_update = (frame_count % 4 == 0)  # 1/4頻度
+                    
+                    if attack_should_update:
                         enemy.update_attack(player)
                         # 弾丸更新は軽量化のため頻度を下げる（ボスは除外）
                         if getattr(enemy, 'is_boss', False) or frame_count % 2 == 0:
@@ -1387,18 +1405,33 @@ def main():
                                     pass
 
                 # 敵の弾丸とプレイヤーの衝突判定（負荷軽減）
+                # エネミー弾丸処理（効率化：事前計算）
                 total_projectiles = sum(len(enemy.get_projectiles()) for enemy in enemies)
-                # 弾丸数が多い場合は処理を制限
-                enemy_limit = max(1, len(enemies) * 2 // 3) if total_projectiles > 50 else len(enemies)
+                # 弾丸数が多い場合はより厳しく制限
+                if total_projectiles > 150:
+                    enemy_limit = max(1, len(enemies) // 4)  # 1/4まで削減
+                elif total_projectiles > 100:
+                    enemy_limit = max(1, len(enemies) // 3)  # 1/3まで削減
+                elif total_projectiles > 50:
+                    enemy_limit = max(1, len(enemies) * 2 // 3)
+                else:
+                    enemy_limit = len(enemies)
+                
+                # プレイヤーサイズの事前計算（重複計算削除）
+                player_half = getattr(player, 'size', 0) // 2
                 
                 for enemy in enemies[:enemy_limit]:
                     projectiles = enemy.get_projectiles()
-                    # 弾丸が多い場合は一部のみ処理
-                    projectile_limit = len(projectiles) if total_projectiles <= 100 else min(10, len(projectiles))
+                    # 弾丸数による厳格制限
+                    if total_projectiles > 150:
+                        projectile_limit = min(5, len(projectiles))  # 大幅制限
+                    elif total_projectiles > 100:
+                        projectile_limit = min(8, len(projectiles))
+                    else:
+                        projectile_limit = min(10, len(projectiles))
                     
                     for projectile in projectiles[:projectile_limit]:
-                        # プレイヤーとの正方形衝突判定（最高速化）
-                        player_half = getattr(player, 'size', 0) // 2
+                        # プレイヤーとの正方形衝突判定（事前計算済みを使用）
                         proj_half = projectile.size // 2
                         if (abs(player.x - projectile.x) < player_half + proj_half and 
                             abs(player.y - projectile.y) < player_half + proj_half):
@@ -1467,8 +1500,15 @@ def main():
                             # 弾丸を削除
                             enemy.projectiles.remove(projectile)
 
-                # 経験値ジェム処理（レスポンス重視で毎フレーム処理）
+                # 経験値ジェム処理（効率化：ループ外事前計算）
                 gems_collected_this_frame = 0  # このフレームで取得したジェム数
+                
+                # ⚡ 最適化：ループ外で1回だけ計算
+                player_half = getattr(player, 'size', 0) // 2
+                extra_range = int(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0
+                attraction_range = BASE_ATTRACTION_DISTANCE + extra_range
+                attraction_range_squared = attraction_range * attraction_range
+                
                 for gem in experience_gems[:]:
                     # ジェムの寿命チェック（引き寄せ中でない場合のみ）
                     if hasattr(gem, 'is_expired') and gem.is_expired() and not getattr(gem, 'being_attracted', False):
@@ -1477,29 +1517,22 @@ def main():
                     
                     gem.move_to_player(player)
                     
-                    # 回収範囲の計算
-                    player_half = getattr(player, 'size', 0) // 2
+                    # 🎯 最適化：ジェム個別の計算のみ
                     gem_half = getattr(gem, 'size', 0) // 2
-                    extra_range = int(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0
-                    
-                    # 引き寄せ範囲（基本引き寄せ距離 + サブアイテム回収範囲）
-                    attraction_range = BASE_ATTRACTION_DISTANCE + extra_range
-                    # 実際の取得範囲（プレイヤーのサイズのみ）
                     pickup_range = player_half + gem_half
+                    pickup_range_squared = pickup_range * pickup_range
                     
-                    # 距離計算（平方根なしの近似ユークリッド距離で円形に近似）
+                    # 距離計算（平方根なしユークリッド距離）
                     dx = player.x - gem.x
                     dy = player.y - gem.y
                     distance_squared = dx * dx + dy * dy
                     
-                    # 引き寄せ範囲に入ったら引き寄せ開始
-                    attraction_range_squared = attraction_range * attraction_range
+                    # 引き寄せ範囲に入ったら引き寄せ開始（事前計算済み）
                     if distance_squared < attraction_range_squared:
                         if not getattr(gem, 'being_attracted', False):
                             gem.being_attracted = True
                     
                     # 実際の取得範囲（プレイヤーアイコンサイズ）に到達したら取得完了
-                    pickup_range_squared = pickup_range * pickup_range
                     if distance_squared < pickup_range_squared:
                         prev_level = player.level
                         # ジェムごとの価値を付与
@@ -1524,32 +1557,27 @@ def main():
                     except Exception:
                         pass
 
+                # アイテム処理（効率化：ループ外事前計算）
+                # ⚡ 最適化：ループ外で1回だけ計算（ジェム処理と共通化）
                 for item in items[:]:
                     item.move_to_player(player)
                     
-                    # 回収範囲と取得範囲の計算
-                    player_half = getattr(player, 'size', 0) // 2
+                    # 🎯 最適化：アイテム個別の計算のみ
                     item_half = getattr(item, 'size', 0) // 2
-                    extra_range = int(player.get_gem_pickup_range()) if hasattr(player, 'get_gem_pickup_range') else 0
-                    
-                    # 引き寄せ範囲（基本引き寄せ距離 + サブアイテム回収範囲）
-                    attraction_range = BASE_ATTRACTION_DISTANCE + extra_range
-                    # 実際の取得範囲（プレイヤーのサイズのみ）
                     pickup_range = player_half + item_half
+                    pickup_range_squared = pickup_range * pickup_range
                     
-                    # 距離計算（平方根なしの近似ユークリッド距離で円形に近似）
+                    # 距離計算（平方根なしユークリッド距離）
                     dx = player.x - item.x
                     dy = player.y - item.y
                     distance_squared = dx * dx + dy * dy
                     
-                    # 引き寄せ範囲に入ったら引き寄せ開始
-                    attraction_range_squared = attraction_range * attraction_range
+                    # 引き寄せ範囲に入ったら引き寄せ開始（事前計算済み）
                     if distance_squared < attraction_range_squared:
                         if not getattr(item, 'being_attracted', False):
                             item.being_attracted = True
                     
                     # 実際の取得範囲に到達したら取得完了
-                    pickup_range_squared = pickup_range * pickup_range
                     if distance_squared < pickup_range_squared:
                         if item.type == "heal":
                             # 体力回復（割合回復）
@@ -1621,10 +1649,34 @@ def main():
                 # テスト用市松模様背景
                 draw_test_checkerboard(world_surf, int_cam_x, int_cam_y)
             
-            # 敵の描画（プレイヤーより背後に表示）
+            # 敵の描画（画面内優先、画面外も一部描画）
+            screen_margin = 150  # マージンを拡大
+            screen_left = int_cam_x - screen_margin
+            screen_right = int_cam_x + SCREEN_WIDTH + screen_margin
+            screen_top = int_cam_y - screen_margin
+            screen_bottom = int_cam_y + SCREEN_HEIGHT + screen_margin
+            
+            # 画面内エネミーを優先描画、画面外も制限付きで描画
+            enemies_drawn = 0
+            screen_enemies = []
+            offscreen_enemies = []
+            
             for enemy in enemies:
+                if (enemy.x >= screen_left and enemy.x <= screen_right and 
+                    enemy.y >= screen_top and enemy.y <= screen_bottom):
+                    screen_enemies.append(enemy)  # 画面内
+                else:
+                    offscreen_enemies.append(enemy)  # 画面外
+            
+            # 画面内エネミーは全て描画
+            for enemy in screen_enemies:
                 enemy.draw(world_surf, int_cam_x, int_cam_y)
-                # 敵の弾丸も描画
+                enemy.draw_projectiles(world_surf, int_cam_x, int_cam_y)
+            
+            # 画面外エネミーも一部描画（完全カットはしない）
+            max_offscreen_draw = min(30, len(offscreen_enemies))  # 画面外も30体まで描画
+            for enemy in offscreen_enemies[:max_offscreen_draw]:
+                enemy.draw(world_surf, int_cam_x, int_cam_y)
                 enemy.draw_projectiles(world_surf, int_cam_x, int_cam_y)
             
             # ボックスの描画（敵の後、パーティクルの前）
