@@ -13,7 +13,7 @@ from core.game_utils import enforce_experience_gems_limit
 
 
 def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval, 
-                 player_x, player_y, camera_x, camera_y, boss_spawn_timer=0):
+                 player_x, player_y, camera_x, camera_y, boss_spawn_timer=0, stage=None):
     """敵の生成処理"""
     new_spawn_timer = spawn_timer + 1
     new_boss_spawn_timer = boss_spawn_timer + 1
@@ -30,6 +30,10 @@ def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval,
         # ワールド境界をクランプ
         boss_x = max(100, min(WORLD_WIDTH - 100, boss_x))
         boss_y = max(100, min(WORLD_HEIGHT - 100, boss_y))
+        
+        # ステージが利用可能な場合、安全な位置を探す
+        if stage:
+            boss_x, boss_y = stage.find_safe_spawn_position(boss_x, boss_y, 50)
         
         # ボス生成
         boss = Enemy(None, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True)
@@ -76,6 +80,10 @@ def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval,
             # ワールド境界をクランプ
             x = max(50, min(WORLD_WIDTH - 50, x))
             y = max(50, min(WORLD_HEIGHT - 50, y))
+            
+            # ステージが利用可能な場合、安全な位置を探す
+            if stage:
+                x, y = stage.find_safe_spawn_position(x, y, 32)
             
             enemy = Enemy(None, game_time, spawn_x=x, spawn_y=y)
             enemies.append(enemy)

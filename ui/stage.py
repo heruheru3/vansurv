@@ -118,32 +118,35 @@ class StageMap:
         return None  # 衝突なし
     
     def is_obstacle_at_world_pos(self, world_x, world_y):
-        """ワールド座標が障害物かどうかチェック"""
+        """ワールド座標が障害物かどうかチェック（軽量化版）"""
         self._load_csv_map_cache()
         if self._csv_map_cache:
             try:
                 tile_id = self._csv_map_cache.get_tile_at(world_x, world_y)
                 # ブロッカータイル: 5(森), 7(水), 8(危険地帯), 9(石/岩)
                 return tile_id in [5, 7, 8, 9]
-            except Exception as e:
-                print(f"[DEBUG] CSV collision check failed: {e}")
+            except Exception:
+                # エラー時は安全のために障害物として扱う（デバッグログは除去）
+                return True
         return False
     
     def find_safe_spawn_position(self, preferred_x, preferred_y, entity_size):
-        """障害物のない安全な開始位置を見つける"""
+        """障害物のない安全な開始位置を見つける（軽量化版）"""
         # まず希望位置をチェック
         if self.is_position_safe(preferred_x, preferred_y, entity_size):
             return preferred_x, preferred_y
         
-        # 希望位置から螺旋状に安全な場所を探索
-        max_radius = 10  # 最大10タイル分探索
+        # 軽量化：螺旋探索を簡素化
+        max_radius = 5  # 探索範囲を半減
         tile_size = self._csv_map_cache.tile_size if self._csv_map_cache else 32
         
+        # 4方向の直線探索に変更（螺旋探索より高速）
+        directions = [(1, 0), (0, 1), (-1, 0), (0, -1)]  # 右、下、左、上
+        
         for radius in range(1, max_radius + 1):
-            for angle_step in range(0, 360, 15):  # 15度刻み
-                angle = math.radians(angle_step)
-                test_x = preferred_x + radius * tile_size * math.cos(angle)
-                test_y = preferred_y + radius * tile_size * math.sin(angle)
+            for dx, dy in directions:
+                test_x = preferred_x + radius * tile_size * dx
+                test_y = preferred_y + radius * tile_size * dy
                 
                 # ワールド境界内かチェック
                 if (entity_size <= test_x <= WORLD_WIDTH - entity_size and 
@@ -151,9 +154,11 @@ class StageMap:
                     if self.is_position_safe(test_x, test_y, entity_size):
                         return test_x, test_y
         
-        # どうしても見つからない場合は左上の安全な場所を返す
-        for y in range(entity_size, WORLD_HEIGHT - entity_size, tile_size):
-            for x in range(entity_size, WORLD_WIDTH - entity_size, tile_size):
+        # 軽量化：フォールバック探索も簡素化
+        # 左上から検索するが、より粗い間隔で
+        step = tile_size * 2  # 間隔を2倍に
+        for y in range(entity_size, WORLD_HEIGHT - entity_size, step):
+            for x in range(entity_size, WORLD_WIDTH - entity_size, step):
                 if self.is_position_safe(x, y, entity_size):
                     return x, y
         

@@ -37,7 +37,6 @@ from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, Leve
 from ui.ui import draw_ui, draw_minimap, draw_level_choice, draw_end_buttons, get_end_button_rects
 from ui.stage import draw_stage_background
 from ui.box import BoxManager  # アイテムボックス管理用
-import ui.stage as stage
 import systems.resources as resources
 from core.game_utils import init_game_state, limit_particles, enforce_experience_gems_limit
 from core.game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item_effect, 
@@ -148,6 +147,10 @@ def main():
 
     # ゲーム状態の初期化
     player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
+
+    # ステージマップのインスタンスを作成
+    from ui.stage import StageMap
+    stage_map = StageMap()
 
     # パーティクルの並列update関数（制限付き）
     def parallel_update_particles(particles):
@@ -1075,26 +1078,43 @@ def main():
                     
                     if should_spawn:
                             
-                            # ボスを画面外からスポーン
-                            screen_margin = 100  # 画面外の距離
-                            side = random.randint(0, 3)  # 0:上, 1:右, 2:下, 3:左
+                            # ボスを画面外からスポーン（軽量化版）
+                            screen_margin = 150
+                            attempts = 0
+                            max_attempts = 3  # ボスは試行回数をさらに削減
+                            boss_x, boss_y = None, None
                             
-                            if side == 0:  # 上から
-                                boss_x = player.x + random.randint(-SCREEN_WIDTH//2, SCREEN_WIDTH//2)
-                                boss_y = player.y - SCREEN_HEIGHT//2 - screen_margin
-                            elif side == 1:  # 右から
-                                boss_x = player.x + SCREEN_WIDTH//2 + screen_margin
-                                boss_y = player.y + random.randint(-SCREEN_HEIGHT//2, SCREEN_HEIGHT//2)
-                            elif side == 2:  # 下から
-                                boss_x = player.x + random.randint(-SCREEN_WIDTH//2, SCREEN_WIDTH//2)
-                                boss_y = player.y + SCREEN_HEIGHT//2 + screen_margin
-                            else:  # 左から
-                                boss_x = player.x - SCREEN_WIDTH//2 - screen_margin
-                                boss_y = player.y + random.randint(-SCREEN_HEIGHT//2, SCREEN_HEIGHT//2)
+                            while attempts < max_attempts and boss_x is None:
+                                side = random.randint(0, 3)
+                                
+                                if side == 0:  # 上から
+                                    boss_x = max(50, min(WORLD_WIDTH - 50, player.x + random.randint(-SCREEN_WIDTH//2, SCREEN_WIDTH//2)))
+                                    boss_y = max(50, player.y - SCREEN_HEIGHT//2 - screen_margin - random.randint(0, 50))
+                                elif side == 1:  # 右から
+                                    boss_x = min(WORLD_WIDTH - 50, player.x + SCREEN_WIDTH//2 + screen_margin + random.randint(0, 50))
+                                    boss_y = max(50, min(WORLD_HEIGHT - 50, player.y + random.randint(-SCREEN_HEIGHT//2, SCREEN_HEIGHT//2)))
+                                elif side == 2:  # 下から
+                                    boss_x = max(50, min(WORLD_WIDTH - 50, player.x + random.randint(-SCREEN_WIDTH//2, SCREEN_WIDTH//2)))
+                                    boss_y = min(WORLD_HEIGHT - 50, player.y + SCREEN_HEIGHT//2 + screen_margin + random.randint(0, 50))
+                                else:  # 左から
+                                    boss_x = max(50, player.x - SCREEN_WIDTH//2 - screen_margin - random.randint(0, 50))
+                                    boss_y = max(50, min(WORLD_HEIGHT - 50, player.y + random.randint(-SCREEN_HEIGHT//2, SCREEN_HEIGHT//2)))
+                                
+                                # 境界チェック
+                                if not (50 <= boss_x <= WORLD_WIDTH - 50 and 50 <= boss_y <= WORLD_HEIGHT - 50):
+                                    boss_x = None
+                                    attempts += 1
+                                else:
+                                    break
                             
-                            # ワールド境界をクランプ
-                            boss_x = max(50, min(WORLD_WIDTH - 50, boss_x))
-                            boss_y = max(50, min(WORLD_HEIGHT - 50, boss_y))
+                            # フォールバック
+                            if boss_x is None:
+                                boss_x = max(50, min(WORLD_WIDTH - 50, WORLD_WIDTH // 2))
+                                boss_y = max(50, min(WORLD_HEIGHT - 50, WORLD_HEIGHT // 2))
+                            
+                            # ステージを考慮して安全な位置を探す（軽量化）
+                            if stage_map:
+                                boss_x, boss_y = stage_map.find_safe_spawn_position(boss_x, boss_y, 50)
                             
                             # ボス生成（NoベースでCSVの設定に基づき）
                             boss_stats_key = (boss_type, level, spawn_time)  # 互換性用
@@ -1130,23 +1150,44 @@ def main():
                     for _ in range(num_enemies):
                         cam_vx = int(camera_x)
                         cam_vy = int(camera_y)
-                        margin = 32
-                        side = random.randint(0, 3)
-                        if side == 0:
-                            sx = random.randint(cam_vx - margin, cam_vx + SCREEN_WIDTH + margin)
-                            sy = cam_vy - margin
-                        elif side == 1:
-                            sx = cam_vx + SCREEN_WIDTH + margin
-                            sy = random.randint(cam_vy - margin, cam_vy + SCREEN_HEIGHT + margin)
-                        elif side == 2:
-                            sx = random.randint(cam_vx - margin, cam_vx + SCREEN_WIDTH + margin)
-                            sy = cam_vy + SCREEN_HEIGHT + margin
-                        else:
-                            sx = cam_vx - margin
-                            sy = random.randint(cam_vy - margin, cam_vy + SCREEN_HEIGHT + margin)
+                        margin = 64
+                        
+                        # 軽量化：候補を生成せず、直接有効な位置を計算
+                        attempts = 0
+                        max_attempts = 5  # 最大試行回数を大幅削減
+                        sx, sy = None, None
+                        
+                        while attempts < max_attempts and sx is None:
+                            side = random.randint(0, 3)
+                            
+                            if side == 0:  # 上側
+                                sx = random.randint(max(50, cam_vx - margin), min(WORLD_WIDTH - 50, cam_vx + SCREEN_WIDTH + margin))
+                                sy = max(50, cam_vy - margin - random.randint(0, 50))
+                            elif side == 1:  # 右側
+                                sx = min(WORLD_WIDTH - 50, cam_vx + SCREEN_WIDTH + margin + random.randint(0, 50))
+                                sy = random.randint(max(50, cam_vy - margin), min(WORLD_HEIGHT - 50, cam_vy + SCREEN_HEIGHT + margin))
+                            elif side == 2:  # 下側
+                                sx = random.randint(max(50, cam_vx - margin), min(WORLD_WIDTH - 50, cam_vx + SCREEN_WIDTH + margin))
+                                sy = min(WORLD_HEIGHT - 50, cam_vy + SCREEN_HEIGHT + margin + random.randint(0, 50))
+                            else:  # 左側
+                                sx = max(50, cam_vx - margin - random.randint(0, 50))
+                                sy = random.randint(max(50, cam_vy - margin), min(WORLD_HEIGHT - 50, cam_vy + SCREEN_HEIGHT + margin))
+                            
+                            # 境界チェック
+                            if not (50 <= sx <= WORLD_WIDTH - 50 and 50 <= sy <= WORLD_HEIGHT - 50):
+                                sx = None  # 無効な位置の場合は再試行
+                                attempts += 1
+                            else:
+                                break
+                        
+                        # フォールバック
+                        if sx is None:
+                            sx = random.randint(max(50, cam_vx), min(WORLD_WIDTH - 50, cam_vx + SCREEN_WIDTH))
+                            sy = random.randint(max(50, cam_vy), min(WORLD_HEIGHT - 50, cam_vy + SCREEN_HEIGHT))
 
-                        sx = max(-margin, min(WORLD_WIDTH + margin, sx))
-                        sy = max(-margin, min(WORLD_HEIGHT + margin, sy))
+                        # ステージを考慮して安全な位置を探す（軽量化）
+                        if stage_map:
+                            sx, sy = stage_map.find_safe_spawn_position(sx, sy, 32)
 
                         enemy = Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, spawn_side=side)
                         enemies.append(enemy)
