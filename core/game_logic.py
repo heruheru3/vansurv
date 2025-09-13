@@ -18,6 +18,12 @@ def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval,
     new_spawn_timer = spawn_timer + 1
     new_boss_spawn_timer = boss_spawn_timer + 1
     
+    # 敵数上限チェック（並列処理効果を測定しやすくするため）
+    if len(enemies) >= MAX_ENEMIES_ON_SCREEN:
+        # 上限に達している場合は古い敵から削除
+        while len(enemies) > MAX_ENEMIES_ON_SCREEN * 0.8:  # 80%まで削減
+            enemies.pop(0)
+    
     # ボス出現チェック（1分=3600フレーム間隔）
     boss_spawn_interval = 3600  # 60秒 * 60FPS
     if new_boss_spawn_timer >= boss_spawn_interval and game_time >= 60:

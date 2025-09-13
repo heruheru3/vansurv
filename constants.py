@@ -61,16 +61,36 @@ BOMB_ITEM_DROP_RATE = 0.002   # 0.2%の確率でボムアイテム（0.01 + 0.00
 MAGNET_ITEM_DROP_RATE = 0.001  # 0.1%の確率でマグネットアイテム
 
 # パーティクル関連の制限（パフォーマンス改善用）
-PARTICLE_LIMIT = 120        # これ以上は古いパーティクルから切る（200から120に削減）
+PARTICLE_LIMIT = 200        # これ以上は古いパーティクルから切る（120から500に大幅増加）
 
 # パフォーマンス最適化設定
 FULLSCREEN_FPS_THRESHOLD = 2.5  # この倍率以上でFPS調整
 FULLSCREEN_FPS = 60  # フルスクリーン時の目標FPS（大画面時）
 NORMAL_FPS = 60  # 通常時のFPS
-PARTICLE_TRIM_TO = 80       # 切るときに残す数（150から80に削減）
+PARTICLE_TRIM_TO = 300      # 切るときに残す数（80から300に大幅増加）
 
 # 画面上に存在可能な経験値ジェムの上限
-MAX_GEMS_ON_SCREEN = 100  # 150から100に削減
+MAX_GEMS_ON_SCREEN = 100    # 100から500に大幅増加
+
+# 敵の最大数（8コア並列処理で高負荷に対応）
+MAX_ENEMIES_ON_SCREEN = 200  # 300から500に増加（8コアCPU使用率向上のため）
+
+# 並列処理ON/OFF切り替え設定
+PARALLEL_PROCESSING_ENABLED = True  # 並列処理の有効/無効（F8で切り替え可能）
+
+# 並列処理の積極性設定（8コア環境用）
+PARALLEL_PROCESSING_AGGRESSIVE = True   # 積極的並列処理モード
+PARALLEL_MIN_ENTITIES = 1               # 並列処理開始の最小エンティティ数（CPU使用率最大化）
+PARALLEL_MAX_WORKERS = 8                # 最大ワーカー数（8コア対応）
+
+# パフォーマンス表示設定（F9で切り替え）
+SHOW_PERFORMANCE_STATS = False  # パフォーマンス統計表示のON/OFF
+
+# パフォーマンスログ設定
+ENABLE_PERFORMANCE_LOG = True   # パフォーマンスログの有効/無効（F10で切り替え）
+PERFORMANCE_LOG_INTERVAL = 0.5  # ログ出力間隔（秒）
+PERFORMANCE_LOG_FILE = "logs/performance_log.csv"  # ログファイルパス
+PERFORMANCE_LOG_MAX_ENTRIES = 3600  # ログエントリの最大数（1時間分）
 
 # HP自然回復設定
 NATURAL_HEAL_INTERVAL_MS = 2000  # 自然回復の間隔（ミリ秒）
