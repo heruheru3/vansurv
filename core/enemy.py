@@ -1347,9 +1347,8 @@ class Enemy:
         if not self.is_boss:
             return False
             
-        margin = 150  # ボス用の大きめのマージン
-        return (self.x < -margin or self.x > WORLD_WIDTH + margin or 
-                self.y < -margin or self.y > WORLD_HEIGHT + margin)
+        return (self.x < -BOSS_WORLD_MARGIN or self.x > WORLD_WIDTH + BOSS_WORLD_MARGIN or 
+                self.y < -BOSS_WORLD_MARGIN or self.y > WORLD_HEIGHT + BOSS_WORLD_MARGIN)
 
     def respawn_boss_randomly(self, player):
         """ボスをランダムな位置にリスポーン（HPは維持）"""

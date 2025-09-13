@@ -16,6 +16,11 @@ DELTA_TIME_SMOOTHING = 0.1      # デルタタイムスムージング係数（0
 WORLD_WIDTH = SCREEN_WIDTH * 4
 WORLD_HEIGHT = SCREEN_HEIGHT * 4
 
+# 画面外敵消去マージン設定
+OFFSCREEN_MARGIN = 100          # 通常の敵の画面外消去マージン（ピクセル）
+DRAWING_MARGIN = 100             # 敵描画時のカリングマージン（ピクセル）
+BOSS_WORLD_MARGIN = 150         # ボス用のワールド境界マージン（ピクセル）
+
 # 色の定義
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)

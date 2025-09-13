@@ -1786,12 +1786,11 @@ def main():
                     #     画面外からポップする形で再出現させる（ボスは除外） ---
                     try:
                         if not getattr(enemy, 'is_boss', False):
-                            # カメラ境界にマージンを追加して判定（縦横100px）
-                            MARGIN = 100
-                            cam_left = int(camera_x) - MARGIN
-                            cam_right = int(camera_x) + SCREEN_WIDTH + MARGIN
-                            cam_top = int(camera_y) - MARGIN
-                            cam_bottom = int(camera_y) + SCREEN_HEIGHT + MARGIN
+                            # カメラ境界にマージンを追加して判定
+                            cam_left = int(camera_x) - OFFSCREEN_MARGIN
+                            cam_right = int(camera_x) + SCREEN_WIDTH + OFFSCREEN_MARGIN
+                            cam_top = int(camera_y) - OFFSCREEN_MARGIN
+                            cam_bottom = int(camera_y) + SCREEN_HEIGHT + OFFSCREEN_MARGIN
 
                             if (enemy.x < cam_left or enemy.x > cam_right or
                                 enemy.y < cam_top or enemy.y > cam_bottom):
@@ -1799,20 +1798,19 @@ def main():
                                 enemies_to_remove.append(enemy)
 
                                 # 画面外（カメラ端の外側）から出現するように生成位置を決定
-                                spawn_margin = 100
                                 side = random.randint(0, 3)  # 0:上,1:右,2:下,3:左
                                 if side == 0:  # 上
-                                    sx = random.randint(int(camera_x) - spawn_margin, int(camera_x) + SCREEN_WIDTH + spawn_margin)
-                                    sy = int(camera_y) - spawn_margin
+                                    sx = random.randint(int(camera_x) - OFFSCREEN_MARGIN, int(camera_x) + SCREEN_WIDTH + OFFSCREEN_MARGIN)
+                                    sy = int(camera_y) - OFFSCREEN_MARGIN
                                 elif side == 1:  # 右
-                                    sx = int(camera_x) + SCREEN_WIDTH + spawn_margin
-                                    sy = random.randint(int(camera_y) - spawn_margin, int(camera_y) + SCREEN_HEIGHT + spawn_margin)
+                                    sx = int(camera_x) + SCREEN_WIDTH + OFFSCREEN_MARGIN
+                                    sy = random.randint(int(camera_y) - OFFSCREEN_MARGIN, int(camera_y) + SCREEN_HEIGHT + OFFSCREEN_MARGIN)
                                 elif side == 2:  # 下
-                                    sx = random.randint(int(camera_x) - spawn_margin, int(camera_x) + SCREEN_WIDTH + spawn_margin)
-                                    sy = int(camera_y) + SCREEN_HEIGHT + spawn_margin
+                                    sx = random.randint(int(camera_x) - OFFSCREEN_MARGIN, int(camera_x) + SCREEN_WIDTH + OFFSCREEN_MARGIN)
+                                    sy = int(camera_y) + SCREEN_HEIGHT + OFFSCREEN_MARGIN
                                 else:  # 左
-                                    sx = int(camera_x) - spawn_margin
-                                    sy = random.randint(int(camera_y) - spawn_margin, int(camera_y) + SCREEN_HEIGHT + spawn_margin)
+                                    sx = int(camera_x) - OFFSCREEN_MARGIN
+                                    sy = random.randint(int(camera_y) - OFFSCREEN_MARGIN, int(camera_y) + SCREEN_HEIGHT + OFFSCREEN_MARGIN)
 
                                 # ワールド境界をクランプ
                                 sx = max(50, min(WORLD_WIDTH - 50, sx))
@@ -2186,11 +2184,10 @@ def main():
                 draw_test_checkerboard(world_surf, int_cam_x, int_cam_y)
             
             # 敵の描画（厳格な画面内カリング + 距離ソート最適化）
-            screen_margin = 64  # マージンを大幅縮小（150→64）
-            screen_left = int_cam_x - screen_margin
-            screen_right = int_cam_x + SCREEN_WIDTH + screen_margin
-            screen_top = int_cam_y - screen_margin
-            screen_bottom = int_cam_y + SCREEN_HEIGHT + screen_margin
+            screen_left = int_cam_x - DRAWING_MARGIN
+            screen_right = int_cam_x + SCREEN_WIDTH + DRAWING_MARGIN
+            screen_top = int_cam_y - DRAWING_MARGIN
+            screen_bottom = int_cam_y + SCREEN_HEIGHT + DRAWING_MARGIN
             
             # 画面内エネミーのみ厳選（画面外描画を完全停止）
             screen_enemies = []
