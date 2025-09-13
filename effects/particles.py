@@ -2,7 +2,7 @@ import pygame
 import math
 import random
 from constants import *
-from resources import get_font
+from systems.resources import get_font
 
 class DeathParticle:
     def __init__(self, x, y, color):

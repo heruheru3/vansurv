@@ -4,6 +4,7 @@ import math
 import random
 import os
 from constants import *
+from core.audio import audio
 
 def draw_test_checkerboard(surface, camera_x, camera_y):
     """テスト用の市松模様背景を描画"""
@@ -29,21 +30,21 @@ def draw_test_checkerboard(surface, camera_x, camera_y):
             pygame.draw.rect(surface, color, 
                            (screen_x, screen_y, TEST_TILE_SIZE, TEST_TILE_SIZE))
 
-from player import Player
-from enemy import Enemy
+from core.player import Player
+from core.enemy import Enemy
 from effects.items import ExperienceGem, GameItem, MoneyItem
 from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber, AvoidanceParticle, HealEffect, AutoHealEffect
-from ui import draw_ui, draw_minimap, draw_level_choice, draw_end_buttons, get_end_button_rects
-from stage import draw_stage_background
-from box import BoxManager  # アイテムボックス管理用
-import stage
-import resources
-from game_utils import init_game_state, limit_particles, enforce_experience_gems_limit
-from game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item_effect, 
+from ui.ui import draw_ui, draw_minimap, draw_level_choice, draw_end_buttons, get_end_button_rects
+from ui.stage import draw_stage_background
+from ui.box import BoxManager  # アイテムボックス管理用
+import ui.stage as stage
+import systems.resources as resources
+from core.game_utils import init_game_state, limit_particles, enforce_experience_gems_limit
+from core.game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item_effect, 
                        update_difficulty, handle_player_level_up, collect_experience_gems, collect_items)
-from collision import check_player_enemy_collision, check_attack_enemy_collision
+from core.collision import check_player_enemy_collision, check_attack_enemy_collision
 from map import MapLoader
-from save_system import SaveSystem
+from systems.save_system import SaveSystem
 
 # ランタイムで切り替え可能なデバッグフラグ（F3でトグル）
 DEBUG_MODE = DEBUG
@@ -87,7 +88,7 @@ def main():
 
     # Start background music (level1) if available
     try:
-        from audio import audio
+        # from audio import audio (先頭でインポート済み)
         audio.play_bgm('level1')
     except Exception:
         pass
@@ -100,7 +101,7 @@ def main():
 
     # --- ボス設定のプリロード: ボス画像を事前に読み込んでおく（スポーン時のIO/変換を避ける）
     try:
-        from enemy import Enemy
+        from core.enemy import Enemy
         # get_all_boss_configs 内で load_boss_stats が呼ばれる
         boss_configs = Enemy.get_all_boss_configs()
         # 画像を一通りキャッシュしておく（Noベースのエントリのみ）
@@ -211,7 +212,7 @@ def main():
         particles.append(HealEffect(x, y, heal_amount))
         # サウンド再生（回復）
         try:
-            from audio import audio
+            # from audio import audio (先頭でインポート済み)
             audio.play_sound('heal', duration=0.5, fade_out=0.1)
         except Exception:
             pass
@@ -911,7 +912,7 @@ def main():
                             enemy.hp -= dmg
 
                             # サウンド: 敵被弾
-                            from audio import audio
+                            # from audio import audio (先頭でインポート済み)
                             audio.play_sound('enemy_hurt')
 
                             # ノックバック処理
@@ -956,7 +957,7 @@ def main():
                                     garlic_heal_amount = player.get_garlic_heal_amount()
                                     healed = player.heal(garlic_heal_amount, "garlic")
                                     if healed > 0:
-                                        from audio import audio
+                                        # from audio import audio (先頭でインポート済み)
                                         audio.play_sound('heal')
                                     attack.last_garlic_heal_time = now
 
@@ -1002,7 +1003,7 @@ def main():
                                     # ボス撃破時に特別な宝箱 (box4.png) をドロップ
                                     try:
                                         # ItemBox は BoxManager を通じて管理されるべきなので、box_manager に追加
-                                        from box import ItemBox
+                                        from ui.box import ItemBox
                                         special_box = ItemBox(enemy.x, enemy.y, box_type=4)
                                         box_manager.boxes.append(special_box)
                                         # 大きめのスポーンエフェクト
@@ -1395,7 +1396,7 @@ def main():
 
                                 # サウンド: プレイヤー被弾
                                 try:
-                                    from audio import audio
+                                    # from audio import audio (先頭でインポート済み)
                                     audio.play_sound('player_hurt')
                                 except Exception:
                                     pass
@@ -1474,7 +1475,7 @@ def main():
 
                                         # サウンド: プレイヤー被弾（弾）
                                         try:
-                                            from audio import audio
+                                            # from audio import audio (先頭でインポート済み)
                                             audio.play_sound('player_hurt')
                                         except Exception:
                                             pass
@@ -1559,7 +1560,7 @@ def main():
                 # ジェム取得音声（このフレームで1つ以上取得した場合のみ1回再生）
                 if gems_collected_this_frame > 0:
                     try:
-                        from audio import audio
+                        # from audio import audio (先頭でインポート済み)
                         # 複数ジェム取得時は音量を少し上げる（最大1.0）
                         volume = min(1.0, 0.6 + gems_collected_this_frame * 0.1)
                         # min_intervalを短めに設定してレスポンスを良くする

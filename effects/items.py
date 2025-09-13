@@ -3,7 +3,7 @@ import pygame
 import math
 import random
 from constants import *
-from resources import load_icons
+from systems.resources import load_icons
 
 
 class ExperienceGem:
@@ -480,7 +480,7 @@ class MoneyItem:
                 
                 # 金額表示（小さなテキスト、スケール適用）
                 try:
-                    from resources import get_font
+                    from systems.resources import get_font
                     font = get_font(max(10, int(14 * self.spawn_scale)))
                     if font:
                         text = f"{self.amount}G"
@@ -510,7 +510,7 @@ class MoneyItem:
             
             # 金額表示
             try:
-                from resources import get_font
+                from systems.resources import get_font
                 font = get_font(12)
                 if font:
                     text = f"{self.amount}"
