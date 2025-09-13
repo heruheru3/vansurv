@@ -890,9 +890,18 @@ def main():
                                 if id(enemy) in attack.hit_targets:
                                     continue
                             else:
-                                # 持続系は最後にダメージを与えた時刻から0.2秒以上経過していれば再ダメージ
+                                # 持続系は最後にダメージを与えた時刻から適切な間隔経過していれば再ダメージ
                                 last = attack.last_hit_times.get(id(enemy), -999)
-                                if game_time - last < 0.2:
+                                damage_interval = 0.2  # デフォルト間隔（秒）
+                                
+                                # 武器タイプごとの間隔設定
+                                attack_type = getattr(attack, 'type', '')
+                                if attack_type == "garlic":
+                                    damage_interval = GARLIC_DAMAGE_INTERVAL_MS / 1000.0  # ミリ秒から秒に変換
+                                elif attack_type == "holy_water":
+                                    damage_interval = HOLY_WATER_DAMAGE_INTERVAL_MS / 1000.0  # ミリ秒から秒に変換
+                                
+                                if game_time - last < damage_interval:
                                     continue
 
                             # 攻撃のダメージを適用

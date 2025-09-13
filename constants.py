@@ -84,9 +84,13 @@ BASE_ATTRACTION_DISTANCE = 100   # アイテム・ジェムの基本引き寄せ
 DEFAULT_SFX_VOLUME = 0.3
 DEFAULT_MUSIC_VOLUME = 0.3
 
-# ガーリック回復設定
+# ガーリック設定
 GARLIC_HEAL_INTERVAL_MS = 500    # ガーリック回復の間隔（ミリ秒）
 GARLIC_HEAL_AMOUNT = 1           # ガーリック回復時の基本回復量（HPサブアイテムレベル分が追加される）
+GARLIC_DAMAGE_INTERVAL_MS = 400  # ガーリック持続ダメージの間隔（ミリ秒）
+
+# 聖水設定
+HOLY_WATER_DAMAGE_INTERVAL_MS = 200  # 聖水持続ダメージの間隔（ミリ秒）
 
 # 回復アイテム設定
 HEAL_ITEM_AMOUNT = 0.25          # 回復アイテムの回復量（割合：0.25 = 25%）
