@@ -164,9 +164,13 @@ class GameItem:
             magnet_speed_multiplier = 1.0
 
         # being_attractedフラグがTrueの場合のみ引き寄せ（main.pyで管理）
-        # ただし、マグネット効果が有効な場合は距離に関係なく引き寄せ
-        should_attract = (getattr(self, 'being_attracted', False) or 
-                         (hasattr(player, 'is_magnet_active') and player.is_magnet_active()))
+        # 特殊アイテム（ボム、マグネット、ヒール）はマグネット効果で引き寄せない
+        is_special_item = self.type in ("bomb", "magnet", "heal")
+        magnet_attracts = (hasattr(player, 'is_magnet_active') and 
+                          player.is_magnet_active() and 
+                          not is_special_item)
+        
+        should_attract = (getattr(self, 'being_attracted', False) or magnet_attracts)
         
         if should_attract and distance != 0:
             move_speed = self.speed * item_speed_multiplier * magnet_speed_multiplier
