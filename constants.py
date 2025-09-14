@@ -51,11 +51,6 @@ DEBUG = False   # デバッグ用ログ出力のON/OFF
 SHOW_FPS = True  # FPS表示のON/OFF
 SHOW_PICKUP_RANGE = False  # ジェム回収範囲の可視化（デバッグ用）
 
-# パフォーマンス計測設定
-ENABLE_PERFORMANCE_LOGGING = True  # パフォーマンス計測ログの有効/無効
-PERFORMANCE_LOG_INTERVAL = 1000    # ログ出力間隔（ミリ秒）
-PERFORMANCE_THRESHOLD_MS = 5.0     # しきい値：この値以上の処理時間でログ出力（ミリ秒）
-
 # マップ・ステージ設定
 USE_CSV_MAP = True    # True: CSVマップ使用, False: ランダム生成背景
 TEST_TILE_SIZE = 64    # テスト用背景の市松模様のタイルサイズ
@@ -100,7 +95,7 @@ PARALLEL_MAX_WORKERS = 8                # 最大ワーカー数（8コア対応�
 SHOW_PERFORMANCE_STATS = False  # パフォーマンス統計表示のON/OFF
 
 # パフォーマンスログ設定
-ENABLE_PERFORMANCE_LOG = True   # パフォーマンスログの有効/無効（F10で切り替え）
+ENABLE_PERFORMANCE_LOG = False   # パフォーマンスログの有効/無効（F10で切り替え）
 PERFORMANCE_LOG_INTERVAL = 0.5  # ログ出力間隔（秒）
 PERFORMANCE_LOG_FILE = "logs/performance_log.csv"  # ログファイルパス
 PERFORMANCE_LOG_MAX_ENTRIES = 3600  # ログエントリの最大数（1時間分）
@@ -114,8 +109,8 @@ BASE_ATTRACTION_DISTANCE = 100   # アイテム・ジェムの基本引き寄せ
 
 # --- オーディオ基本設定 ---
 # 効果音とBGMのデフォルト音量（0.0〜1.0）
-DEFAULT_SFX_VOLUME = 0.3
-DEFAULT_MUSIC_VOLUME = 0.3
+DEFAULT_SFX_VOLUME = 0.1
+DEFAULT_MUSIC_VOLUME = 0.1
 
 # ガーリック設定
 GARLIC_HEAL_INTERVAL_MS = 500    # ガーリック回復の間隔（ミリ秒）
