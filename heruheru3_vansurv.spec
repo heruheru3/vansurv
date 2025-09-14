@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('constants.py', '.'), ('core', 'core/'), ('systems', 'systems/'), ('ui', 'ui/'), ('tools', 'tools/'), ('weapons', 'weapons/'), ('effects', 'effects/'), ('assets', 'assets/'), ('data', 'data/'), ('map', 'map/'), ('save', 'save/')],
+    datas=[('constants.py', '.'), ('core', 'core/'), ('systems', 'systems/'), ('ui', 'ui/'), ('tools', 'tools/'), ('weapons', 'weapons/'), ('effects', 'effects/'), ('utils', 'utils/'), ('assets', 'assets/'), ('data', 'data/'), ('map', 'map/'), ('save', 'save/')],
     hiddenimports=['colorsys', 'math', 'random', 'json', 'os', 'sys', 'datetime'],
     hookspath=[],
     hooksconfig={},

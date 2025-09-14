@@ -1,14 +1,15 @@
 import json
 import os
 from datetime import datetime
+from utils.file_paths import get_save_file_path, ensure_directory_exists
 
 class SaveSystem:
     """ゲームの永続データ（お金、統計など）を管理するクラス"""
     
-    def __init__(self, save_dir="save", save_file="savedata.json"):
-        self.save_dir = save_dir
+    def __init__(self, save_file="savedata.json"):
+        self.save_path = get_save_file_path(save_file)
+        self.save_dir = os.path.dirname(self.save_path)
         self.save_file = save_file
-        self.save_path = os.path.join(save_dir, save_file)
         self.data = self._load_or_create_default()
     
     def _get_default_data(self):
@@ -64,23 +65,22 @@ class SaveSystem:
     
     def _load_or_create_default(self):
         """セーブファイルを読み込み、存在しない場合はデフォルトデータを作成"""
-        # saveディレクトリが存在しない場合は作成
-        if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
+        if not ensure_directory_exists(self.save_dir):
+            print(f"[ERROR] Failed to create save directory: {self.save_dir}")
         
         if os.path.exists(self.save_path):
             try:
                 with open(self.save_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # バージョンチェックや不足データの補完をここで行う
                     default_data = self._get_default_data()
                     self._merge_data(default_data, data)
+                    print(f"[INFO] Save data loaded from: {self.save_path}")
                     return data
-            except (json.JSONDecodeError, FileNotFoundError, KeyError) as e:
-                print(f"[WARNING] Save file corrupted or invalid: {e}")
+            except (json.JSONDecodeError, FileNotFoundError, KeyError, PermissionError) as e:
+                print(f"[WARNING] Save file corrupted or inaccessible: {e}")
                 print("[INFO] Creating new save file with default data")
         
-        # ファイルが存在しないか読み込みに失敗した場合
+        print(f"[INFO] Using default save data. Will save to: {self.save_path}")
         return self._get_default_data()
     
     def _merge_data(self, default, loaded):
@@ -94,10 +94,34 @@ class SaveSystem:
     def save(self):
         """データをファイルに保存"""
         try:
+            if not ensure_directory_exists(self.save_dir):
+                print(f"[ERROR] Cannot create save directory: {self.save_dir}")
+                return False
+            
             self.data["last_updated"] = datetime.now().isoformat()
-            with open(self.save_path, 'w', encoding='utf-8') as f:
-                json.dump(self.data, f, indent=2, ensure_ascii=False)
-            return True
+            
+            # 一時ファイルに書き込んでから置き換え（原子的操作）
+            temp_path = self.save_path + '.tmp'
+            try:
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.data, f, indent=2, ensure_ascii=False)
+                
+                if os.path.exists(self.save_path):
+                    os.remove(self.save_path)
+                os.rename(temp_path, self.save_path)
+                
+                print(f"[INFO] Save data written to: {self.save_path}")
+                return True
+                
+            except (PermissionError, OSError) as e:
+                print(f"[ERROR] Failed to write save file: {e}")
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except:
+                        pass
+                return False
+                
         except Exception as e:
             print(f"[ERROR] Failed to save data: {e}")
             return False

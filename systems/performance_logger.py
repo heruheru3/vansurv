@@ -1,6 +1,7 @@
 """
 パフォーマンス測定用ログシステム
 FPS、エンティティ数、処理時間などを定期的にCSVファイルに記録
+PyInstaller対応（macでの権限問題解決）
 """
 
 import os
@@ -9,6 +10,7 @@ import time
 from datetime import datetime
 from collections import deque
 from constants import *
+from utils.file_paths import get_log_file_path, ensure_directory_exists
 
 # psutilの安全なインポート
 try:
@@ -22,8 +24,8 @@ except ImportError:
 class PerformanceLogger:
     """パフォーマンス測定データをCSVファイルに記録するクラス"""
     
-    def __init__(self, log_file=PERFORMANCE_LOG_FILE, max_entries=PERFORMANCE_LOG_MAX_ENTRIES):
-        self.log_file = log_file
+    def __init__(self, log_file=None, max_entries=PERFORMANCE_LOG_MAX_ENTRIES):
+        self.log_file = get_log_file_path("performance_log.csv") if log_file is None else log_file
         self.max_entries = max_entries
         self.enabled = ENABLE_PERFORMANCE_LOG
         self.last_log_time = 0.0
@@ -61,32 +63,32 @@ class PerformanceLogger:
     def _initialize_log_file(self):
         """ログファイルとディレクトリを初期化"""
         try:
-            # ディレクトリを作成
             log_dir = os.path.dirname(self.log_file)
-            if log_dir and not os.path.exists(log_dir):
-                os.makedirs(log_dir)
+            if log_dir and not ensure_directory_exists(log_dir):
+                print(f"[ERROR] Failed to create log directory: {log_dir}")
+                self.enabled = False
+                return
 
-            # 古いログファイルは削除（必要に応じてコメントアウト可能）
+            # 古いログファイルは削除
             if os.path.exists(self.log_file):
-                os.remove(self.log_file)
-            
-            # 新しいセッションの開始を記録
-            file_exists = os.path.exists(self.log_file)
+                try:
+                    os.remove(self.log_file)
+                except PermissionError as e:
+                    print(f"[WARNING] Cannot remove existing log file: {e}")
+
+            # ログファイル初期化
             with open(self.log_file, 'a', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
+                writer.writerow(self.csv_headers)
                 
-                # ヘッダーが必要な場合は追加
-                if not file_exists:
-                    writer.writerow(self.csv_headers)
-                
-                # セッション区切りのコメント行を追加
                 session_start = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 writer.writerow([f'# New session started at {session_start}'] + [''] * (len(self.csv_headers) - 1))
-                
-            print(f"[INFO] Performance log initialized: {self.log_file}")
             
-        except Exception as e:
-            print(f"[ERROR] Failed to initialize performance log: {e}")
+            print(f"[INFO] Performance log initialized: {self.log_file}")
+                
+        except (PermissionError, OSError) as e:
+            print(f"[ERROR] Cannot write to log file {self.log_file}: {e}")
+            print("[INFO] Performance logging will be disabled")
             self.enabled = False
     
     def toggle_logging(self):
