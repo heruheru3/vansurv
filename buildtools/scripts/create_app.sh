@@ -32,6 +32,7 @@ pyinstaller --noconfirm --onefile --windowed --clean --name heruheru3_vansurv \
 --add-data "data:data/" \
 --add-data "map:map/" \
 --add-data "save:save/" \
+--add-data "utils:utils/" \
 "main.py"
 
 # ビルド結果の確認
