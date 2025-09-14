@@ -4,9 +4,22 @@ SCREEN_HEIGHT = 720
 FPS = 60
 SURVIVAL_TIME = 180
 
+# フレームスキップ・デルタタイム設定
+ENABLE_FRAME_SKIP = True        # フレームスキップの有効/無効
+TARGET_FRAME_TIME = 1000.0 / FPS  # 目標フレーム時間（ミリ秒）
+MAX_FRAME_SKIP = 5              # 最大フレームスキップ数
+MIN_FPS_THRESHOLD = 45          # この値を下回ったら描画最適化を開始
+DELTA_TIME_CAP = 50.0           # デルタタイムの上限（ミリ秒、約3フレーム相当）
+DELTA_TIME_SMOOTHING = 0.1      # デルタタイムスムージング係数（0.0-1.0、小さいほど滑らか）
+
 # ワールドサイズ（画面の4倍）
 WORLD_WIDTH = SCREEN_WIDTH * 4
 WORLD_HEIGHT = SCREEN_HEIGHT * 4
+
+# 画面外敵消去マージン設定
+OFFSCREEN_MARGIN = 100          # 通常の敵の画面外消去マージン（ピクセル）
+DRAWING_MARGIN = 100             # 敵描画時のカリングマージン（ピクセル）
+BOSS_WORLD_MARGIN = 150         # ボス用のワールド境界マージン（ピクセル）
 
 # 色の定義
 WHITE = (255, 255, 255)
@@ -61,16 +74,36 @@ BOMB_ITEM_DROP_RATE = 0.002   # 0.2%の確率でボムアイテム（0.01 + 0.00
 MAGNET_ITEM_DROP_RATE = 0.001  # 0.1%の確率でマグネットアイテム
 
 # パーティクル関連の制限（パフォーマンス改善用）
-PARTICLE_LIMIT = 120        # これ以上は古いパーティクルから切る（200から120に削減）
+PARTICLE_LIMIT = 200        # これ以上は古いパーティクルから切る（120から500に大幅増加）
 
 # パフォーマンス最適化設定
 FULLSCREEN_FPS_THRESHOLD = 2.5  # この倍率以上でFPS調整
 FULLSCREEN_FPS = 60  # フルスクリーン時の目標FPS（大画面時）
 NORMAL_FPS = 60  # 通常時のFPS
-PARTICLE_TRIM_TO = 80       # 切るときに残す数（150から80に削減）
+PARTICLE_TRIM_TO = 300      # 切るときに残す数（80から300に大幅増加）
 
 # 画面上に存在可能な経験値ジェムの上限
-MAX_GEMS_ON_SCREEN = 100  # 150から100に削減
+MAX_GEMS_ON_SCREEN = 100    # 100から500に大幅増加
+
+# 敵の最大数（8コア並列処理で高負荷に対応）
+MAX_ENEMIES_ON_SCREEN = 300  # 300から500に増加（8コアCPU使用率向上のため）
+
+# 並列処理ON/OFF切り替え設定
+PARALLEL_PROCESSING_ENABLED = True  # 並列処理の有効/無効（F8で切り替え可能）
+
+# 並列処理の積極性設定（8コア環境用）
+PARALLEL_PROCESSING_AGGRESSIVE = True   # 積極的並列処理モード
+PARALLEL_MIN_ENTITIES = 1               # 並列処理開始の最小エンティティ数（CPU使用率最大化）
+PARALLEL_MAX_WORKERS = 8                # 最大ワーカー数（8コア対応）
+
+# パフォーマンス表示設定（F9で切り替え）
+SHOW_PERFORMANCE_STATS = False  # パフォーマンス統計表示のON/OFF
+
+# パフォーマンスログ設定
+ENABLE_PERFORMANCE_LOG = True   # パフォーマンスログの有効/無効（F10で切り替え）
+PERFORMANCE_LOG_INTERVAL = 0.5  # ログ出力間隔（秒）
+PERFORMANCE_LOG_FILE = "logs/performance_log.csv"  # ログファイルパス
+PERFORMANCE_LOG_MAX_ENTRIES = 3600  # ログエントリの最大数（1時間分）
 
 # HP自然回復設定
 NATURAL_HEAL_INTERVAL_MS = 2000  # 自然回復の間隔（ミリ秒）
@@ -84,9 +117,13 @@ BASE_ATTRACTION_DISTANCE = 100   # アイテム・ジェムの基本引き寄せ
 DEFAULT_SFX_VOLUME = 0.3
 DEFAULT_MUSIC_VOLUME = 0.3
 
-# ガーリック回復設定
+# ガーリック設定
 GARLIC_HEAL_INTERVAL_MS = 500    # ガーリック回復の間隔（ミリ秒）
 GARLIC_HEAL_AMOUNT = 1           # ガーリック回復時の基本回復量（HPサブアイテムレベル分が追加される）
+GARLIC_DAMAGE_INTERVAL_MS = 400  # ガーリック持続ダメージの間隔（ミリ秒）
+
+# 聖水設定
+HOLY_WATER_DAMAGE_INTERVAL_MS = 200  # 聖水持続ダメージの間隔（ミリ秒）
 
 # 回復アイテム設定
 HEAL_ITEM_AMOUNT = 0.25          # 回復アイテムの回復量（割合：0.25 = 25%）

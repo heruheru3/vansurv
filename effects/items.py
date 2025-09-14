@@ -3,7 +3,7 @@ import pygame
 import math
 import random
 from constants import *
-from resources import load_icons
+from systems.resources import load_icons
 
 
 class ExperienceGem:
@@ -164,9 +164,13 @@ class GameItem:
             magnet_speed_multiplier = 1.0
 
         # being_attractedフラグがTrueの場合のみ引き寄せ（main.pyで管理）
-        # ただし、マグネット効果が有効な場合は距離に関係なく引き寄せ
-        should_attract = (getattr(self, 'being_attracted', False) or 
-                         (hasattr(player, 'is_magnet_active') and player.is_magnet_active()))
+        # 特殊アイテム（ボム、マグネット、ヒール）はマグネット効果で引き寄せない
+        is_special_item = self.type in ("bomb", "magnet", "heal")
+        magnet_attracts = (hasattr(player, 'is_magnet_active') and 
+                          player.is_magnet_active() and 
+                          not is_special_item)
+        
+        should_attract = (getattr(self, 'being_attracted', False) or magnet_attracts)
         
         if should_attract and distance != 0:
             move_speed = self.speed * item_speed_multiplier * magnet_speed_multiplier
@@ -476,7 +480,7 @@ class MoneyItem:
                 
                 # 金額表示（小さなテキスト、スケール適用）
                 try:
-                    from resources import get_font
+                    from systems.resources import get_font
                     font = get_font(max(10, int(14 * self.spawn_scale)))
                     if font:
                         text = f"{self.amount}G"
@@ -506,7 +510,7 @@ class MoneyItem:
             
             # 金額表示
             try:
-                from resources import get_font
+                from systems.resources import get_font
                 font = get_font(12)
                 if font:
                     text = f"{self.amount}"
