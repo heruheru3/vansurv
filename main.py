@@ -520,12 +520,6 @@ def main():
     
     player.heal_effect_callback = heal_effect_callback
 
-    # デバッグ: 初期状態の選択フラグ確認
-    try:
-        print(f"[DEBUG] initial awaiting_weapon_choice={getattr(player,'awaiting_weapon_choice', False)} last_level_choices={getattr(player,'last_level_choices', [])}")
-    except Exception:
-        pass
-
     # メインゲームループ
     running = True
     frame_count = 0  # フレームカウンターを初期化
@@ -561,16 +555,6 @@ def main():
             delta_time = main.smoothed_delta_time_ms / TARGET_FRAME_TIME
             
             # デバッグ：delta_time値を定期的に表示（10フレームごと）
-            if hasattr(main, 'debug_frame_counter'):
-                main.debug_frame_counter += 1
-            else:
-                main.debug_frame_counter = 1
-            
-            if main.debug_frame_counter % 180 == 0:  # 約3秒ごと（60FPS基準）
-                current_fps = 1000.0 / main.smoothed_delta_time_ms if main.smoothed_delta_time_ms > 0 else 0
-                raw_fps = 1000.0 / delta_time_ms if delta_time_ms > 0 else 0
-                print(f"[DEBUG] Raw FPS: {raw_fps:.1f}, Smoothed FPS: {current_fps:.1f}, delta_time: {delta_time:.3f}")
-            
             # フレームスキップ判定
             frame_skip_count = 0
             if ENABLE_FRAME_SKIP and main.smoothed_delta_time_ms > TARGET_FRAME_TIME:
@@ -898,7 +882,7 @@ def main():
                             if end_screen_selection == 1:  # Continue (right)
                                 if game_over:
                                     player.hp = player.get_max_hp()
-                                    player.set_invincible(3.0)
+                                    player.set_special_invincible(3.0)
                                     game_over = False
                                     for _ in range(8):
                                         particles.append(DeathParticle(player.x, player.y, CYAN))
@@ -1079,7 +1063,7 @@ def main():
                             if game_over and rects.get('continue') and rects['continue'].collidepoint(mx, my):
                                 player.hp = player.get_max_hp()
                                 # コンティニュー時に3秒間の無敵時間を付与
-                                player.set_invincible(3.0)
+                                player.set_special_invincible(3.0)
                                 game_over = False
                                 for _ in range(8):
                                     particles.append(DeathParticle(player.x, player.y, CYAN))
@@ -1179,8 +1163,9 @@ def main():
                 except Exception:
                     pass
 
-                # 無敵時間の更新
-                player.update_invincible(delta_time)
+                # 無敵時間の更新（秒単位でのdelta_timeを渡す）
+                delta_time_seconds = main.smoothed_delta_time_ms / 1000.0
+                player.update_invincible(delta_time_seconds)
 
                 # マグネット効果の更新
                 player.update_magnet_effect()
@@ -1622,8 +1607,6 @@ def main():
                     if len(regular_enemies) > MAX_ENEMIES:
                         # 画面外の敵を優先的に削除（画面内の敵は絶対に保護）
                         enemies_to_remove = len(regular_enemies) - MAX_ENEMIES
-                        if DEBUG and enemies_to_remove > 0:
-                            print(f"[DEBUG] Removing {enemies_to_remove} enemies due to limit (current: {len(regular_enemies)}, max: {MAX_ENEMIES}, bosses: {len(boss_enemies)})")
                         
                         # 画面外の敵を特定して優先的に削除（より大きなマージンで確実に保護）
                         off_screen_enemies = []
@@ -1643,11 +1626,6 @@ def main():
                             removed += 1
                         
                         # まだ削除が必要な場合のみ画面内の敵から削除（古い順）
-                        # ただし、視界内の敵は絶対に削除しない
-                        if removed < enemies_to_remove:
-                            if DEBUG:
-                                print(f"[DEBUG] WARNING: Could not remove enough enemies without affecting visible enemies ({removed}/{enemies_to_remove})")
-                        
                         # リストを再構築（ボスを含める）
                         enemies[:] = boss_enemies + on_screen_enemies + off_screen_enemies
 
@@ -1897,39 +1875,38 @@ def main():
                             except Exception:
                                 pass
                         else:
-                            # 無敵時間チェック
-                            now_ms = pygame.time.get_ticks()
-                            last_hit = getattr(player, 'last_hit_time', -999999)
-                            if now_ms - last_hit >= INVINCIBLE_MS:
-                                particles.append(HurtFlash(player.x, player.y, size=player.size))
+                            # 無敵時間チェック（新方式のみ）
+                            if not player.can_take_damage():
+                                continue  # 無敵時間中はダメージを受けない
+                            
+                            # ダメージ処理
+                            particles.append(HurtFlash(player.x, player.y, size=player.size))
 
-                                # サブアイテムアーマーの効果でダメージを軽減
-                                try:
-                                    player.hp -= max(1, int(enemy.damage - player.get_defense()))
-                                except Exception:
-                                    player.hp -= enemy.damage
+                            # サブアイテムアーマーの効果でダメージを軽減
+                            try:
+                                damage = max(1, int(enemy.damage - player.get_defense()))
+                                player.hp -= damage
+                            except Exception:
+                                player.hp -= enemy.damage
 
-                                # 被弾時刻を更新
-                                try:
-                                    player.last_hit_time = now_ms
-                                except Exception:
-                                    pass
+                            # 被弾時刻を更新（新しいシステムで管理）
+                            player.last_hit_time = pygame.time.get_ticks()
+                            
+                            # 通常無敵時間を設定（連続ダメージ防止）
+                            player.set_normal_invincible()
 
-                                # サウンド: プレイヤー被弾
-                                try:
-                                    # from audio import audio (先頭でインポート済み)
-                                    audio.play_sound('player_hurt')
-                                except Exception:
-                                    pass
-
-                                # エネミーは削除しない（継続して存在）
-                                # if not getattr(enemy, 'is_boss', False):
-                                #     enemies.remove(enemy)
-                                if player.hp <= 0:
-                                    game_over = True
-                            else:
-                                # 無敵中はノーダメージ、エネミーも削除しない
+                            # サウンド: プレイヤー被弾
+                            try:
+                                # from audio import audio (先頭でインポート済み)
+                                audio.play_sound('player_hurt')
+                            except Exception:
                                 pass
+
+                            # エネミーは削除しない（継続して存在）
+                            # if not getattr(enemy, 'is_boss', False):
+                            #     enemies.remove(enemy)
+                            if player.hp <= 0:
+                                game_over = True
                                 # try:
                                 #     if not getattr(enemy, 'is_boss', False):
                                 #         enemies.remove(enemy)
@@ -1981,33 +1958,34 @@ def main():
                                     except Exception:
                                         pass
                                 else:
-                                    # 無敵時間チェック
-                                    now_ms = pygame.time.get_ticks()
-                                    last_hit = getattr(player, 'last_hit_time', -999999)
-                                    if now_ms - last_hit >= INVINCIBLE_MS:
-                                        particles.append(HurtFlash(player.x, player.y, size=player.size))
+                                    # 無敵時間チェック（新方式のみ）
+                                    if not player.can_take_damage():
+                                        continue  # 無敵時間中はダメージを受けない
+                                    
+                                    # ダメージ処理
+                                    particles.append(HurtFlash(player.x, player.y, size=player.size))
 
-                                        # ダメージを適用
-                                        try:
-                                            player.hp -= max(1, int(projectile.damage - player.get_defense()))
-                                        except Exception:
-                                            player.hp -= projectile.damage
+                                    # ダメージを適用
+                                    try:
+                                        player.hp -= max(1, int(projectile.damage - player.get_defense()))
+                                    except Exception:
+                                        player.hp -= projectile.damage
 
-                                        # 被弾時刻を更新
-                                        try:
-                                            player.last_hit_time = now_ms
-                                        except Exception:
-                                            pass
+                                    # 被弾時刻を更新（新しいシステムで管理）
+                                    player.last_hit_time = pygame.time.get_ticks()
+                                    
+                                    # 通常無敵時間を設定（連続ダメージ防止）
+                                    player.set_normal_invincible()
 
-                                        # サウンド: プレイヤー被弾（弾）
-                                        try:
-                                            # from audio import audio (先頭でインポート済み)
-                                            audio.play_sound('player_hurt')
-                                        except Exception:
-                                            pass
+                                    # サウンド: プレイヤー被弾（弾）
+                                    try:
+                                        # from audio import audio (先頭でインポート済み)
+                                        audio.play_sound('player_hurt')
+                                    except Exception:
+                                        pass
 
-                                        if player.hp <= 0:
-                                            game_over = True
+                                    if player.hp <= 0:
+                                        game_over = True
                                 
                                 # 弾丸を削除
                                 enemy.projectiles.remove(projectile)
@@ -2386,15 +2364,6 @@ def main():
             except Exception:
                 pass
 
-            # デバッグ: ゲーム終了時に damage_stats の中身をログ出力 (表が出ない原因調査用)
-            try:
-                if (game_over or game_clear) and DEBUG_MODE:
-                    if not damage_stats:
-                        print("[DEBUG] damage_stats is empty at game end")
-                    else:
-                        print(f"[DEBUG] damage_stats keys={list(damage_stats.items())[:8]}")
-            except Exception:
-                pass
             # UI描画を仮想画面に（毎フレーム描画でちらつき防止）
             draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money)
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）

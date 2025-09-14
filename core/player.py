@@ -41,10 +41,16 @@ class Player:
         self.level = 1
         self.exp_to_next_level = 3
 
-        # 無敵時間関連
-        self.invincible_time = 0.0  # 無敵時間（秒）
-        self.invincible_duration = 0.0  # 無敵持続時間
-        self.is_invincible = False
+        # 無敵時間関連（2種類）
+        # 1. 通常無敵時間（被弾後の短い無敵時間）
+        self.normal_invincible_time = 0.0
+        self.normal_invincible_duration = 0.5  # 0.5秒の通常無敵時間
+        self.is_normal_invincible = False
+        
+        # 2. 特別無敵時間（コンティニュー後の長い無敵時間）
+        self.special_invincible_time = 0.0
+        self.special_invincible_duration = 0.0
+        self.is_special_invincible = False
 
         # 武器定義
         all_weapons = {
@@ -426,8 +432,6 @@ class Player:
 
     def toggle_auto_heal(self):
         self.auto_heal_on_level_up = not getattr(self, 'auto_heal_on_level_up', False)
-        if DEBUG:
-            print(f"[DEBUG] auto_heal_on_level_up = {self.auto_heal_on_level_up}")
 
     def level_up(self):
         self.level += 1
@@ -482,8 +486,6 @@ class Player:
             self._powerup_played_for_subitem_choice = False
         except Exception:
             pass
-        if DEBUG:
-            print(f"[DEBUG] Subitem choices prepared: {choices}")
 
     def apply_subitem_choice(self, chosen_key):
         # セーブシステムに記録
@@ -507,15 +509,11 @@ class Player:
             if chosen_key in self.subitem_templates:
                 if chosen_key in self.subitems:
                     self.subitems[chosen_key].level += 1
-                    if DEBUG:
-                        print(f"[DEBUG] Upgraded subitem: {chosen_key} -> level {self.subitems[chosen_key].level}")
                 else:
                     if len(self.subitems) >= MAX_SUBITEMS:
                         if self.subitems:
                             k = random.choice(list(self.subitems.keys()))
                             self.subitems[k].level += 1
-                            if DEBUG:
-                                print(f"[DEBUG] At max subitems; upgraded existing: {k}")
                     else:
                         template = self.subitem_templates[chosen_key]
                         try:
@@ -524,11 +522,8 @@ class Player:
                             inst = type(template)(template.name, base=template.base, per_level=template.per_level, is_percent=getattr(template, 'is_percent', False))
                             inst.level = 1
                         self.subitems[chosen_key] = inst
-                        if DEBUG:
-                            print(f"[DEBUG] Acquired subitem: {chosen_key}")
             else:
-                if DEBUG:
-                    print(f"[DEBUG] Unknown subitem chosen: {chosen_key}")
+                pass
         except Exception:
             pass
 
@@ -556,8 +551,6 @@ class Player:
                 # 現在の出現率倍率を1.3倍する
                 old_multiplier = self.magnet_drop_rate_multiplier
                 self.magnet_drop_rate_multiplier = old_multiplier * 1.3
-                if DEBUG:
-                    print(f"[DEBUG] gem_pickup_range level {current_level}: magnet multiplier {old_multiplier:.6f} -> {self.magnet_drop_rate_multiplier:.6f}")
         except Exception:
             pass
 
@@ -591,8 +584,6 @@ class Player:
                             weapon = self.weapons.get(upgrade_target)
                             if weapon and hasattr(weapon, 'level_up'):
                                 weapon.level_up()
-                                if DEBUG:
-                                    print(f"[DEBUG] At max weapons; upgraded existing weapon instead: {upgrade_target}")
                     else:
                         weapon_class = self.available_weapons.pop(key)
                         try:
@@ -602,15 +593,11 @@ class Player:
                                 self.weapons[key] = weapon_class
                             except Exception:
                                 pass
-                        if DEBUG:
-                            print(f"[DEBUG] Player acquired weapon: {key}")
                 else:
                     weapon = self.weapons.get(key)
                     if weapon and hasattr(weapon, 'level_up'):
                         try:
                             weapon.level_up()
-                            if DEBUG:
-                                print(f"[DEBUG] Player upgraded weapon: {key}")
                         except Exception:
                             pass
             elif typ == 'sub':
@@ -625,8 +612,7 @@ class Player:
                         except Exception:
                             pass
             else:
-                if DEBUG:
-                    print(f"[DEBUG] Unknown choice type: {typ}")
+                pass
         except Exception:
             pass
         self.awaiting_weapon_choice = False
@@ -695,8 +681,6 @@ class Player:
                 self._powerup_played_for_level_choice = False
             except Exception:
                 pass
-            if DEBUG:
-                print(f"[DEBUG] Mixed level choices prepared: {choices}")
             return choices
         except Exception:
             self.last_level_choices = []
@@ -824,10 +808,6 @@ class Player:
                     natural_heal_amount = self.get_natural_heal_amount()
                     heal_amount = self.heal(natural_heal_amount, "auto")
                     self.last_regen_ms = now
-                    
-                    # デバッグログ
-                    if heal_amount > 0:
-                        print(f"[DEBUG] Natural heal: {heal_amount} HP (Level {self.subitems['hp'].level if 'hp' in self.subitems else 0}) at ({self.x}, {self.y})")
         except Exception:
             pass
 
@@ -960,27 +940,42 @@ class Player:
             print(f"[WARNING] Could not adjust spawn position: {e}")
             pass
 
-    def set_invincible(self, duration):
-        """無敵時間を設定"""
-        self.invincible_time = 0.0
-        self.invincible_duration = duration
-        self.is_invincible = True
-        print(f"[INFO] Player invincible for {duration:.1f} seconds")
+    def set_normal_invincible(self):
+        """通常の無敵時間を設定（被弾後の連続ダメージ防止）"""
+        self.normal_invincible_time = 0.0
+        self.is_normal_invincible = True
+
+    def set_special_invincible(self, duration):
+        """特別無敵時間を設定（コンティニュー後など）"""
+        self.special_invincible_time = 0.0
+        self.special_invincible_duration = duration
+        self.is_special_invincible = True
 
     def update_invincible(self, delta_time):
-        """無敵時間を更新"""
-        if self.is_invincible:
-            self.invincible_time += delta_time
-            if self.invincible_time >= self.invincible_duration:
-                self.is_invincible = False
-                print("[INFO] Player invincibility ended")
+        """両方の無敵時間を更新"""
+        # 通常無敵時間の更新
+        if self.is_normal_invincible:
+            self.normal_invincible_time += delta_time
+            if self.normal_invincible_time >= self.normal_invincible_duration:
+                self.is_normal_invincible = False
+        
+        # 特別無敵時間の更新
+        if self.is_special_invincible:
+            self.special_invincible_time += delta_time
+            if self.special_invincible_time >= self.special_invincible_duration:
+                self.is_special_invincible = False
 
     def can_take_damage(self):
-        """ダメージを受けられるかどうか"""
-        return not self.is_invincible
+        """ダメージを受けられるかどうか（どちらかの無敵時間中は受けられない）"""
+        invincible = self.is_normal_invincible or self.is_special_invincible
+        return not invincible
 
     def should_blink(self):
         """無敵時間中の点滅エフェクト用（0.2秒ごとに切り替え）"""
-        if not self.is_invincible:
-            return False
-        return int(self.invincible_time / 0.2) % 2 == 0
+        if self.is_special_invincible:
+            # 特別無敵時間中は点滅
+            return int(self.special_invincible_time / 0.2) % 2 == 0
+        elif self.is_normal_invincible:
+            # 通常無敵時間中も点滅
+            return int(self.normal_invincible_time / 0.2) % 2 == 0
+        return False
