@@ -6,7 +6,7 @@ __pycache__/
 *.pyd
 
 output/
-main.spec
+*.spec
 .VSCode*/
 .vscode
 .VSCodeCounter
