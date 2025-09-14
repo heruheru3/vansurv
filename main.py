@@ -2065,10 +2065,9 @@ def main():
                 if gems_collected_this_frame > 0:
                     try:
                         # from audio import audio (先頭でインポート済み)
-                        # 複数ジェム取得時は音量を少し上げる（最大1.0）
-                        volume = min(1.0, 0.6 + gems_collected_this_frame * 0.1)
+                        # constants.pyのDEFAULT_SFX_VOLUME（0.1）を使用して音量を統一
                         # min_intervalを短めに設定してレスポンスを良くする
-                        audio.play_sound('gem_pickup', volume=volume, min_interval=0.1)
+                        audio.play_sound('gem_pickup', min_interval=0.1)
                     except Exception:
                         pass
 
