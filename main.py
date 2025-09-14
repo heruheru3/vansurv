@@ -1866,6 +1866,10 @@ def main():
                     enemy_half = getattr(enemy, 'size', 0) // 2
                     if (abs(player.x - enemy.x) < player_half + enemy_half and 
                         abs(player.y - enemy.y) < player_half + enemy_half):
+                        # 無敵時間チェック（最優先）
+                        if not player.can_take_damage():
+                            continue  # 無敵時間中はダメージも回避も発生しない
+                        
                         if random.random() < player.get_avoidance():
                             # サブアイテムスピードアップ効果で攻撃を回避
                             particles.append(AvoidanceParticle(player.x, player.y))
@@ -1875,10 +1879,6 @@ def main():
                             except Exception:
                                 pass
                         else:
-                            # 無敵時間チェック（新方式のみ）
-                            if not player.can_take_damage():
-                                continue  # 無敵時間中はダメージを受けない
-                            
                             # ダメージ処理
                             particles.append(HurtFlash(player.x, player.y, size=player.size))
 
@@ -1949,19 +1949,19 @@ def main():
                         proj_half = projectile.size // 2
                         if (abs(player.x - projectile.x) < player_half + proj_half and 
                             abs(player.y - projectile.y) < player_half + proj_half):
+                                # 無敵時間チェック（最優先）
+                                if not player.can_take_damage():
+                                    continue  # 無敵時間中はダメージも回避も発生しない
+                                
                                 if random.random() < player.get_avoidance():
                                     # 攻撃を回避
                                     particles.append(AvoidanceParticle(player.x, player.y))
                                     try:
                                         from effects.particles import LuckyText
-                                        particles.append(LuckyText(player.x, player.y - getattr(player, 'size', 32) - 6, "Dodge!", color=CYAN))
+                                        particles.append(LuckyText(player.x, player.y - getattr(player, 'size', 32) - 6, "Lukey!", color=CYAN))
                                     except Exception:
                                         pass
                                 else:
-                                    # 無敵時間チェック（新方式のみ）
-                                    if not player.can_take_damage():
-                                        continue  # 無敵時間中はダメージを受けない
-                                    
                                     # ダメージ処理
                                     particles.append(HurtFlash(player.x, player.y, size=player.size))
 
