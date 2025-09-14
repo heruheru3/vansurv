@@ -234,6 +234,7 @@ class Axe(Weapon):
         self.size = 50  # 攻撃範囲
         self.throw_speed = 6  # 投げる速度
         self.rotation_speed = 0.2  # 回転速度（遅く調整）
+        self.num_projectiles = 1  # 投げる数
 
     def attack(self, player):
         if not self.can_attack():
@@ -265,7 +266,7 @@ class Axe(Weapon):
         effective_size = min(100, int(self.size * range_mult))
         effective_duration = max(100, int(3000 * time_mult))
         effective_damage = self.damage * base_mult
-        effective_num = min(5, int(1 + extra))
+        effective_num = min(4, self.num_projectiles + extra)
         
         # ステージマップ参照を取得
         stage = None
@@ -308,9 +309,9 @@ class Axe(Weapon):
         self.damage *= 1.2  # ダメージ15%増加
         # 奇数レベルで数を増やす
         if self.level % 2 == 1:
-            self.num_projectiles += 1
-        else:
             self.cooldown = max(self.cooldown * 0.95, 1000)  # クールダウン減少（最小1000ms）
+        else:
+            self.num_projectiles += 1
 
 class Stone(Weapon):
     def __init__(self):
