@@ -1656,8 +1656,9 @@ class EnemyProjectile:
             from ui.stage import get_stage_map
             stage_map = get_stage_map()
             
-            # 弾丸の中心位置で障害物チェック
-            if stage_map.is_obstacle_at_world_pos(self.x, self.y):
+            # ボス弾は森(5)と石/岩(9)のみでブロック、水(7)と危険地帯(8)は通り抜ける
+            tile_id = stage_map.get_tile_at_world_pos(self.x, self.y)
+            if tile_id in [5, 9]:  # 森と石/岩のみでブロック
                 # 障害物に当たった弾丸は削除対象にする（期限切れにする）
                 self.created_time = pygame.time.get_ticks() - self.lifetime
                 return
