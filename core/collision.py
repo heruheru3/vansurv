@@ -14,7 +14,11 @@ def check_player_enemy_collision(player, enemies, particles, current_time):
     """プレイヤーと敵の衝突判定"""
     player_hit = False
     
-    # 無敵時間チェック
+    # 無敵時間チェック（新方式）
+    if not player.can_take_damage():
+        return player_hit
+    
+    # 従来の無敵時間チェック（後方互換性のため残す）
     if current_time - getattr(player, 'last_hit_time', -999999) < INVINCIBLE_MS:
         return player_hit
     

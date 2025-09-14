@@ -41,6 +41,11 @@ class Player:
         self.level = 1
         self.exp_to_next_level = 3
 
+        # 無敵時間関連
+        self.invincible_time = 0.0  # 無敵時間（秒）
+        self.invincible_duration = 0.0  # 無敵持続時間
+        self.is_invincible = False
+
         # 武器定義
         all_weapons = {
             'whip': Whip,
@@ -954,3 +959,28 @@ class Player:
             # ステージが初期化されていない場合はそのまま
             print(f"[WARNING] Could not adjust spawn position: {e}")
             pass
+
+    def set_invincible(self, duration):
+        """無敵時間を設定"""
+        self.invincible_time = 0.0
+        self.invincible_duration = duration
+        self.is_invincible = True
+        print(f"[INFO] Player invincible for {duration:.1f} seconds")
+
+    def update_invincible(self, delta_time):
+        """無敵時間を更新"""
+        if self.is_invincible:
+            self.invincible_time += delta_time
+            if self.invincible_time >= self.invincible_duration:
+                self.is_invincible = False
+                print("[INFO] Player invincibility ended")
+
+    def can_take_damage(self):
+        """ダメージを受けられるかどうか"""
+        return not self.is_invincible
+
+    def should_blink(self):
+        """無敵時間中の点滅エフェクト用（0.2秒ごとに切り替え）"""
+        if not self.is_invincible:
+            return False
+        return int(self.invincible_time / 0.2) % 2 == 0

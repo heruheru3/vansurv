@@ -1053,8 +1053,14 @@ def get_end_button_rects():
         return {'restart': None, 'continue': None}
 
 
-def draw_end_buttons(screen, is_game_over, is_game_clear):
+def draw_end_buttons(screen, is_game_over, is_game_clear, selected_option=0):
     """エンド画面用のボタンを描画し、矩形を返す。主に main.py 側でクリック判定に使う。
+    
+    Args:
+        screen: 描画対象のスクリーン
+        is_game_over: ゲームオーバー状態
+        is_game_clear: ゲームクリア状態
+        selected_option: 選択されたオプション (0: Restart (left), 1: Continue (right))
     """
     rects = get_end_button_rects()
     restart_rect = rects.get('restart')
@@ -1063,24 +1069,50 @@ def draw_end_buttons(screen, is_game_over, is_game_clear):
         font = get_font(18)
         # GAME OVER / GAME CLEAR の場合は Continue と Restart を表示
         if is_game_over or is_game_clear:
-            # Continue（緑）
+            # Continue - 選択状態に応じて色を変更
             try:
-                pygame.draw.rect(screen, (40, 160, 40), continue_rect, border_radius=8)
+                if selected_option == 1:  # Continue選択中 (right)
+                    pygame.draw.rect(screen, (60, 200, 60), continue_rect, border_radius=8)  # 明るい緑
+                    # 選択中の枠線を描画（白い太枠）
+                    pygame.draw.rect(screen, (255, 255, 255), continue_rect, width=3, border_radius=8)
+                    # 影のような効果を追加
+                    shadow_rect = pygame.Rect(continue_rect.x + 2, continue_rect.y + 2, continue_rect.width, continue_rect.height)
+                    pygame.draw.rect(screen, (0, 0, 0, 50), shadow_rect, width=1, border_radius=8)
+                else:
+                    pygame.draw.rect(screen, (40, 160, 40), continue_rect, border_radius=8)  # 通常の緑
             except Exception:
                 pass
-            # Restart（灰）
+            # Restart - 選択状態に応じて色を変更
             try:
-                pygame.draw.rect(screen, (40, 40, 40), restart_rect, border_radius=8)
+                if selected_option == 0:  # Restart選択中 (left)
+                    pygame.draw.rect(screen, (80, 80, 80), restart_rect, border_radius=8)  # 明るい灰色
+                    # 選択中の枠線を描画（白い太枠）
+                    pygame.draw.rect(screen, (255, 255, 255), restart_rect, width=3, border_radius=8)
+                    # 影のような効果を追加
+                    shadow_rect = pygame.Rect(restart_rect.x + 2, restart_rect.y + 2, restart_rect.width, restart_rect.height)
+                    pygame.draw.rect(screen, (0, 0, 0, 50), shadow_rect, width=1, border_radius=8)
+                else:
+                    pygame.draw.rect(screen, (40, 40, 40), restart_rect, border_radius=8)  # 通常の灰色
             except Exception:
                 pass
 
             try:
-                txt = font.render('Restart', True, WHITE)
+                # 選択中のボタンのテキストは少し大きく表示
+                if selected_option == 0:  # Restart選択中 (left)
+                    txt_font = get_font(20)  # 少し大きなフォント
+                    txt = txt_font.render('Restart', True, WHITE)
+                else:
+                    txt = font.render('Restart', True, WHITE)
                 screen.blit(txt, (restart_rect.centerx - txt.get_width()//2, restart_rect.centery - txt.get_height()//2))
             except Exception:
                 pass
             try:
-                txt = font.render('Continue', True, WHITE)
+                # 選択中のボタンのテキストは少し大きく表示
+                if selected_option == 1:  # Continue選択中 (right)
+                    txt_font = get_font(20)  # 少し大きなフォント
+                    txt = txt_font.render('Continue', True, WHITE)
+                else:
+                    txt = font.render('Continue', True, WHITE)
                 screen.blit(txt, (continue_rect.centerx - txt.get_width()//2, continue_rect.centery - txt.get_height()//2))
             except Exception:
                 pass
