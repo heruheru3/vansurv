@@ -428,7 +428,7 @@ class RotatingBook(Weapon):
 
         effective_radius = max(1, int(self.orbit_radius * range_mult))
         effective_duration = int(self.duration * time_mult)
-        effective_books = max(1, int(self.num_books + extra))
+        effective_books = min(6, int(self.num_books + extra))
         effective_damage = self.damage + base_bonus
 
         for i in range(effective_books):
@@ -436,8 +436,8 @@ class RotatingBook(Weapon):
             a = Attack(x=player.x + math.cos(angle) * effective_radius,
                        y=player.y + math.sin(angle) * effective_radius,
                        # 本のサイズはプロパティから取得する
-                       size_x=int(self.book_w * range_mult),
-                       size_y=int(self.book_h * range_mult),
+                       size_x=min(80, int(self.book_w * range_mult)),
+                       size_y=min(80, int(self.book_h * range_mult)),
                        type_="book",
                        duration=effective_duration,
                        follow_player=player,
@@ -459,13 +459,11 @@ class RotatingBook(Weapon):
         self.damage = int(self.damage * 1.15)
         self.cooldown = min(int(self.cooldown * 0.95), 5000)
         # 本のサイズと回転速度も強化して、視覚的に派手にする
-        try:
-            self.book_w = min(60, int(self.book_w * 1.1))
-            self.book_h = min(60, int(self.book_h * 1.1))
-            # 回転速度は積算的に高める（一定の上限を設ける）
-            self.rotation_speed = min(1.5, self.rotation_speed * 1.1)
-        except Exception:
-            pass
+        self.book_w = min(64, int(self.book_w * 1.2))
+        self.book_h = min(64, int(self.book_h * 1.2))
+        # 回転速度は積算的に高める（一定の上限を設ける）
+        self.rotation_speed = min(1.5, self.rotation_speed * 1.1)
+
 
 class Knife(Weapon):
     """プレイヤーの向いている方向へ直線で投擲するナイフ
