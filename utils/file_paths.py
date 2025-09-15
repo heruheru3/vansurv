@@ -103,3 +103,16 @@ def get_log_file_path(filename="performance_log.csv"):
 def get_save_file_path(filename="savedata.json"):
     """セーブファイルの絶対パスを取得"""
     return get_safe_file_path(f"save/{filename}", use_documents=True)
+
+
+def get_resource_path(relative_path):
+    """PyInstallerで実行時にリソースファイルの正しいパスを取得する（読み取り専用リソース用）"""
+    try:
+        # PyInstallerで実行されている場合
+        base_path = sys._MEIPASS
+    except AttributeError:
+        # 通常のPythonで実行されている場合（開発環境）
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        base_path = os.path.dirname(current_dir)  # utils の親ディレクトリ（ゲームルート）
+    
+    return os.path.join(base_path, relative_path)

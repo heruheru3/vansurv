@@ -83,7 +83,7 @@ class ItemBox:
             return cls._image_cache[box_type]
         
         # 画像ファイルパスを構築
-        image_path = resource_path(os.path.join("assets", "icons", f"box{box_type}.png"))
+        image_path = get_resource_path(os.path.join("assets", "icons", f"box{box_type}.png"))
         
         try:
             # ファイルの存在確認
@@ -592,6 +592,14 @@ class ItemBox:
         margin_squared = margin * margin
         return distance_squared > margin_squared
 
+
+import pygame
+import random
+import os
+import sys
+from constants import *
+from core.audio import audio
+from utils.file_paths import get_resource_path
 
 class BoxManager:
     """ボックスの出現と管理を行うクラス"""

@@ -3,16 +3,7 @@ import math
 import os
 import sys
 from constants import *
-
-def resource_path(relative_path):
-    """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
-    try:
-        # PyInstallerで実行されている場合
-        base_path = sys._MEIPASS
-    except Exception:
-        # 通常のPythonで実行されている場合
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
+from utils.file_paths import get_resource_path
 
 class Attack:
     # 武器画像のキャッシュ
@@ -76,7 +67,7 @@ class Attack:
             return cls._weapon_image_cache[weapon_type]
         
         # 画像ファイルパスを構築
-        image_path = resource_path(os.path.join("assets", "weapons", f"{weapon_type}.png"))
+        image_path = get_resource_path(os.path.join("assets", "weapons", f"{weapon_type}.png"))
         
         try:
             if os.path.exists(image_path):

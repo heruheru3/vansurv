@@ -1,16 +1,7 @@
 import pygame
 import os
 import sys
-
-def resource_path(relative_path):
-    """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
-    try:
-        # PyInstallerで実行されている場合
-        base_path = sys._MEIPASS
-    except Exception:
-        # 通常のPythonで実行されている場合
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
+from utils.file_paths import get_resource_path
 
 # キャッシュ
 _icon_cache = {}
@@ -33,7 +24,7 @@ def load_icons(size=32, icon_names=None, icons_dir=None):
     if icon_names is None:
         icon_names = DEFAULT_ICON_NAMES
     if icons_dir is None:
-        icons_dir = resource_path(os.path.join('assets', 'icons'))
+        icons_dir = get_resource_path(os.path.join('assets', 'icons'))
 
     icons = {}
     for nm in icon_names:
@@ -70,7 +61,7 @@ def get_font(size):
     global _jp_font_path
     if _jp_font_path is None:
         try:
-            fonts_dir = resource_path(os.path.join('assets', 'fonts'))
+            fonts_dir = get_resource_path(os.path.join('assets', 'fonts'))
             medium_path = os.path.join(fonts_dir, 'NotoSansCJKjp-Medium.ttf')
             if os.path.exists(medium_path):
                 _jp_font_path = medium_path
@@ -114,7 +105,7 @@ def get_font(size):
 def load_sound(name, sounds_dir=None):
     """名前（拡張子なし）からサウンドを読み込み、キャッシュして返す。失敗時は None。"""
     if sounds_dir is None:
-        sounds_dir = resource_path(os.path.join('assets', 'sfx'))
+        sounds_dir = get_resource_path(os.path.join('assets', 'sfx'))
     base = os.path.join(sounds_dir, name)
     # try common extensions
     for ext in ('.wav', '.ogg', '.mp3'):
@@ -146,7 +137,7 @@ def preload_all(icon_size=32, icon_names=None, font_sizes=None, sound_names=None
     if icon_names is None:
         icon_names = DEFAULT_ICON_NAMES
     if icons_dir is None:
-        icons_dir = resource_path(os.path.join('assets', 'icons'))
+        icons_dir = get_resource_path(os.path.join('assets', 'icons'))
     for nm in icon_names:
         load_icons(size=icon_size, icon_names=[nm], icons_dir=icons_dir)
 

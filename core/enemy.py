@@ -7,16 +7,7 @@ import colorsys
 import csv
 import time
 from constants import *
-
-def resource_path(relative_path):
-    """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
-    try:
-        # PyInstallerで実行されている場合
-        base_path = sys._MEIPASS
-    except Exception:
-        # 通常のPythonで実行されている場合
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
+from utils.file_paths import get_resource_path
 
 class Enemy:
     # 画像キャッシュ（クラス変数）
@@ -36,7 +27,7 @@ class Enemy:
         if cls._stats_loaded:
             return
             
-        csv_path = resource_path("data/enemy_stats.csv")
+        csv_path = get_resource_path("data/enemy_stats.csv")
         try:
             with open(csv_path, 'r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
@@ -70,7 +61,7 @@ class Enemy:
         if cls._boss_stats_loaded:
             return
             
-        csv_path = resource_path("data/boss_stats.csv")
+        csv_path = get_resource_path("data/boss_stats.csv")
         try:
             with open(csv_path, 'r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
@@ -187,7 +178,7 @@ class Enemy:
             # print(f"[DEBUG] Cache hit for key: {cache_key}")
             return cls._image_cache[cache_key]
 
-        image_path = resource_path(os.path.join("assets", "character", "enemy", image_file))
+        image_path = get_resource_path(os.path.join("assets", "character", "enemy", image_file))
         try:
             if not os.path.exists(image_path):
                 print(f"[WARNING] Enemy image file not found: {image_path}")

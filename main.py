@@ -286,7 +286,12 @@ def main():
     player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
 
     # エネミースポーンマネージャーの初期化
-    spawn_manager = EnemySpawnManager()
+    try:
+        spawn_manager = EnemySpawnManager()
+    except Exception as e:
+        print(f"ERROR: Failed to initialize EnemySpawnManager: {e}")
+        pygame.quit()
+        sys.exit(1)
     
     # エンド画面のキーボード選択状態
     end_screen_selection = 0  # 0: Restart (left), 1: Continue (right)
@@ -924,7 +929,12 @@ def main():
                                 print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                                 
                                 player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
-                                spawn_manager = EnemySpawnManager()  # スポーンマネージャーも再初期化
+                                try:
+                                    spawn_manager = EnemySpawnManager()  # スポーンマネージャーも再初期化
+                                except Exception as e:
+                                    print(f"ERROR: Failed to reinitialize EnemySpawnManager: {e}")
+                                    pygame.quit()
+                                    sys.exit(1)
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
                                 box_manager = BoxManager()
@@ -1099,7 +1109,12 @@ def main():
                                 print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                                 
                                 player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
-                                spawn_manager = EnemySpawnManager()  # スポーンマネージャーも再初期化
+                                try:
+                                    spawn_manager = EnemySpawnManager()  # スポーンマネージャーも再初期化
+                                except Exception as e:
+                                    print(f"ERROR: Failed to reinitialize EnemySpawnManager: {e}")
+                                    pygame.quit()
+                                    sys.exit(1)
                                 # リセット
                                 current_game_money = 0
                                 enemies_killed_this_game = 0

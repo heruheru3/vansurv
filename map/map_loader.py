@@ -8,21 +8,7 @@ import csv
 import os
 import sys
 from constants import *
-
-def get_resource_path(relative_path):
-    """PyInstallerの実行ファイル用リソースパス取得"""
-    try:
-        # PyInstallerで実行されている場合
-        base_path = sys._MEIPASS
-        print(f"[INFO] PyInstaller detected, base path: {base_path}")
-    except Exception:
-        # 通常のPython実行の場合
-        base_path = os.path.abspath(".")
-        print(f"[INFO] Normal Python execution, base path: {base_path}")
-    
-    full_path = os.path.join(base_path, relative_path)
-    print(f"[INFO] Resource path: {relative_path} -> {full_path}")
-    return full_path
+from utils.file_paths import get_resource_path
 
 class MapLoader:
     def __init__(self):

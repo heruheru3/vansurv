@@ -1,7 +1,9 @@
 import csv
 import random
 import os
+import sys
 from typing import List, Dict, Optional, Tuple
+from utils.file_paths import get_resource_path
 
 class EnemySpawnManager:
     """エネミー出現ルールを管理するクラス"""
@@ -14,15 +16,9 @@ class EnemySpawnManager:
     
     def load_spawn_rules(self):
         """CSV ファイルからスポーンルールを読み込み"""
+        csv_path = get_resource_path(self.csv_path)
         try:
-            if not os.path.exists(self.csv_path):
-                print(f"Warning: Spawn rules CSV not found at {self.csv_path}")
-                print("Falling back to hardcoded rules")
-                self.use_csv_rules = False
-                return
-            
-            self.spawn_rules = []
-            with open(self.csv_path, 'r', encoding='utf-8') as file:
+            with open(csv_path, 'r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
                 for row in reader:
                     # データ型変換
@@ -40,13 +36,12 @@ class EnemySpawnManager:
                     }
                     self.spawn_rules.append(rule)
             
-            print(f"Loaded {len(self.spawn_rules)} spawn rules from {self.csv_path}")
+            print(f"Loaded {len(self.spawn_rules)} spawn rules from {csv_path}")
             self.use_csv_rules = True
             
         except Exception as e:
             print(f"Error loading spawn rules: {e}")
-            print("Falling back to hardcoded rules")
-            self.use_csv_rules = False
+            raise RuntimeError(f"Failed to load spawn rules from {csv_path}: {e}")
     
     def get_active_rules(self, game_time: int) -> List[Dict]:
         """現在の時刻で有効なルールを取得"""
@@ -73,13 +68,11 @@ class EnemySpawnManager:
             tuple: (enemy_no, rule_dict or None)
         """
         if not self.use_csv_rules:
-            print("ERROR: CSV spawn rules are required but not available!")
-            return 1, None  # 最低限のフォールバック
+            raise RuntimeError("CSV spawn rules are required but not available!")
         
         active_rules = self.get_active_rules(game_time)
         if not active_rules:
-            print(f"WARNING: No active spawn rules found for game_time {game_time}")
-            return 1, None
+            raise RuntimeError(f"No active spawn rules found for game_time {game_time}")
         
         # 各ルールから候補を収集
         candidates = []
@@ -94,8 +87,7 @@ class EnemySpawnManager:
                 weights.append(rule['spawn_weight'])
         
         if not candidates:
-            print(f"WARNING: No enemy candidates found for game_time {game_time}")
-            return 1, None
+            raise RuntimeError(f"No enemy candidates found for game_time {game_time}")
         
         # 重み付き選択
         selected = random.choices(candidates, weights=weights)[0]

@@ -2,7 +2,7 @@ import pygame
 import os
 import threading
 import time
-from systems.resources import load_sound, resource_path
+from systems.resources import load_sound, get_resource_path
 from constants import DEFAULT_SFX_VOLUME, DEFAULT_MUSIC_VOLUME, DEBUG
 
 
@@ -154,7 +154,7 @@ class AudioManager:
         try:
             if self.muted:
                 return
-            path = resource_path(os.path.join('assets', 'sfx', name))
+            path = get_resource_path(os.path.join('assets', 'sfx', name))
             # try common extensions
             for ext in ('.ogg', '.mp3', '.wav'):
                 p = path + ext
@@ -177,7 +177,7 @@ class AudioManager:
             if self.muted:
                 return
             # build path under assets/music
-            path = resource_path(os.path.join('assets', 'music', name))
+            path = get_resource_path(os.path.join('assets', 'music', name))
             for ext in ('.ogg', '.mp3', '.wav'):
                 p = path + ext
                 if os.path.exists(p):

@@ -5,16 +5,7 @@ import json
 import os
 from systems.resources import get_font
 from core.audio import audio
-
-def resource_path(relative_path):
-    """PyInstallerで実行時にリソースファイルの正しいパスを取得する"""
-    try:
-        # PyInstallerで実行されている場合
-        base_path = sys._MEIPASS
-    except Exception:
-        # 通常のPythonで実行されている場合
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
+from utils.file_paths import get_resource_path
 
 # 軽量キャッシュ: サーフェスを使い回す（フォントは resources.get_font に一本化）
 _surf_cache = {}
@@ -645,7 +636,7 @@ def draw_initial_weapon_grid(screen, player, icons, virtual_mouse_pos=None):
 
         # 説明データの読み込み
         try:
-            data_path = resource_path(os.path.join('data', 'descriptions.json'))
+            data_path = get_resource_path(os.path.join('data', 'descriptions.json'))
             with open(data_path, 'r', encoding='utf-8') as f:
                 desc_data = json.load(f)
         except Exception:
@@ -829,7 +820,7 @@ def draw_level_choice(screen, player, icons, virtual_mouse_pos=None):
 
         # 説明データの読み込み
         try:
-            data_path = resource_path(os.path.join('data', 'descriptions.json'))
+            data_path = get_resource_path(os.path.join('data', 'descriptions.json'))
             with open(data_path, 'r', encoding='utf-8') as f:
                 desc_data = json.load(f)
         except Exception:
@@ -1226,7 +1217,7 @@ def draw_subitem_choice(screen, player, icons=None, virtual_mouse_pos=None):
             display_name = key.replace('_', ' ').title()  # デフォルト名
             long_desc = ''
             try:
-                data_path = resource_path(os.path.join('data', 'descriptions.json'))
+                data_path = get_resource_path(os.path.join('data', 'descriptions.json'))
                 with open(data_path, 'r', encoding='utf-8') as f:
                     sub_desc_data = json.load(f).get('subitems', {})
                 item_data = sub_desc_data.get(key, {})
