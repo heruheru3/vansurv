@@ -41,10 +41,10 @@ class Enemy:
             with open(csv_path, 'r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
                 for row in reader:
-                    type_id = int(row['type'])
-                    level = int(row['level'])
-                    key = (type_id, level)
-                    cls._enemy_stats[key] = {
+                    enemy_no = int(row['enemy_no'])  # enemy_noをキーとして使用
+                    cls._enemy_stats[enemy_no] = {
+                        'type': int(row['type']),  # 行動パターン用に保持
+                        'level': int(row['level']),  # レベル情報も保持
                         'base_hp': int(row['base_hp']),
                         'base_speed': float(row['base_speed']),
                         'base_damage': int(row['base_damage']),
@@ -170,15 +170,18 @@ class Enemy:
 
         else:
             cls.load_enemy_stats()
-            key = (enemy_no, level_or_behavior)
-            if key in cls._enemy_stats:
-                image_file = cls._enemy_stats[key]['image_file'] + '.png'
-                image_size = cls._enemy_stats[key]['image_size']
-                cache_key = f"{enemy_no}-{cls._enemy_stats[key]['image_file']}"
+            
+            # enemy_no が直接指定されている場合のみ対応
+            if enemy_no in cls._enemy_stats:
+                enemy_data = cls._enemy_stats[enemy_no]
+                image_file = enemy_data['image_file'] + '.png'
+                image_size = enemy_data['image_size']
+                cache_key = f"no{enemy_no}-{enemy_data['image_file']}"
             else:
-                cache_key = f"{enemy_no:02d}-{level_or_behavior:02d}"
-                image_file = f"{cache_key}.png"
-                image_size = 32 + int((48 - 32) * (level_or_behavior - 1) / 4)
+                # enemy_noが見つからない場合はエラー
+                print(f"[ERROR] Enemy No.{enemy_no} not found in enemy_stats.csv")
+                cls._image_cache[f"error-{enemy_no}"] = None
+                return None
 
         if cache_key in cls._image_cache:
             # print(f"[DEBUG] Cache hit for key: {cache_key}")
@@ -303,7 +306,7 @@ class Enemy:
         
         return adjusted_surface
     
-    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None, boss_image_file=None, boss_stats_key=None, boss_no=None):
+    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None, boss_image_file=None, boss_stats_key=None, boss_no=None, enemy_no=None):
         self.screen = screen
         self.is_boss = is_boss  # ボス判定フラグ
         self.boss_level = boss_level if is_boss else 1  # ボスレベル（ボス以外は1）
@@ -311,6 +314,7 @@ class Enemy:
         self.boss_image_file = boss_image_file  # ボス画像ファイル名（mainから渡す）
         self.boss_stats_key = boss_stats_key  # ボス設定キー（mainから渡す）
         self.boss_no = boss_no  # ボス番号（CSVのNoカラム）
+        self.enemy_no = enemy_no  # 通常敵の番号（CSVのenemy_noカラム）
         
         # ヒット時のフラッシュ用タイマ（秒）
         self.hit_flash_timer = 0.0
@@ -341,11 +345,17 @@ class Enemy:
                 self.behavior_type = 1  # デフォルトは追跡
             self.level = 1  # ボスのレベルは1固定（タイプで区別）
         else:
-            # 行動パターン（type）をランダムに決定
-            self.behavior_type = self.get_random_behavior_type(game_time)
-            # 強さレベル（level）をランダムに決定
-            self.level = self.get_random_strength_level(game_time)
-            # CSVのキーとして使用（type, level）
+            # 通常敵：enemy_noが必須
+            if self.enemy_no is None:
+                raise ValueError("enemy_no is required for normal enemies")
+            
+            Enemy.load_enemy_stats()
+            if self.enemy_no not in self._enemy_stats:
+                raise ValueError(f"Enemy No.{self.enemy_no} not found in enemy_stats.csv")
+            
+            enemy_data = self._enemy_stats[self.enemy_no]
+            self.behavior_type = enemy_data['type']
+            self.level = enemy_data['level']
             self.enemy_type = self.behavior_type  # typeと同じ値
         
         # 行動パターン用の変数
@@ -464,70 +474,74 @@ class Enemy:
                 return True
         return False
 
-    def get_random_behavior_type(self, game_time):
-        """行動パターン（type）をランダムに決定
-        type 1: プレイヤーに寄ってくる（追跡）
-        type 2: プレイヤーに向かうがそのまま直進して画面端に消える
-        type 3: プレイヤーから一定の距離を保ち、魔法の杖のような弾を発射する
-        type 4: 遅い速度でプレイヤーに近づき、遠距離攻撃も行う
-        """
-        if game_time <= 30:  # 序盤は単純な行動のみ
-            rand = random.random()
-            if rand < 0.8:    # 80%
-                return 1      # 追跡
-            else:            # 20%
-                return 2      # 直進
-        elif game_time <= 70:  # 中盤から射撃敵も登場
-            rand = random.random()
-            if rand < 0.5:    # 50%
-                return 1      # 追跡
-            elif rand < 0.7:  # 20%
-                return 2      # 直進
-            elif rand < 0.85: # 15%
-                return 3      # 距離保持射撃
-            else:            # 15%
-                return 4      # 固定砲台
-        else:                # 終盤は多様な行動
-            rand = random.random()
-            if rand < 0.4:    # 40%
-                return 1      # 追跡
-            elif rand < 0.55: # 15%
-                return 2      # 直進
-            elif rand < 0.75: # 20%
-                return 3      # 距離保持射撃
-            else:            # 25%
-                return 4      # 固定砲台
-
-    def get_random_strength_level(self, game_time):
-        """強さレベル（level）をランダムに決定
-        level 1-5: そのtypeの中での強さ（1が最弱、5が最強）
-        """
+    @classmethod
+    def get_random_enemy_no(cls, game_time):
+        """時間に応じてランダムなenemy_noを選択する（新方式）"""
+        cls.load_enemy_stats()
+        
+        # 現在利用可能なenemy_noのリストを取得
+        available_enemies = list(cls._enemy_stats.keys())
+        if not available_enemies:
+            return 1  # フォールバック
+        
+        # 時間に応じた重み付け選択
         if game_time <= 30:  # 序盤（0-30秒）
-            rand = random.random()
-            if rand < 0.7:    # 70%
-                return 1      # 最弱
-            else:            # 30%
-                return 2      # 弱
+            # レベル1の敵を優先
+            candidates = [no for no in available_enemies 
+                         if cls._enemy_stats[no]['level'] == 1]
+            if candidates:
+                return random.choice(candidates)
+            
         elif game_time <= 70:  # 中盤（31-70秒）
-            rand = random.random()
-            if rand < 0.4:    # 40%
-                return 1      # 最弱
-            elif rand < 0.7:  # 30%
-                return 2      # 弱
-            elif rand < 0.9:  # 20%
-                return 3      # 中
-            else:            # 10%
-                return 4      # 強
-        else:                # 終盤（71秒以降）
-            rand = random.random()
-            if rand < 0.25:   # 25%
-                return 1      # 弱
-            elif rand < 0.5:  # 25%
-                return 2      # 中の下
-            elif rand < 0.75: # 25%
-                return 3      # 中の上
-            else:            # 25%
-                return 4      # 強
+            # レベル1-2の敵を中心に、一部レベル3も
+            weights = []
+            candidates = []
+            for no in available_enemies:
+                level = cls._enemy_stats[no]['level']
+                if level == 1:
+                    weight = 0.5  # 50%
+                elif level == 2:
+                    weight = 0.3  # 30%
+                elif level == 3:
+                    weight = 0.2  # 20%
+                else:
+                    weight = 0.0  # 登場しない
+                
+                if weight > 0:
+                    candidates.append(no)
+                    weights.append(weight)
+            
+            if candidates:
+                return random.choices(candidates, weights=weights)[0]
+                
+        else:  # 終盤（71秒以降）
+            # 全レベルが出現、高レベルの確率が上昇
+            weights = []
+            candidates = []
+            for no in available_enemies:
+                level = cls._enemy_stats[no]['level']
+                if level == 1:
+                    weight = 0.25  # 25%
+                elif level == 2:
+                    weight = 0.25  # 25%
+                elif level == 3:
+                    weight = 0.25  # 25%
+                elif level == 4:
+                    weight = 0.15  # 15%
+                elif level == 5:
+                    weight = 0.10  # 10%
+                else:
+                    weight = 0.0
+                
+                if weight > 0:
+                    candidates.append(no)
+                    weights.append(weight)
+            
+            if candidates:
+                return random.choices(candidates, weights=weights)[0]
+        
+        # フォールバック：最初の敵
+        return available_enemies[0]
 
     def setup_enemy_stats(self):
         # ボスの場合はボス設定から読み込み
@@ -613,20 +627,15 @@ class Enemy:
         # 通常エネミーの場合はエネミー設定から読み込み
         Enemy.load_enemy_stats()
         
-        # ステータス取得のフォールバック（CSVが読み込めない場合の基本設定）
-        default_stats = {
-            'base_hp': 15,
-            'base_speed': 1.125,
-            'base_damage': 2,
-            'speed_multiplier': 1.0,
-            'attack_cooldown': 0
-        }
+        # enemy_noが必須：指定されていない場合はエラー
+        if not hasattr(self, 'enemy_no') or self.enemy_no is None:
+            raise ValueError("enemy_no is required for normal enemies")
         
-        # CSVのキー構造: (type, level)
-        # enemy_type: 敵の種類（1-4）→CSVのtype列
-        # level: そのタイプ内でのレベル（1-5）→CSVのlevel列
-        key = (self.enemy_type, getattr(self, 'level', 1))  # levelが未定義の場合は1
-        stats = self._enemy_stats.get(key, default_stats)
+        # ステータス取得
+        if self.enemy_no not in self._enemy_stats:
+            raise ValueError(f"Enemy No.{self.enemy_no} not found in enemy_stats.csv")
+            
+        stats = self._enemy_stats[self.enemy_no]
         
         # 基本ステータス設定
         self.hp = stats['base_hp']
@@ -637,15 +646,9 @@ class Enemy:
         self.projectile_speed = stats.get('projectile_speed', 2.0)  # デフォルト値2.0
         
         # CSVからサイズ情報を取得（当たり判定用）
-        if key in self._enemy_stats:
-            image_size = self._enemy_stats[key]['image_size']
-            # 当たり判定は画像サイズより少し小さめに設定
-            self.size = int(image_size * 0.7)  # 画像サイズの70%
-        else:
-            # フォールバック：従来の計算方式
-            base_radius = 15
-            max_radius = 24
-            self.size = base_radius + int((max_radius - base_radius) * (self.enemy_type - 1) / 4)
+        image_size = stats['image_size']
+        # 当たり判定は画像サイズより少し小さめに設定
+        self.size = int(image_size * 0.7)  # 画像サイズの70%
         
         # 行動パターンに応じた色設定（レベルに応じて彩度を変える）
         if self.is_boss:
@@ -673,12 +676,17 @@ class Enemy:
         
         # 画像の読み込み（エラーハンドリング強化）
         try:
-            # ボスの場合はboss_level、通常敵の場合はlevelを渡す
-            level_or_behavior = self.boss_level if self.is_boss else getattr(self, 'level', 1)
-            self.images = self._load_enemy_image(self.enemy_type, level_or_behavior)
+            if self.is_boss:
+                # ボスの場合は従来の方式
+                level_or_behavior = self.boss_level
+                self.images = self._load_enemy_image(self.enemy_type, level_or_behavior)
+            else:
+                # 通常敵の場合はenemy_noを使用
+                self.images = self._load_enemy_image(self.enemy_no, 0)  # level_or_behaviorは使わない
+            
             # 画像読み込みに失敗した場合のフォールバック
             if self.images is None:
-                print(f"[WARNING] Failed to load enemy image for type {self.behavior_type}-{self.enemy_type}, using fallback")
+                print(f"[WARNING] Failed to load enemy image for enemy_no {getattr(self, 'enemy_no', 'unknown')}, using fallback")
                 self.images = None
         except Exception as e:
             print(f"[ERROR] Exception while loading enemy image: {e}")

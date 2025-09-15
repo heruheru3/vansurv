@@ -1587,7 +1587,10 @@ def main():
                         if stage_map:
                             sx, sy = stage_map.find_safe_spawn_position(sx, sy, 32)
 
-                        enemy = Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, spawn_side=side)
+                        # 時間に応じたランダムなenemy_noを選択
+                        enemy_no = Enemy.get_random_enemy_no(game_time)
+                        
+                        enemy = Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, spawn_side=side, enemy_no=enemy_no)
                         enemies.append(enemy)
                         particles.append(SpawnParticle(enemy.x, enemy.y, enemy.color))
                     spawn_timer = 0
@@ -1805,8 +1808,10 @@ def main():
                                 sx = max(50, min(WORLD_WIDTH - 50, sx))
                                 sy = max(50, min(WORLD_HEIGHT - 50, sy))
 
+                                # 時間に応じたランダムなenemy_noを選択
+                                enemy_no = Enemy.get_random_enemy_no(game_time)
                                 # 生成は画面外から行うので spawn_x/spawn_y のみ渡す
-                                new_enemies_to_add.append(Enemy(screen, game_time, spawn_x=sx, spawn_y=sy))
+                                new_enemies_to_add.append(Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, enemy_no=enemy_no))
                                 # この敵は以降の削除チェックをスキップ
                                 continue
                     except Exception:

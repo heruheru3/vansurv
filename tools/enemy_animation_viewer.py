@@ -82,19 +82,31 @@ class EnemyAnimationViewer:
                 x = start_x + (enemy_level - 1) * spacing_x
                 y = start_y + (behavior_type - 1) * spacing_y
                 
+                # CSVのenemy_noを計算（type=1,level=1は1、type=1,level=2は2...）
+                # 各タイプ5レベルずつなので: (behavior_type-1)*5 + enemy_level
+                enemy_no = (behavior_type - 1) * 5 + enemy_level
+                
                 # ダミーの敵を作成
-                enemy = Enemy(self.screen, 60, spawn_x=x, spawn_y=y)
-                # 強制的に設定を変更
-                enemy.behavior_type = behavior_type
-                enemy.enemy_type = enemy_level
-                enemy.setup_enemy_stats()
-                
-                # 移動を開始させるため、少し動かす
-                enemy.last_x = x - 1
-                enemy.last_y = y - 1
-                enemy.is_moving = True
-                
-                self.enemies.append(enemy)
+                try:
+                    enemy = Enemy(self.screen, 60, spawn_x=x, spawn_y=y, enemy_no=enemy_no)
+                    
+                    # 移動を開始させるため、少し動かす
+                    enemy.last_x = x - 1
+                    enemy.last_y = y - 1
+                    enemy.is_moving = True
+                    
+                    self.enemies.append(enemy)
+                except ValueError as e:
+                    print(f"[WARNING] Failed to create enemy {enemy_no}: {e}")
+                    # フォールバック：enemy_no=1で作成
+                    try:
+                        enemy = Enemy(self.screen, 60, spawn_x=x, spawn_y=y, enemy_no=1)
+                        enemy.last_x = x - 1
+                        enemy.last_y = y - 1
+                        enemy.is_moving = True
+                        self.enemies.append(enemy)
+                    except Exception:
+                        pass  # 作成失敗時はスキップ
     
     def handle_events(self):
         """イベント処理"""

@@ -91,7 +91,10 @@ def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval,
             if stage:
                 x, y = stage.find_safe_spawn_position(x, y, 32)
             
-            enemy = Enemy(None, game_time, spawn_x=x, spawn_y=y)
+            # 時間に応じたランダムなenemy_noを選択
+            from core.enemy import Enemy
+            enemy_no = Enemy.get_random_enemy_no(game_time)
+            enemy = Enemy(None, game_time, spawn_x=x, spawn_y=y, enemy_no=enemy_no)
             enemies.append(enemy)
             
             # スポーンエフェクト
