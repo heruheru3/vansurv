@@ -1030,7 +1030,10 @@ class Enemy:
                 # 画像のサイズを取得（実際の画像サイズを優先、フォールバックとしてキャッシュのサイズ情報を使用）
                 actual_image_size = image.get_width()  # 実際にスケールされた画像のサイズ
                 cached_size = self.images.get('size', 32)
-                image_size = actual_image_size if actual_image_size > 0 else cached_size
+                base_image_size = actual_image_size if actual_image_size > 0 else cached_size
+                
+                # size_multiplierを適用して最終的な描画サイズを決定
+                image_size = int(base_image_size * getattr(self, 'size_multiplier', 1.0))
                 
                 # 歩行アニメーション効果を計算
                 foot_offset_y = 0
@@ -1045,8 +1048,12 @@ class Enemy:
                 base_x = sx - image_size // 2
                 base_y = sy - image_size // 2
                 
-                # 使用する画像を決定
-                current_image = image
+                # 使用する画像を決定（size_multiplierに応じてスケーリング）
+                if image_size != base_image_size:
+                    # サイズが変更されている場合はスケーリング
+                    current_image = pygame.transform.scale(image, (image_size, image_size))
+                else:
+                    current_image = image
                 
                 # ボス用の赤いオーラ効果（enemy_typeが101以上の場合のみ）
                 if hasattr(self, 'enemy_type') and self.enemy_type >= 101:
