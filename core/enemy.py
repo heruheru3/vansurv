@@ -306,7 +306,7 @@ class Enemy:
         
         return adjusted_surface
     
-    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None, boss_image_file=None, boss_stats_key=None, boss_no=None, enemy_no=None):
+    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None, boss_image_file=None, boss_stats_key=None, boss_no=None, enemy_no=None, strength_multiplier=1.0, size_multiplier=1.0):
         self.screen = screen
         self.is_boss = is_boss  # ボス判定フラグ
         self.boss_level = boss_level if is_boss else 1  # ボスレベル（ボス以外は1）
@@ -315,6 +315,10 @@ class Enemy:
         self.boss_stats_key = boss_stats_key  # ボス設定キー（mainから渡す）
         self.boss_no = boss_no  # ボス番号（CSVのNoカラム）
         self.enemy_no = enemy_no  # 通常敵の番号（CSVのenemy_noカラム）
+        
+        # スポーンルールからの倍率
+        self.strength_multiplier = strength_multiplier  # HP・攻撃力倍率
+        self.size_multiplier = size_multiplier  # サイズ倍率
         
         # ヒット時のフラッシュ用タイマ（秒）
         self.hit_flash_timer = 0.0
@@ -696,9 +700,28 @@ class Enemy:
         if not hasattr(self, 'images'):
             print(f"[ERROR] images attribute not set, initializing to None")
             self.images = None
+        
+        # スポーンルールからの倍率を適用
+        self._apply_spawn_multipliers()
             
         self.facing_right = True  # 向いている方向（True: 右, False: 左）
         self.last_movement_x = 0  # 最後の移動方向を記録
+    
+    def _apply_spawn_multipliers(self):
+        """スポーンルールからの倍率を適用"""
+        # 強さ倍率の適用
+        if hasattr(self, 'strength_multiplier') and self.strength_multiplier != 1.0:
+            self.hp = int(self.hp * self.strength_multiplier)
+            self.max_hp = int(self.max_hp * self.strength_multiplier)
+            self.damage = int(self.damage * self.strength_multiplier)
+        
+        # サイズ倍率の適用
+        if hasattr(self, 'size_multiplier') and self.size_multiplier != 1.0:
+            # サイズ（当たり判定）に倍率を適用
+            self.size = int(self.size * self.size_multiplier)
+            # 画像サイズ情報があれば更新（表示用）
+            if hasattr(self, 'images') and self.images and 'size' in self.images:
+                self.images['size'] = int(self.images['size'] * self.size_multiplier)
 
     def apply_knockback(self, attack_x, attack_y, knockback_force):
         """ノックバックを適用する

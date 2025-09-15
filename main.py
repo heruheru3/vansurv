@@ -87,6 +87,7 @@ def draw_test_checkerboard(surface, camera_x, camera_y):
 
 from core.player import Player
 from core.enemy import Enemy
+from core.enemy_spawn_manager import EnemySpawnManager
 from effects.items import ExperienceGem, GameItem, MoneyItem
 from effects.particles import DeathParticle, PlayerHurtParticle, HurtFlash, LevelUpEffect, SpawnParticle, DamageNumber, AvoidanceParticle, HealEffect, AutoHealEffect
 from ui.ui import draw_ui, draw_minimap, draw_level_choice, draw_end_buttons, get_end_button_rects
@@ -284,6 +285,9 @@ def main():
     # ゲーム状態の初期化
     player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
 
+    # エネミースポーンマネージャーの初期化
+    spawn_manager = EnemySpawnManager()
+    
     # エンド画面のキーボード選択状態
     end_screen_selection = 0  # 0: Restart (left), 1: Continue (right)
 
@@ -920,6 +924,7 @@ def main():
                                 print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                                 
                                 player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
+                                spawn_manager = EnemySpawnManager()  # スポーンマネージャーも再初期化
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
                                 box_manager = BoxManager()
@@ -1094,6 +1099,7 @@ def main():
                                 print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                                 
                                 player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
+                                spawn_manager = EnemySpawnManager()  # スポーンマネージャーも再初期化
                                 # リセット
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
@@ -1532,7 +1538,10 @@ def main():
                             print(f"[INFO] Boss No.{boss_no} (Type {boss_type}) spawned at ({boss_x:.0f}, {boss_y:.0f}). Player at ({player.x:.0f}, {player.y:.0f}). Total bosses: {boss_count}")
 
                 # 敵の生成を爆発的に
-                spawn_timer += 1
+                # spawn_frequency倍率を適用してスポーン頻度を調整
+                frequency_multiplier = spawn_manager.get_average_spawn_frequency(game_time)
+                spawn_timer += frequency_multiplier  # 倍率を適用
+                
                 if spawn_timer >= spawn_interval:
                     if game_time <= 30:
                         num_enemies = 1 + int(game_time // 10)
@@ -1587,10 +1596,12 @@ def main():
                         if stage_map:
                             sx, sy = stage_map.find_safe_spawn_position(sx, sy, 32)
 
-                        # 時間に応じたランダムなenemy_noを選択
-                        enemy_no = Enemy.get_random_enemy_no(game_time)
+                        # 時間に応じたランダムなenemy_noと倍率を選択
+                        enemy_no, rule = spawn_manager.select_enemy_no(game_time)
+                        strength_mult, size_mult = spawn_manager.get_enemy_modifiers(rule)
                         
-                        enemy = Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, spawn_side=side, enemy_no=enemy_no)
+                        enemy = Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, spawn_side=side, 
+                                     enemy_no=enemy_no, strength_multiplier=strength_mult, size_multiplier=size_mult)
                         enemies.append(enemy)
                         particles.append(SpawnParticle(enemy.x, enemy.y, enemy.color))
                     spawn_timer = 0
@@ -1808,10 +1819,12 @@ def main():
                                 sx = max(50, min(WORLD_WIDTH - 50, sx))
                                 sy = max(50, min(WORLD_HEIGHT - 50, sy))
 
-                                # 時間に応じたランダムなenemy_noを選択
-                                enemy_no = Enemy.get_random_enemy_no(game_time)
+                                # 時間に応じたランダムなenemy_noと倍率を選択
+                                enemy_no, rule = spawn_manager.select_enemy_no(game_time)
+                                strength_mult, size_mult = spawn_manager.get_enemy_modifiers(rule)
                                 # 生成は画面外から行うので spawn_x/spawn_y のみ渡す
-                                new_enemies_to_add.append(Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, enemy_no=enemy_no))
+                                new_enemies_to_add.append(Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, 
+                                                               enemy_no=enemy_no, strength_multiplier=strength_mult, size_multiplier=size_mult))
                                 # この敵は以降の削除チェックをスキップ
                                 continue
                     except Exception:
