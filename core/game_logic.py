@@ -91,17 +91,12 @@ def spawn_enemies(enemies, particles, game_time, spawn_timer, spawn_interval,
             if stage:
                 x, y = stage.find_safe_spawn_position(x, y, 32)
             
-            # 時間に応じたランダムなenemy_noと倍率を選択
+            # spawn_managerを使用して敵生成
             from core.enemy import Enemy
-            if spawn_manager:
-                enemy_no, rule = spawn_manager.select_enemy_no(game_time)
-                strength_mult, size_mult = spawn_manager.get_enemy_modifiers(rule)
-                enemy = Enemy(None, game_time, spawn_x=x, spawn_y=y, enemy_no=enemy_no, 
-                             strength_multiplier=strength_mult, size_multiplier=size_mult)
-            else:
-                # フォールバック：従来のロジックを使用
-                enemy_no = Enemy.get_random_enemy_no(game_time)
-                enemy = Enemy(None, game_time, spawn_x=x, spawn_y=y, enemy_no=enemy_no)
+            enemy_no, rule = spawn_manager.select_enemy_no(game_time)
+            strength_mult, size_mult = spawn_manager.get_enemy_modifiers(rule)
+            enemy = Enemy(None, game_time, spawn_x=x, spawn_y=y, enemy_no=enemy_no, 
+                         strength_multiplier=strength_mult, size_multiplier=size_mult)
             enemies.append(enemy)
             
             # スポーンエフェクト

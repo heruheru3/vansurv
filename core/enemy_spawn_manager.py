@@ -73,11 +73,13 @@ class EnemySpawnManager:
             tuple: (enemy_no, rule_dict or None)
         """
         if not self.use_csv_rules:
-            return self._fallback_selection(game_time), None
+            print("ERROR: CSV spawn rules are required but not available!")
+            return 1, None  # 最低限のフォールバック
         
         active_rules = self.get_active_rules(game_time)
         if not active_rules:
-            return self._fallback_selection(game_time), None
+            print(f"WARNING: No active spawn rules found for game_time {game_time}")
+            return 1, None
         
         # 各ルールから候補を収集
         candidates = []
@@ -92,7 +94,8 @@ class EnemySpawnManager:
                 weights.append(rule['spawn_weight'])
         
         if not candidates:
-            return self._fallback_selection(game_time), None
+            print(f"WARNING: No enemy candidates found for game_time {game_time}")
+            return 1, None
         
         # 重み付き選択
         selected = random.choices(candidates, weights=weights)[0]
@@ -145,18 +148,6 @@ class EnemySpawnManager:
             return 1.0
         
         return total_weighted_frequency / total_weight
-    
-    def _fallback_selection(self, game_time: int) -> int:
-        """
-        CSVが利用できない場合のフォールバック選択
-        従来のハードコードロジックを模倣
-        """
-        # enemy_stats.csvから利用可能な敵を取得する必要があるが、
-        # ここでは簡単な実装として固定値を返す
-        # 実際には Enemy.get_random_enemy_no() の既存ロジックを呼び出す
-        
-        from core.enemy import Enemy
-        return Enemy.get_random_enemy_no(game_time)
     
     def reload_rules(self):
         """ルールを再読み込み（デバッグ・調整用）"""
