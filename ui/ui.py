@@ -115,7 +115,7 @@ def get_minimap_surf(map_w, map_h, alpha=128, bg=(20,20,20)):
         _surf_cache[key] = s
     return s
 
-def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True, money=0, game_money=0):
+def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True, money=0, game_money=0, enemy_kill_stats=None):
     # メイン画面のフォントをやや小さく（約70%）にする
     font = get_font(18)
     
@@ -303,6 +303,41 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
             screen.blit(row_font.render("Total", True, BLACK), (table_x + 24, row_y))
             screen.blit(row_font.render(str(int(total_dmg)), True, BLACK), (table_x + 320, row_y))
             screen.blit(row_font.render(f"{(total_dmg/total_time):.1f}", True, BLACK), (table_x + 580, row_y))
+    except Exception:
+        pass
+
+    # エネミー撃破統計の表示（武器統計の下、ボタンの上）
+    try:
+        if (game_over or game_clear) and enemy_kill_stats:
+            # 武器統計テーブルの実際の位置とサイズを使用
+            if damage_stats:
+                # 武器統計がある場合は、その下に配置
+                weapon_table_w = min(880, SCREEN_WIDTH - 80)
+                weapon_table_h = 320  # 固定高さ
+                weapon_table_x = (SCREEN_WIDTH - weapon_table_w) // 2
+                weapon_table_y = max(20, (SCREEN_HEIGHT - weapon_table_h) // 2 - 20)
+                
+                # 武器統計テーブルの下に20px間隔で配置
+                enemy_table_start_y = weapon_table_y + weapon_table_h + 20
+            else:
+                # 武器統計がない場合は、画面中央より少し下に配置
+                enemy_table_start_y = SCREEN_HEIGHT // 2 + 40
+            
+            # エネミー撃破統計パネルの設定
+            enemy_table_w = min(560, SCREEN_WIDTH - 80)  # 武器統計より小さく
+            enemy_table_h = 140  # 2段表示に適したサイズ
+            enemy_table_x = (SCREEN_WIDTH - enemy_table_w) // 2
+            enemy_table_y = enemy_table_start_y
+
+            enemy_result_surf = get_result_surf(enemy_table_w, enemy_table_h, alpha=128)
+            screen.blit(enemy_result_surf, (enemy_table_x, enemy_table_y))
+
+            # タイトル
+            header_font = get_font(16)
+            screen.blit(header_font.render("Enemies Defeated", True, BLACK), (enemy_table_x + 20, enemy_table_y + 8))
+
+            # エネミー撃破数をアイコンと数字で表示（10個×2段）
+            draw_enemy_kill_stats(screen, enemy_kill_stats, enemy_table_x + 20, enemy_table_y + 35, enemy_table_w - 40, 90)
     except Exception:
         pass
 
@@ -1247,5 +1282,112 @@ def draw_subitem_choice(screen, player, icons=None, virtual_mouse_pos=None):
                         screen.blit(b_surf, (bx + (bw - b_surf.get_width()) // 2, by + (bh - b_surf.get_height()) // 2))
                 except Exception:
                     pass
+    except Exception:
+        pass
+
+def get_enemy_info():
+    """エネミー情報を読み込んで返す"""
+    try:
+        import os
+        import csv
+        # 直接ファイルパスを構築
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        csv_path = os.path.join(base_dir, 'data', 'enemy_stats.csv')
+        
+        enemy_info = {}
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                enemy_no = int(row['enemy_no'])
+                enemy_info[enemy_no] = {
+                    'type': int(row['type']),
+                    'level': int(row['level']),
+                    'image_file': row['image_file'],
+                    'image_size': int(row['image_size'])
+                }
+        return enemy_info
+    except Exception:
+        return {}
+
+def draw_enemy_kill_stats(screen, enemy_kill_stats, start_x, start_y, area_width, area_height):
+    """エネミー撃破統計をアイコンと数字で表示"""
+    try:
+        import pygame
+        import os
+        
+        # 直接ファイルパスを構築
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        
+        # エネミー情報を取得
+        enemy_info = get_enemy_info()
+        if not enemy_info:
+            return
+        
+        # 表示用フォント（小さめ）
+        small_font = get_font(12)
+        
+        # アイコンサイズとレイアウト設定
+        icon_size = 24  # 小さめのアイコン
+        cols = 10  # 横10個
+        rows = 2   # 2段
+        col_width = area_width // cols
+        row_height = area_height // rows
+        
+        # 全20体のエネミーを順番に表示
+        for enemy_no in range(1, 21):  # enemy_no 1-20
+            if enemy_no not in enemy_info:
+                continue
+                
+            # 行・列の計算
+            col = (enemy_no - 1) % cols
+            row = (enemy_no - 1) // cols
+            if row >= rows:  # 2段を超える場合はスキップ
+                break
+                
+            # 描画位置
+            x = start_x + col * col_width + (col_width - icon_size) // 2
+            y = start_y + row * row_height
+            
+            # 撃破数取得
+            kill_count = enemy_kill_stats.get(enemy_no, 0)
+            
+            # エネミーアイコンを描画
+            try:
+                info = enemy_info[enemy_no]
+                image_file = info['image_file']
+                # 直接ファイルパスを構築（enemyサブフォルダを含む）
+                assets_dir = os.path.join(base_dir, 'assets', 'character', 'enemy')
+                image_path = os.path.join(assets_dir, f'{image_file}.png')
+                
+                if os.path.exists(image_path):
+                    # 画像をロードしてリサイズ
+                    enemy_image = pygame.image.load(image_path)
+                    enemy_image = pygame.transform.scale(enemy_image, (icon_size, icon_size))
+                    
+                    # 撃破数が0の場合は半透明に
+                    if kill_count == 0:
+                        enemy_image.set_alpha(100)
+                    
+                    screen.blit(enemy_image, (x, y))
+                else:
+                    # 画像がない場合は色付きの四角で代用
+                    type_colors = {1: (255, 100, 100), 2: (100, 255, 100), 3: (100, 100, 255), 4: (255, 255, 100)}
+                    color = type_colors.get(info['type'], (150, 150, 150))
+                    if kill_count == 0:
+                        color = tuple(c // 3 for c in color)  # 暗くする
+                    pygame.draw.rect(screen, color, (x, y, icon_size, icon_size))
+                    pygame.draw.rect(screen, BLACK, (x, y, icon_size, icon_size), 1)
+            except Exception:
+                # 描画に失敗した場合はグレーの四角
+                color = (50, 50, 50) if kill_count == 0 else (150, 150, 150)
+                pygame.draw.rect(screen, color, (x, y, icon_size, icon_size))
+                pygame.draw.rect(screen, BLACK, (x, y, icon_size, icon_size), 1)
+            
+            # 撃破数をアイコンの下に表示
+            count_text = small_font.render(str(kill_count), True, WHITE if kill_count > 0 else (100, 100, 100))
+            text_x = x + (icon_size - count_text.get_width()) // 2
+            text_y = y + icon_size + 2
+            screen.blit(count_text, (text_x, text_y))
+            
     except Exception:
         pass

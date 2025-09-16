@@ -480,6 +480,7 @@ def main():
     # お金関連の初期化
     current_game_money = 0  # 現在のゲームセッションで獲得したお金
     enemies_killed_this_game = 0  # 今回のゲームで倒した敵の数
+    enemy_kill_stats = {}  # エネミーNo.別撃破数統計
     
     # ボックスマネージャーの初期化
     box_manager = BoxManager()
@@ -916,6 +917,7 @@ def main():
                                     game_clear = False
                                     current_game_money = 0
                                     enemies_killed_this_game = 0
+                                    enemy_kill_stats = {}
                                     box_manager = BoxManager()
                             else:  # Restart (left)
                                 save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
@@ -935,6 +937,7 @@ def main():
                                     sys.exit(1)
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
+                                enemy_kill_stats = {}
                                 box_manager = BoxManager()
                             
                             # 選択状態をリセット
@@ -1116,6 +1119,7 @@ def main():
                                 # リセット
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
+                                enemy_kill_stats = {}
                                 # ボックスマネージャーをリセット
                                 box_manager = BoxManager()
                                 # HP回復エフェクト用のコールバックを設定
@@ -1428,6 +1432,13 @@ def main():
                                 # 撃破カウンターを増加
                                 enemies_killed_this_game += 1
                                 current_game_money += MONEY_PER_ENEMY_KILLED
+                                
+                                # エネミーNo.別撃破統計を更新
+                                enemy_no = getattr(enemy, 'enemy_no', 1)  # デフォルトはNo.1
+                                if enemy_no in enemy_kill_stats:
+                                    enemy_kill_stats[enemy_no] += 1
+                                else:
+                                    enemy_kill_stats[enemy_no] = 1
 
                                 # エネミーからは100%経験値ジェムのみドロップ
                                 experience_gems.append(ExperienceGem(enemy.x, enemy.y))
@@ -2382,7 +2393,7 @@ def main():
                 pass
 
             # UI描画を仮想画面に（毎フレーム描画でちらつき防止）
-            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money)
+            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money, enemy_kill_stats=enemy_kill_stats)
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
             if game_over or game_clear:
                 from ui.ui import draw_end_buttons
