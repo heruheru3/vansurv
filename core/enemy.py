@@ -282,6 +282,15 @@ class Enemy:
         # デバッグフラグ（サイズ情報の重複ログを防ぐ）
         self._debug_size_logged = False
         
+        # 地形無視モード用の属性
+        self.stuck_timer = 0.0  # 地形にハマっている時間（秒）
+        self.stuck_threshold = 3.0  # 3秒でnoclipモード発動
+        self.noclip_mode = False  # 地形無視モード
+        self.noclip_timer = 0.0  # noclip_mode継続時間
+        self.noclip_min_duration = 1.0  # noclip_modeの最小継続時間（秒）
+        self.last_position = (0, 0)  # 前フレームの位置
+        self.movement_epsilon = 1.0  # 移動量がこれ以下なら「動いていない」とみなす
+        
         # 全体的にやや遅めに調整
         # base_speed を導入して、プレイヤーの speed 変更の影響を受けないようにする
         self.base_speed = 1.5
@@ -682,6 +691,9 @@ class Enemy:
         # ノックバック中のみ通常の移動を無効にする（クールダウン中は移動可能）
         if self.knockback_timer > 0:
             return
+        
+        # 移動前の位置を記録
+        start_pos = (self.x, self.y)
             
         new_x, new_y = self.x, self.y
         
@@ -694,8 +706,8 @@ class Enemy:
         elif self.behavior_type == 2:
             # 2. 直進タイプ（プレイヤー方向へ一直線に進み、画面外に出ていく）
             # ここでは跳ね返りや地形反転を行わず、軽量に直進させる
-            if self.initial_direction is None:
-                # 初回のみプレイヤー方向を計算して保存し、速度ベクトルを設定
+            if self.initial_direction is None or self.noclip_mode:
+                # 初回、またはnoclip_mode時はプレイヤー方向を再計算
                 self.initial_direction = math.atan2(player.y - self.y, player.x - self.x)
                 self.velocity_x = math.cos(self.initial_direction) * self.base_speed
                 self.velocity_y = math.sin(self.initial_direction) * self.base_speed
@@ -747,6 +759,7 @@ class Enemy:
             return False
 
         # 障害物との衝突判定（CSVマップまたはステージマップが有効な場合）
+        from constants import USE_CSV_MAP
         if USE_CSV_MAP and (new_x != self.x or new_y != self.y):
             try:
                 from ui.stage import get_stage_map
@@ -760,12 +773,13 @@ class Enemy:
                     (new_x + self.size//2, new_y + self.size//2),
                 ]
                 
-                # 障害物にぶつからない場合のみ移動
+                # 障害物にぶつからない場合のみ移動（noclip_mode時は地形を無視）
                 collision = False
-                for corner_x, corner_y in corners:
-                    if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
-                        collision = True
-                        break
+                if not self.noclip_mode:  # noclip_mode時は地形判定をスキップ
+                    for corner_x, corner_y in corners:
+                        if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                            collision = True
+                            break
                 
                 if not collision:
                     # 分離処理の可否を確認。無効なら古いフォールバック処理のみ実行する
@@ -847,7 +861,7 @@ class Enemy:
 
                             # 候補位置が地形・他エネミーと衝突しないか確認
                             valid_candidate = True
-                            if USE_CSV_MAP:
+                            if USE_CSV_MAP and not self.noclip_mode:  # noclip_mode時は地形判定をスキップ
                                 from ui.stage import get_stage_map
                                 stage_map = get_stage_map()
                                 half_size = self.size // 2
@@ -902,44 +916,86 @@ class Enemy:
                     
                     # X軸のみの移動を試す
                     x_collision = False
-                    for corner_x, corner_y in x_only_corners:
-                        if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
-                            x_collision = True
-                            break
+                    if not self.noclip_mode:  # noclip_mode時は地形判定をスキップ
+                        for corner_x, corner_y in x_only_corners:
+                            if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                                x_collision = True
+                                break
                     
-                    if not x_collision:
-                        self.x = new_x
-                    else:
-                        # Y軸のみの移動を試す
-                        y_collision = False
+                    # Y軸のみの移動を試す
+                    y_collision = False
+                    if not self.noclip_mode:  # noclip_mode時は地形判定をスキップ
                         for corner_x, corner_y in y_only_corners:
                             if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
                                 y_collision = True
                                 break
-                        
-                        if not y_collision:
-                                # 同様にY移動を適用する前に他の敵との重なりをチェック
-                                if not _would_collide_with_others(self.x, new_y, enemies):
-                                    self.y = new_y
+                    
+                    # スライディング移動：どちらか一方向でも移動可能なら適用
+                    moved = False
+                    if not x_collision and not _would_collide_with_others(new_x, self.y, enemies):
+                        self.x = new_x
+                        moved = True
+                    if not y_collision and not _would_collide_with_others(self.x, new_y, enemies):
+                        self.y = new_y
+                        moved = True
+                    
+                    # 両方向とも移動できない場合の脱出処理（軽量）
+                    if not moved and (x_collision and y_collision):
+                        # プレイヤーから離れる方向に少し押し返し
+                        away_x = self.x - player.x
+                        away_y = self.y - player.y
+                        if away_x != 0 or away_y != 0:
+                            length = math.sqrt(away_x**2 + away_y**2)
+                            escape_x = self.x + (away_x / length) * 3
+                            escape_y = self.y + (away_y / length) * 3
+                            
+                            # 脱出先が安全かチェック（簡易）
+                            escape_safe = True
+                            if not self.noclip_mode:  # noclip_mode時は地形判定をスキップ
+                                escape_corners = [
+                                    (escape_x - self.size//2, escape_y - self.size//2),
+                                    (escape_x + self.size//2, escape_y + self.size//2),
+                                ]
+                                for corner_x, corner_y in escape_corners:
+                                    if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                                        escape_safe = False
+                                        break
+                            
+                            if escape_safe and not _would_collide_with_others(escape_x, escape_y, enemies):
+                                self.x = escape_x
+                                self.y = escape_y
             
             except Exception:
                 # 障害物判定に失敗した場合は通常の移動
                 self.x = new_x
                 self.y = new_y
         else:
-            # マップが無効な場合は障害物判定なしで移動
-            if _would_collide_with_others(new_x, new_y, enemies):
-                # Xのみを試す
-                if not _would_collide_with_others(new_x, self.y, enemies):
+            # マップが無効な場合、またはnoclip_mode時は障害物判定なしで移動
+            if self.noclip_mode:
+                # noclip_mode: 地形を無視して直接移動（他エネミーとの衝突のみチェック）
+                if not _would_collide_with_others(new_x, new_y, enemies):
                     self.x = new_x
-                elif not _would_collide_with_others(self.x, new_y, enemies):
                     self.y = new_y
                 else:
-                    # どちらもダメなら移動をキャンセル
-                    pass
+                    # 他エネミーがいる場合はスライディング移動
+                    if not _would_collide_with_others(new_x, self.y, enemies):
+                        self.x = new_x
+                    elif not _would_collide_with_others(self.x, new_y, enemies):
+                        self.y = new_y
             else:
-                self.x = new_x
-                self.y = new_y
+                # 通常の処理（マップが無効な場合）
+                if _would_collide_with_others(new_x, new_y, enemies):
+                    # Xのみを試す
+                    if not _would_collide_with_others(new_x, self.y, enemies):
+                        self.x = new_x
+                    elif not _would_collide_with_others(self.x, new_y, enemies):
+                        self.y = new_y
+                    else:
+                        # どちらもダメなら移動をキャンセル
+                        pass
+                else:
+                    self.x = new_x
+                    self.y = new_y
         
         # 移動方向に基づいて向きを更新
         movement_x = new_x - getattr(self, '_prev_x', self.x)
@@ -962,6 +1018,55 @@ class Enemy:
         # 現在位置を記録（次フレームの比較用）
         self.last_x = self.x
         self.last_y = self.y
+        
+        # 地形無視モードの状態管理（移動処理完了後）
+        end_pos = (self.x, self.y)
+        actual_movement = math.sqrt((end_pos[0] - start_pos[0])**2 + (end_pos[1] - start_pos[1])**2)
+        
+        # 実際の移動量が小さい場合、詰まりタイマーを増加
+        if actual_movement < self.movement_epsilon:
+            self.stuck_timer += delta_time / 60.0  # delta_timeはフレーム数なので秒に変換
+            if self.stuck_timer >= self.stuck_threshold and not self.noclip_mode:
+                self.noclip_mode = True
+                self.noclip_timer = 0.0  # noclipタイマーリセット
+                # デバッグ用（必要に応じてコメントアウト）
+                # print(f"[NOCLIP] Enemy {id(self)} type {self.behavior_type} entering noclip mode after {self.stuck_timer:.1f}s")
+        else:
+            # 移動している場合はタイマーリセット
+            self.stuck_timer = 0.0
+        
+        # noclip_mode時間の更新
+        if self.noclip_mode:
+            self.noclip_timer += delta_time / 60.0
+            
+            # noclip_modeから通常モードへの復帰判定
+            if self.noclip_timer >= self.noclip_min_duration:  # 最小継続時間を満たしている
+                # 現在地が地形に当たっていないことを確認してから解除
+                can_exit_noclip = True
+                try:
+                    if USE_CSV_MAP:
+                        from ui.stage import get_stage_map
+                        stage_map = get_stage_map()
+                        if stage_map:
+                            # 現在位置の4隅が地形に当たっていないかチェック
+                            check_corners = [
+                                (self.x - self.size//2, self.y - self.size//2),
+                                (self.x + self.size//2, self.y - self.size//2),
+                                (self.x - self.size//2, self.y + self.size//2),
+                                (self.x + self.size//2, self.y + self.size//2),
+                            ]
+                            for corner_x, corner_y in check_corners:
+                                if stage_map.is_obstacle_at_world_pos(corner_x, corner_y):
+                                    can_exit_noclip = False
+                                    break
+                except Exception:
+                    # 地形チェックに失敗した場合は安全側でnoclip維持
+                    can_exit_noclip = False
+                
+                if can_exit_noclip:
+                    self.noclip_mode = False
+                    self.noclip_timer = 0.0
+                    # print(f"[NOCLIP] Enemy {id(self)} type {self.behavior_type} exiting noclip mode - clear of terrain")
 
         # ヒットフラッシュのタイマを減算（フレーム毎に呼ばれることを想定、60FPS基準）
         if self.hit_flash_timer > 0.0:
@@ -1194,6 +1299,17 @@ class Enemy:
                 y = sy + icon_y_offset + radius * math.sin(angle)
                 star_points.append((x, y))
             pygame.draw.polygon(screen, (255, 255, 255), star_points)
+        
+        # noclip_mode時の視覚的表示（色で状態を表現）
+        if self.noclip_mode:
+            # 継続時間に応じて色を変化（赤→オレンジ→青）
+            if self.noclip_timer < self.noclip_min_duration:
+                # 最小継続時間未満は赤（まだ解除できない）
+                color = (255, 100, 100)
+            else:
+                # 最小継続時間を超えると青（解除可能状態）
+                color = (0, 150, 255)
+            pygame.draw.circle(screen, color, (sx, sy), self.size // 2 + 2, 2)
 
     def on_hit(self):
         """敵が被弾したときに呼ぶ。白フラッシュをトリガーする."""
