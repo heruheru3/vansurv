@@ -115,7 +115,7 @@ def get_minimap_surf(map_w, map_h, alpha=128, bg=(20,20,20)):
         _surf_cache[key] = s
     return s
 
-def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True, money=0, game_money=0, enemy_kill_stats=None):
+def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True, money=0, game_money=0, enemy_kill_stats=None, force_ended=False):
     # メイン画面のフォントをやや小さく（約70%）にする
     font = get_font(18)
     
@@ -168,22 +168,19 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
 
     # ゲームクリア/オーバー表示を修正
     if game_clear:
-        # タイトル／時間／再開テキストを、リザルト表と重ならないように配置
+        # タイトル／時間のみ表示（レザルト表は共通処理で表示）
         big_font = get_font(34)
         final_time_font = get_font(20)
-        restart_font = get_font(14)
 
         if damage_stats:
-            # リザルト表の開始位置を再計算して、その上に収まるようにする
-            table_h = 320
-            table_y = max(20, (SCREEN_HEIGHT - table_h) // 2 - 20)
+            # リザルト表の開始位置を共通処理と合わせる
+            table_h = 280  # 共通処理と同じ高さ
+            table_y = max(20, (SCREEN_HEIGHT - table_h) // 2 - 40)  # 共通処理と同じ位置計算
             title_y = table_y - 80
             time_y = table_y - 32
-            restart_y = table_y - 8
         else:
             title_y = SCREEN_HEIGHT // 2 - 80
             time_y = SCREEN_HEIGHT // 2 - 20
-            restart_y = SCREEN_HEIGHT // 2 + 20
 
         clear_surf = big_font.render("GAME CLEAR!", True, GREEN)
         clear_rect = clear_surf.get_rect(center=(SCREEN_WIDTH // 2, title_y))
@@ -192,52 +189,6 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
         final_time = final_time_font.render(f"Survival Time: {int(game_time)}s", True, GREEN)
         final_time_rect = final_time.get_rect(center=(SCREEN_WIDTH // 2, time_y))
         screen.blit(final_time, final_time_rect)
-
-        restart_text = restart_font.render("Press ENTER to restart", True, GREEN)
-        restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, restart_y))
-        screen.blit(restart_text, restart_rect)
-
-        # リザルト表示: 半透明の白背景に変更し、垂直方向は中央よりやや上に配置
-        if damage_stats:
-            # テーブル領域を調整
-            table_w = min(880, SCREEN_WIDTH - 80)
-            table_h = 320
-            # 垂直方向の中央にして少し上に寄せる
-            table_x = (SCREEN_WIDTH - table_w) // 2
-            table_y = max(20, (SCREEN_HEIGHT - table_h) // 2 - 20)
-
-            # 半透明の白背景をサーフェスで取得（キャッシュ）
-            result_surf = get_result_surf(table_w, table_h, alpha=128)
-            screen.blit(result_surf, (table_x, table_y))
-
-            header_font = get_font(20)
-            row_font = get_font(16)
-            # ヘッダ（サーフェス上に描画する代わりに直接座標で描画）
-            screen.blit(header_font.render("Weapon", True, BLACK), (table_x + 24, table_y + 8))
-            screen.blit(header_font.render("Total Damage", True, BLACK), (table_x + 280, table_y + 8))
-            screen.blit(header_font.render("DPS", True, BLACK), (table_x + 560, table_y + 8))
-
-            total_time = max(1.0, game_time)
-            # ソートして表示（ダメージ降順）
-            items = sorted(damage_stats.items(), key=lambda kv: kv[1], reverse=True)
-            row_y = table_y + 56
-            row_height = 40
-            for wname, dmg in items:
-                dps = dmg / total_time
-                screen.blit(row_font.render(str(wname), True, BLACK), (table_x + 24, row_y))
-                screen.blit(row_font.render(str(int(dmg)), True, BLACK), (table_x + 320, row_y))
-                screen.blit(row_font.render(f"{dps:.1f}", True, BLACK), (table_x + 580, row_y))
-                row_y += row_height
-                # テーブルが溢れたら停止
-                if row_y + row_height > table_y + table_h - 40:
-                    break
-
-            # 合計行
-            total_dmg = sum(damage_stats.values())
-            row_y = table_y + table_h - 40
-            screen.blit(row_font.render("Total", True, BLACK), (table_x + 24, row_y))
-            screen.blit(row_font.render(str(int(total_dmg)), True, BLACK), (table_x + 320, row_y))
-            screen.blit(row_font.render(f"{(total_dmg/total_time):.1f}", True, BLACK), (table_x + 580, row_y))
 
     elif game_over:
         # タイトル／時間／再開テキストを、リザルト表と重ならないように配置
@@ -256,25 +207,36 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
             time_y = SCREEN_HEIGHT // 2 - 20
             restart_y = SCREEN_HEIGHT // 2 + 20
 
-        over_surf = big_font.render("GAME OVER", True, RED)
+        if force_ended:
+            # ESCキーによる強制終了の場合は途中経過画面として表示
+            over_surf = big_font.render("GAME PAUSED", True, YELLOW)
+        else:
+            # 通常のゲームオーバー
+            over_surf = big_font.render("GAME OVER", True, RED)
         over_rect = over_surf.get_rect(center=(SCREEN_WIDTH // 2, title_y))
         screen.blit(over_surf, over_rect)
 
-        final_time = final_time_font.render(f"Survival Time: {int(game_time)}s", True, RED)
+        if force_ended:
+            final_time = final_time_font.render(f"Current Time: {int(game_time)}s", True, YELLOW)
+        else:
+            final_time = final_time_font.render(f"Survival Time: {int(game_time)}s", True, RED)
         final_time_rect = final_time.get_rect(center=(SCREEN_WIDTH // 2, time_y))
         screen.blit(final_time, final_time_rect)
 
-        restart_text = restart_font.render("Press ENTER to restart", True, RED)
-        restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, restart_y))
-        screen.blit(restart_text, restart_rect)
+        # if force_ended:
+        #     restart_text = restart_font.render("Press ENTER to continue or restart", True, YELLOW)
+        # else:
+        #     restart_text = restart_font.render("Press ENTER to restart", True, RED)
+        # restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, restart_y))
+        # screen.blit(restart_text, restart_rect)
 
     # 結果パネル: ゲーム終了時に damage_stats があれば表示（GAME CLEAR / GAME OVER 共通）
     try:
         if (game_over or game_clear) and damage_stats:
             table_w = min(880, SCREEN_WIDTH - 80)
-            table_h = 320
+            table_h = 280  # 320から280に縮小（40px短縮）
             table_x = (SCREEN_WIDTH - table_w) // 2
-            table_y = max(20, (SCREEN_HEIGHT - table_h) // 2 - 20)
+            table_y = max(20, (SCREEN_HEIGHT - table_h) // 2 - 40)  # 少し上に移動
 
             result_surf = get_result_surf(table_w, table_h, alpha=128)
             screen.blit(result_surf, (table_x, table_y))
@@ -288,18 +250,18 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
             total_time = max(1.0, game_time)
             items = sorted(damage_stats.items(), key=lambda kv: kv[1], reverse=True)
             row_y = table_y + 56
-            row_height = 40
+            row_height = 36  # 40から36に縮小（行間を詰める）
             for wname, dmg in items:
                 dps = dmg / total_time
                 screen.blit(row_font.render(str(wname), True, BLACK), (table_x + 24, row_y))
                 screen.blit(row_font.render(str(int(dmg)), True, BLACK), (table_x + 320, row_y))
                 screen.blit(row_font.render(f"{dps:.1f}", True, BLACK), (table_x + 580, row_y))
                 row_y += row_height
-                if row_y + row_height > table_y + table_h - 40:
+                if row_y + row_height > table_y + table_h - 50:  # Totalエリア確保のため50pxマージン
                     break
 
             total_dmg = sum(damage_stats.values())
-            row_y = table_y + table_h - 40
+            row_y = table_y + table_h - 30  # 30pxのマージンに縮小
             screen.blit(row_font.render("Total", True, BLACK), (table_x + 24, row_y))
             screen.blit(row_font.render(str(int(total_dmg)), True, BLACK), (table_x + 320, row_y))
             screen.blit(row_font.render(f"{(total_dmg/total_time):.1f}", True, BLACK), (table_x + 580, row_y))
@@ -313,9 +275,9 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
             if damage_stats:
                 # 武器統計がある場合は、その下に配置
                 weapon_table_w = min(880, SCREEN_WIDTH - 80)
-                weapon_table_h = 320  # 固定高さ
+                weapon_table_h = 280  # 新しい高さ
                 weapon_table_x = (SCREEN_WIDTH - weapon_table_w) // 2
-                weapon_table_y = max(20, (SCREEN_HEIGHT - weapon_table_h) // 2 - 20)
+                weapon_table_y = max(20, (SCREEN_HEIGHT - weapon_table_h) // 2 - 40)
                 
                 # 武器統計テーブルの下に20px間隔で配置
                 enemy_table_start_y = weapon_table_y + weapon_table_h + 20
@@ -325,9 +287,15 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
             
             # エネミー撃破統計パネルの設定
             enemy_table_w = min(560, SCREEN_WIDTH - 80)  # 武器統計より小さく
-            enemy_table_h = 140  # 2段表示に適したサイズ
+            enemy_table_h = 140  # ボタンが下に移動したのでもう少し小さく
             enemy_table_x = (SCREEN_WIDTH - enemy_table_w) // 2
             enemy_table_y = enemy_table_start_y
+            
+            # ボタンとの重複チェック（ボタンが最下部にあるので大丈夫だが念のため）
+            button_y = SCREEN_HEIGHT - 48 - 20  # ボタンの位置
+            if enemy_table_y + enemy_table_h > button_y - 20:
+                # もし重複するなら、エネミー統計テーブルをさらに上に移動
+                enemy_table_y = button_y - enemy_table_h - 20
 
             enemy_result_surf = get_result_surf(enemy_table_w, enemy_table_h, alpha=128)
             screen.blit(enemy_result_surf, (enemy_table_x, enemy_table_y))
@@ -1057,7 +1025,7 @@ def draw_level_choice(screen, player, icons, virtual_mouse_pos=None):
     except Exception:
         pass
 
-def get_end_button_rects():
+def get_end_button_rects(is_game_clear=False):
     """GAME OVER / CLEAR 時に表示するボタンの矩形を返す。描画は行わない。
     戻り値: {'restart': Rect, 'continue': Rect or None}
     """
@@ -1065,13 +1033,22 @@ def get_end_button_rects():
         button_w = 220
         button_h = 48
         gap = 24
-        total_w = button_w * 2 + gap
-        cx = SCREEN_WIDTH // 2
-        by = SCREEN_HEIGHT // 2 + 80
-        left_x = cx - total_w // 2
-        restart_rect = pygame.Rect(left_x, by, button_w, button_h)
-        continue_rect = pygame.Rect(left_x + button_w + gap, by, button_w, button_h)
-        return {'restart': restart_rect, 'continue': continue_rect}
+        
+        if is_game_clear:
+            # GameClear時はRestartボタンのみ（中央配置）
+            cx = SCREEN_WIDTH // 2
+            by = SCREEN_HEIGHT - button_h - 20  # 画面最下部から20px上
+            restart_rect = pygame.Rect(cx - button_w // 2, by, button_w, button_h)
+            return {'restart': restart_rect, 'continue': None}
+        else:
+            # GameOver時は両方のボタン
+            total_w = button_w * 2 + gap
+            cx = SCREEN_WIDTH // 2
+            by = SCREEN_HEIGHT - button_h - 20  # 画面最下部から20px上
+            left_x = cx - total_w // 2
+            restart_rect = pygame.Rect(left_x, by, button_w, button_h)
+            continue_rect = pygame.Rect(left_x + button_w + gap, by, button_w, button_h)
+            return {'restart': restart_rect, 'continue': continue_rect}
     except Exception:
         return {'restart': None, 'continue': None}
 
@@ -1085,13 +1062,31 @@ def draw_end_buttons(screen, is_game_over, is_game_clear, selected_option=0):
         is_game_clear: ゲームクリア状態
         selected_option: 選択されたオプション (0: Restart (left), 1: Continue (right))
     """
-    rects = get_end_button_rects()
+    rects = get_end_button_rects(is_game_clear)
     restart_rect = rects.get('restart')
     continue_rect = rects.get('continue')
     try:
         font = get_font(18)
-        # GAME OVER / GAME CLEAR の場合は Continue と Restart を表示
-        if is_game_over or is_game_clear:
+        
+        if is_game_clear:
+            # GameClear時はRestartボタンのみ
+            try:
+                pygame.draw.rect(screen, (80, 80, 80), restart_rect, border_radius=8)  # 明るい灰色
+                # 選択中の枠線を描画（白い太枠）
+                pygame.draw.rect(screen, (255, 255, 255), restart_rect, width=3, border_radius=8)
+                # 影のような効果を追加
+                shadow_rect = pygame.Rect(restart_rect.x + 2, restart_rect.y + 2, restart_rect.width, restart_rect.height)
+                pygame.draw.rect(screen, (0, 0, 0, 50), shadow_rect, width=1, border_radius=8)
+                
+                # テキスト描画
+                txt_font = get_font(20)  # 少し大きなフォント
+                txt = txt_font.render('Restart', True, WHITE)
+                screen.blit(txt, (restart_rect.centerx - txt.get_width()//2, restart_rect.centery - txt.get_height()//2))
+            except Exception:
+                pass
+        
+        elif is_game_over:
+            # GameOver時はContinueとRestartの両方
             # Continue - 選択状態に応じて色を変更
             try:
                 if selected_option == 1:  # Continue選択中 (right)

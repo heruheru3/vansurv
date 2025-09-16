@@ -481,6 +481,7 @@ def main():
     current_game_money = 0  # 現在のゲームセッションで獲得したお金
     enemies_killed_this_game = 0  # 今回のゲームで倒した敵の数
     enemy_kill_stats = {}  # エネミーNo.別撃破数統計
+    force_ended = False  # ESCキーによる強制終了フラグ
     
     # ボックスマネージャーの初期化
     box_manager = BoxManager()
@@ -708,6 +709,7 @@ def main():
                         print("[INFO] Game forcibly ended by ESC key")
                         # 強制終了フラグを立てる（game_overと同じ扱い）
                         game_over = True
+                        force_ended = True  # 強制終了フラグ
                         # セーブデータに記録
                         save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
                         save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
@@ -882,19 +884,23 @@ def main():
                     # エンド画面でのキーボード操作
                     if game_over or game_clear:
                         if event.key in (pygame.K_LEFT, pygame.K_a):
-                            end_screen_selection = max(0, end_screen_selection - 1)
+                            if not game_clear:  # GameClear時は選択変更無効
+                                end_screen_selection = max(0, end_screen_selection - 1)
                         elif event.key in (pygame.K_RIGHT, pygame.K_d):
-                            end_screen_selection = min(1, end_screen_selection + 1)
+                            if not game_clear:  # GameClear時は選択変更無効
+                                end_screen_selection = min(1, end_screen_selection + 1)
                         elif event.key == pygame.K_RETURN:
                             # 選択されたボタンを実行
-                            if end_screen_selection == 1:  # Continue (right)
-                                if game_over:
-                                    player.hp = player.get_max_hp()
-                                    player.set_special_invincible(3.0)
-                                    game_over = False
-                                    for _ in range(8):
-                                        particles.append(DeathParticle(player.x, player.y, CYAN))
-                                elif game_clear:
+                            if end_screen_selection == 1 and game_over:  # Continue (right) - GameOverのみ
+                                player.hp = player.get_max_hp()
+                                player.set_special_invincible(3.0)
+                                game_over = False
+                                force_ended = False  # 強制終了フラグもリセット
+                                for _ in range(8):
+                                    particles.append(DeathParticle(player.x, player.y, CYAN))
+                            elif end_screen_selection == 0 or game_clear:  # Restart (left) または GameClear時
+                                # ゲームクリア時のボーナス処理
+                                if game_clear:
                                     print("[INFO] Survived required time - continuing without resetting player/weapons.")
                                     current_game_money += MONEY_GAME_CLEAR_BONUS
                                     save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
@@ -904,40 +910,32 @@ def main():
                                     save_system.check_achievements()
                                     save_system.save()
                                     print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
-                                    
-                                    enemies = []
-                                    experience_gems = []
-                                    items = []
-                                    particles = []
-                                    spawn_timer = 0
-                                    boss_spawn_timer = 0
-                                    spawn_interval = 60
-                                    game_time = 0
-                                    last_difficulty_increase = 0
-                                    game_clear = False
-                                    current_game_money = 0
-                                    enemies_killed_this_game = 0
-                                    enemy_kill_stats = {}
-                                    box_manager = BoxManager()
-                            else:  # Restart (left)
-                                save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
-                                save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
-                                if damage_stats:
-                                    save_system.record_weapon_usage(damage_stats)
-                                save_system.check_achievements()
-                                save_system.save()
-                                print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
+                                else:
+                                    # ゲームオーバー時のリスタート処理
+                                    save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
+                                    save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
+                                    if damage_stats:
+                                        save_system.record_weapon_usage(damage_stats)
+                                    save_system.check_achievements()
+                                    save_system.save()
+                                    print(f"[INFO] Game data saved. Total money now: {save_system.get_money()}G")
                                 
-                                player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
-                                try:
-                                    spawn_manager = EnemySpawnManager()  # スポーンマネージャーも再初期化
-                                except Exception as e:
-                                    print(f"ERROR: Failed to reinitialize EnemySpawnManager: {e}")
-                                    pygame.quit()
-                                    sys.exit(1)
+                                # 共通のリセット処理
+                                enemies = []
+                                experience_gems = []
+                                items = []
+                                particles = []
+                                spawn_timer = 0
+                                boss_spawn_timer = 0
+                                spawn_interval = 60
+                                game_time = 0
+                                last_difficulty_increase = 0
+                                game_clear = False
+                                game_over = False
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
                                 enemy_kill_stats = {}
+                                force_ended = False  # 強制終了フラグもリセット
                                 box_manager = BoxManager()
                             
                             # 選択状態をリセット
@@ -1074,25 +1072,14 @@ def main():
                         virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
                         mx, my = int(virtual_x), int(virtual_y)
                         try:
-                            rects = get_end_button_rects()
+                            rects = get_end_button_rects(game_clear)
                             # Continue はゲームオーバー時のみ有効
                             if game_over and rects.get('continue') and rects['continue'].collidepoint(mx, my):
                                 player.hp = player.get_max_hp()
                                 # コンティニュー時に3秒間の無敵時間を付与
                                 player.set_special_invincible(3.0)
                                 game_over = False
-                                for _ in range(8):
-                                    particles.append(DeathParticle(player.x, player.y, CYAN))
-                                continue
-                            # GAME CLEAR の Continue: 残り時間を規定値に戻して続行
-                            if game_clear and rects.get('continue') and rects['continue'].collidepoint(mx, my):
-                                try:
-                                    # reset game_time to 0 on continue from game clear
-                                    game_time = 0
-                                except Exception:
-                                    game_time = 0
-                                game_clear = False
-                                # 画面エフェクト
+                                force_ended = False  # 強制終了フラグもリセット
                                 for _ in range(8):
                                     particles.append(DeathParticle(player.x, player.y, CYAN))
                                 continue
@@ -1120,6 +1107,7 @@ def main():
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
                                 enemy_kill_stats = {}
+                                force_ended = False  # 強制終了フラグもリセット
                                 # ボックスマネージャーをリセット
                                 box_manager = BoxManager()
                                 # HP回復エフェクト用のコールバックを設定
@@ -2393,7 +2381,7 @@ def main():
                 pass
 
             # UI描画を仮想画面に（毎フレーム描画でちらつき防止）
-            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money, enemy_kill_stats=enemy_kill_stats)
+            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money, enemy_kill_stats=enemy_kill_stats, force_ended=force_ended)
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
             if game_over or game_clear:
                 from ui.ui import draw_end_buttons
