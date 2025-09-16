@@ -481,6 +481,7 @@ def main():
     current_game_money = 0  # 現在のゲームセッションで獲得したお金
     enemies_killed_this_game = 0  # 今回のゲームで倒した敵の数
     enemy_kill_stats = {}  # エネミーNo.別撃破数統計
+    boss_kill_stats = {}  # ボスNo.別撃破数統計
     force_ended = False  # ESCキーによる強制終了フラグ
     
     # ボックスマネージャーの初期化
@@ -935,6 +936,7 @@ def main():
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
                                 enemy_kill_stats = {}
+                                boss_kill_stats = {}
                                 force_ended = False  # 強制終了フラグもリセット
                                 box_manager = BoxManager()
                             
@@ -1107,6 +1109,7 @@ def main():
                                 current_game_money = 0
                                 enemies_killed_this_game = 0
                                 enemy_kill_stats = {}
+                                boss_kill_stats = {}
                                 force_ended = False  # 強制終了フラグもリセット
                                 # ボックスマネージャーをリセット
                                 box_manager = BoxManager()
@@ -1427,6 +1430,15 @@ def main():
                                     enemy_kill_stats[enemy_no] += 1
                                 else:
                                     enemy_kill_stats[enemy_no] = 1
+                                
+                                # ボス撃破統計を更新（ボスの場合）
+                                is_boss = getattr(enemy, 'is_boss', False)
+                                if is_boss:
+                                    boss_no = getattr(enemy, 'boss_no', 1)  # デフォルトはボスNo.1
+                                    if boss_no in boss_kill_stats:
+                                        boss_kill_stats[boss_no] += 1
+                                    else:
+                                        boss_kill_stats[boss_no] = 1
 
                                 # エネミーからは100%経験値ジェムのみドロップ
                                 experience_gems.append(ExperienceGem(enemy.x, enemy.y))
@@ -2381,7 +2393,7 @@ def main():
                 pass
 
             # UI描画を仮想画面に（毎フレーム描画でちらつき防止）
-            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money, enemy_kill_stats=enemy_kill_stats, force_ended=force_ended)
+            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money, enemy_kill_stats=enemy_kill_stats, boss_kill_stats=boss_kill_stats, force_ended=force_ended)
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
             if game_over or game_clear:
                 from ui.ui import draw_end_buttons

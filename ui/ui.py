@@ -115,7 +115,7 @@ def get_minimap_surf(map_w, map_h, alpha=128, bg=(20,20,20)):
         _surf_cache[key] = s
     return s
 
-def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True, money=0, game_money=0, enemy_kill_stats=None, force_ended=False):
+def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True, money=0, game_money=0, enemy_kill_stats=None, boss_kill_stats=None, force_ended=False):
     # メイン画面のフォントをやや小さく（約70%）にする
     font = get_font(18)
     
@@ -175,12 +175,12 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
         if damage_stats:
             # リザルト表の開始位置を共通処理と合わせる
             table_h = 280  # 共通処理と同じ高さ
-            table_y = max(20, (SCREEN_HEIGHT - table_h) // 2 - 40)  # 共通処理と同じ位置計算
-            title_y = table_y - 80
-            time_y = table_y - 32
+            table_y = max(10, (SCREEN_HEIGHT - table_h) // 2 - 80)  # 共通処理と同じ位置計算（上に移動）
+            title_y = 40  # 上部に20pxの余裕を確保
+            time_y = title_y + 40  # タイトルの下に配置
         else:
-            title_y = SCREEN_HEIGHT // 2 - 80
-            time_y = SCREEN_HEIGHT // 2 - 20
+            title_y = 40  # 上部に20pxの余裕を確保
+            time_y = 60   # タイトルの下に配置
 
         clear_surf = big_font.render("GAME CLEAR!", True, GREEN)
         clear_rect = clear_surf.get_rect(center=(SCREEN_WIDTH // 2, title_y))
@@ -197,15 +197,15 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
         restart_font = get_font(14)
 
         if damage_stats:
-            table_h = 320
-            table_y = max(20, (SCREEN_HEIGHT - table_h) // 2 - 20)
-            title_y = table_y - 80
-            time_y = table_y - 32
-            restart_y = table_y - 8
+            table_h = 280  # 共通処理と同じ高さに統一
+            table_y = max(10, (SCREEN_HEIGHT - table_h) // 2 - 80)  # 共通処理と同じ位置計算（上に移動）
+            title_y = 20  # 上部に20pxの余裕を確保
+            time_y = title_y + 40  # タイトルの下に配置
+            restart_y = time_y + 30  # 時間の下に配置
         else:
-            title_y = SCREEN_HEIGHT // 2 - 80
-            time_y = SCREEN_HEIGHT // 2 - 20
-            restart_y = SCREEN_HEIGHT // 2 + 20
+            title_y = 40  # 上部に20pxの余裕を確保
+            time_y = title_y + 40   # タイトルの下に配置
+            restart_y = 100 # 時間の下に配置
 
         if force_ended:
             # ESCキーによる強制終了の場合は途中経過画面として表示
@@ -230,13 +230,13 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
         # restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, restart_y))
         # screen.blit(restart_text, restart_rect)
 
-    # 結果パネル: ゲーム終了時に damage_stats があれば表示（GAME CLEAR / GAME OVER 共通）
+    # 結果パネル: ゲーム終了時に武器統計を常に表示（GAME CLEAR / GAME OVER 共通）
     try:
-        if (game_over or game_clear) and damage_stats:
+        if game_over or game_clear:
             table_w = min(880, SCREEN_WIDTH - 80)
-            table_h = 280  # 320から280に縮小（40px短縮）
+            table_h = 250  # さらに縮小（280から250に、30px短縮）
             table_x = (SCREEN_WIDTH - table_w) // 2
-            table_y = max(20, (SCREEN_HEIGHT - table_h) // 2 - 40)  # 少し上に移動
+            table_y = 110  # 全体的に20px下げる（90→110に調整）
 
             result_surf = get_result_surf(table_w, table_h, alpha=128)
             screen.blit(result_surf, (table_x, table_y))
@@ -248,46 +248,45 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
             screen.blit(header_font.render("DPS", True, BLACK), (table_x + 560, table_y + 8))
 
             total_time = max(1.0, game_time)
-            items = sorted(damage_stats.items(), key=lambda kv: kv[1], reverse=True)
-            row_y = table_y + 56
-            row_height = 36  # 40から36に縮小（行間を詰める）
+            
+            # damage_statsがない場合は空の辞書として扱う
+            stats_to_show = damage_stats if damage_stats else {}
+            items = sorted(stats_to_show.items(), key=lambda kv: kv[1], reverse=True)
+            row_y = table_y + 50  # ヘッダーとの間隔を短縮（56から50に）
+            row_height = 30  # 行間をさらに短縮（36から30に）
+            
             for wname, dmg in items:
                 dps = dmg / total_time
                 screen.blit(row_font.render(str(wname), True, BLACK), (table_x + 24, row_y))
                 screen.blit(row_font.render(str(int(dmg)), True, BLACK), (table_x + 320, row_y))
                 screen.blit(row_font.render(f"{dps:.1f}", True, BLACK), (table_x + 580, row_y))
                 row_y += row_height
-                if row_y + row_height > table_y + table_h - 50:  # Totalエリア確保のため50pxマージン
+                if row_y + row_height > table_y + table_h - 40:  # Totalエリア確保マージンを短縮（50から40に）
                     break
 
-            total_dmg = sum(damage_stats.values())
-            row_y = table_y + table_h - 30  # 30pxのマージンに縮小
+            total_dmg = sum(stats_to_show.values()) if stats_to_show else 0
+            row_y = table_y + table_h - 25  # マージンをさらに短縮（30から25に）
             screen.blit(row_font.render("Total", True, BLACK), (table_x + 24, row_y))
             screen.blit(row_font.render(str(int(total_dmg)), True, BLACK), (table_x + 320, row_y))
             screen.blit(row_font.render(f"{(total_dmg/total_time):.1f}", True, BLACK), (table_x + 580, row_y))
     except Exception:
         pass
 
-    # エネミー撃破統計の表示（武器統計の下、ボタンの上）
+    # エネミー撃破統計の表示（レザルト画面のみ、撃破数0でも枠を表示）
     try:
-        if (game_over or game_clear) and enemy_kill_stats:
-            # 武器統計テーブルの実際の位置とサイズを使用
-            if damage_stats:
-                # 武器統計がある場合は、その下に配置
-                weapon_table_w = min(880, SCREEN_WIDTH - 80)
-                weapon_table_h = 280  # 新しい高さ
-                weapon_table_x = (SCREEN_WIDTH - weapon_table_w) // 2
-                weapon_table_y = max(20, (SCREEN_HEIGHT - weapon_table_h) // 2 - 40)
-                
-                # 武器統計テーブルの下に20px間隔で配置
-                enemy_table_start_y = weapon_table_y + weapon_table_h + 20
-            else:
-                # 武器統計がない場合は、画面中央より少し下に配置
-                enemy_table_start_y = SCREEN_HEIGHT // 2 + 40
+        if (game_over or game_clear) and enemy_kill_stats is not None:
+            # 武器統計テーブルの下に配置（武器統計は常に表示される）
+            weapon_table_w = min(880, SCREEN_WIDTH - 80)
+            weapon_table_h = 250  # 武器統計と同じ高さ
+            weapon_table_x = (SCREEN_WIDTH - weapon_table_w) // 2
+            weapon_table_y = 110  # 武器統計と同じ位置計算（20px下げる）
+            
+            # 武器統計テーブルの下に10px間隔で配置
+            enemy_table_start_y = weapon_table_y + weapon_table_h + 10
             
             # エネミー撃破統計パネルの設定
             enemy_table_w = min(560, SCREEN_WIDTH - 80)  # 武器統計より小さく
-            enemy_table_h = 140  # ボタンが下に移動したのでもう少し小さく
+            enemy_table_h = 130  # さらに縮小（140から130に）
             enemy_table_x = (SCREEN_WIDTH - enemy_table_w) // 2
             enemy_table_y = enemy_table_start_y
             
@@ -306,6 +305,28 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
 
             # エネミー撃破数をアイコンと数字で表示（10個×2段）
             draw_enemy_kill_stats(screen, enemy_kill_stats, enemy_table_x + 20, enemy_table_y + 35, enemy_table_w - 40, 90)
+    except Exception:
+        pass
+
+    # ボス撃破統計の表示（レザルト画面のみ、撃破数0でも枠を表示）
+    try:
+        if (game_over or game_clear) and boss_kill_stats is not None:
+            # ボス統計テーブルの配置
+            boss_table_w = 700
+            boss_table_h = 110  # さらに縮小（100から90に）
+            boss_table_x = (SCREEN_WIDTH - boss_table_w) // 2
+            boss_table_y = enemy_table_y + enemy_table_h + 10  # エネミー統計の下（15pxから10pxに短縮）
+            
+            # 背景
+            boss_result_surf = get_result_surf(boss_table_w, boss_table_h, alpha=128)
+            screen.blit(boss_result_surf, (boss_table_x, boss_table_y))
+
+            # タイトル
+            header_font = get_font(16)
+            screen.blit(header_font.render("Boss Defeated", True, BLACK), (boss_table_x + 20, boss_table_y + 8))
+
+            # ボス撃破状況をアイコンとチェックマークで表示
+            draw_boss_kill_stats(screen, boss_kill_stats, boss_table_x + 20, boss_table_y + 35, boss_table_w - 40, 60)
     except Exception:
         pass
 
@@ -1037,14 +1058,14 @@ def get_end_button_rects(is_game_clear=False):
         if is_game_clear:
             # GameClear時はRestartボタンのみ（中央配置）
             cx = SCREEN_WIDTH // 2
-            by = SCREEN_HEIGHT - button_h - 20  # 画面最下部から20px上
+            by = SCREEN_HEIGHT - button_h - 40  # 画面最下部から40px上
             restart_rect = pygame.Rect(cx - button_w // 2, by, button_w, button_h)
             return {'restart': restart_rect, 'continue': None}
         else:
             # GameOver時は両方のボタン
             total_w = button_w * 2 + gap
             cx = SCREEN_WIDTH // 2
-            by = SCREEN_HEIGHT - button_h - 20  # 画面最下部から20px上
+            by = SCREEN_HEIGHT - button_h - 40  # 画面最下部から40px上
             left_x = cx - total_w // 2
             restart_rect = pygame.Rect(left_x, by, button_w, button_h)
             continue_rect = pygame.Rect(left_x + button_w + gap, by, button_w, button_h)
@@ -1304,6 +1325,27 @@ def get_enemy_info():
     except Exception:
         return {}
 
+def get_boss_info():
+    """ボス情報を読み込んで返す"""
+    try:
+        import os
+        import csv
+        # 直接ファイルパスを構築
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        csv_path = os.path.join(base_dir, 'data', 'boss_stats.csv')
+        
+        boss_info = {}
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                boss_no = int(row['No'])
+                boss_info[boss_no] = {
+                    'image_file': row['image_file']
+                }
+        return boss_info
+    except Exception:
+        return {}
+
 def draw_enemy_kill_stats(screen, enemy_kill_stats, start_x, start_y, area_width, area_height):
     """エネミー撃破統計をアイコンと数字で表示"""
     try:
@@ -1379,10 +1421,108 @@ def draw_enemy_kill_stats(screen, enemy_kill_stats, start_x, start_y, area_width
                 pygame.draw.rect(screen, BLACK, (x, y, icon_size, icon_size), 1)
             
             # 撃破数をアイコンの下に表示
-            count_text = small_font.render(str(kill_count), True, WHITE if kill_count > 0 else (100, 100, 100))
+            count_text = small_font.render(str(kill_count), True, BLACK if kill_count > 0 else (100, 100, 100))
             text_x = x + (icon_size - count_text.get_width()) // 2
             text_y = y + icon_size + 2
             screen.blit(count_text, (text_x, text_y))
+            
+    except Exception:
+        pass
+
+def draw_boss_kill_stats(screen, boss_kill_stats, start_x, start_y, area_width, area_height):
+    """ボス撃破統計をアイコンと撃破マークで表示"""
+    try:
+        import pygame
+        import os
+        
+        # ボス情報取得
+        boss_info = get_boss_info()
+        if not boss_info:
+            return
+        
+        # 固定設定
+        icon_size = 60
+        check_size = 20  # チェックマークサイズ
+        
+        # フォント設定
+        small_font = get_font(16)
+        medium_font = get_font(20)
+        
+        # カラー定義
+        WHITE = (255, 255, 255)
+        BLACK = (0, 0, 0)
+        GREEN = (0, 255, 0)
+        
+        # 基本ディレクトリ取得
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        
+        # ボス数を取得してアイコンの配置を計算
+        boss_count = len(boss_info)
+        if boss_count == 0:
+            return
+            
+        # 横並びで配置
+        total_width = boss_count * icon_size + (boss_count - 1) * 10  # アイコン間隔10px
+        start_icon_x = start_x + (area_width - total_width) // 2
+        
+        # ボスアイコンを横並びで表示
+        for i, boss_no in enumerate(sorted(boss_info.keys())):
+            info = boss_info[boss_no]
+            
+            # 描画位置
+            x = start_icon_x + i * (icon_size + 10)
+            y = start_y
+            
+            # 撃破状況取得
+            is_defeated = boss_kill_stats.get(boss_no, 0) > 0
+            
+            # ボスアイコンを描画
+            try:
+                image_file = info['image_file']
+                # 直接ファイルパスを構築（enemyサブフォルダを含む）
+                assets_dir = os.path.join(base_dir, 'assets', 'character', 'enemy')
+                image_path = os.path.join(assets_dir, f'{image_file}.png')
+                
+                if os.path.exists(image_path):
+                    # 画像をロードしてリサイズ
+                    boss_image = pygame.image.load(image_path)
+                    boss_image = pygame.transform.scale(boss_image, (icon_size, icon_size))
+                    
+                    # 未撃破の場合は半透明に
+                    if not is_defeated:
+                        boss_image.set_alpha(100)
+                    
+                    screen.blit(boss_image, (x, y))
+                else:
+                    # 画像がない場合は色付きの四角で代用（ボスは赤系）
+                    color = (200, 50, 50) if is_defeated else (100, 25, 25)
+                    pygame.draw.rect(screen, color, (x, y, icon_size, icon_size))
+                    pygame.draw.rect(screen, BLACK, (x, y, icon_size, icon_size), 2)
+            except Exception:
+                # 描画に失敗した場合はグレーの四角
+                color = (150, 150, 150) if is_defeated else (75, 75, 75)
+                pygame.draw.rect(screen, color, (x, y, icon_size, icon_size))
+                pygame.draw.rect(screen, BLACK, (x, y, icon_size, icon_size), 2)
+            
+            # 撃破済みの場合はチェックマークを重ねて表示
+            if is_defeated:
+                check_x = x + icon_size - check_size - 5
+                check_y = y + 5
+                
+                # チェックマーク背景（白い円）
+                pygame.draw.circle(screen, WHITE, (check_x + check_size // 2, check_y + check_size // 2), check_size // 2 + 2)
+                pygame.draw.circle(screen, BLACK, (check_x + check_size // 2, check_y + check_size // 2), check_size // 2 + 2, 2)
+                
+                # チェックマーク（緑の✓）
+                pygame.draw.circle(screen, GREEN, (check_x + check_size // 2, check_y + check_size // 2), check_size // 2)
+                
+                # ✓マークを線で描画
+                check_points = [
+                    (check_x + check_size // 4, check_y + check_size // 2),
+                    (check_x + check_size // 2, check_y + check_size * 3 // 4),
+                    (check_x + check_size * 3 // 4, check_y + check_size // 4)
+                ]
+                pygame.draw.lines(screen, WHITE, False, check_points, 3)
             
     except Exception:
         pass

@@ -109,8 +109,8 @@ BASE_ATTRACTION_DISTANCE = 100   # アイテム・ジェムの基本引き寄せ
 
 # --- オーディオ基本設定 ---
 # 効果音とBGMのデフォルト音量（0.0〜1.0）
-DEFAULT_SFX_VOLUME = 0.1
-DEFAULT_MUSIC_VOLUME = 0.1
+DEFAULT_SFX_VOLUME = 0.2
+DEFAULT_MUSIC_VOLUME = 0.3
 
 # ガーリック設定
 GARLIC_HEAL_INTERVAL_MS = 500    # ガーリック回復の間隔（ミリ秒）
