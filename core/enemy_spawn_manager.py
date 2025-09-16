@@ -36,11 +36,9 @@ class EnemySpawnManager:
                     }
                     self.spawn_rules.append(rule)
             
-            print(f"Loaded {len(self.spawn_rules)} spawn rules from {csv_path}")
             self.use_csv_rules = True
             
         except Exception as e:
-            print(f"Error loading spawn rules: {e}")
             raise RuntimeError(f"Failed to load spawn rules from {csv_path}: {e}")
     
     def get_active_rules(self, game_time: int) -> List[Dict]:

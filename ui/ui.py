@@ -933,9 +933,6 @@ def draw_level_choice(screen, player, icons, virtual_mouse_pos=None):
                 if isinstance(item_data, dict):
                     display_name = item_data.get('name', display_name)
                     long_desc = item_data.get('description', '')
-                elif isinstance(item_data, str):
-                    # 旧形式との互換性
-                    long_desc = item_data
             except Exception:
                 pass
             
@@ -1224,9 +1221,6 @@ def draw_subitem_choice(screen, player, icons=None, virtual_mouse_pos=None):
                 if isinstance(item_data, dict):
                     display_name = item_data.get('name', display_name)
                     long_desc = item_data.get('description', '')
-                elif isinstance(item_data, str):
-                    # 旧形式との互換性
-                    long_desc = item_data
             except Exception:
                 pass
             

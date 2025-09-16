@@ -46,8 +46,6 @@ class MapLoader:
             full_path = get_resource_path(csv_file_path)
             
             if not os.path.exists(full_path):
-                print(f"[WARNING] Map file not found: {full_path}")
-                print(f"[WARNING] Original path: {csv_file_path}")
                 return False
             
             with open(full_path, 'r', encoding='utf-8') as file:
@@ -66,15 +64,11 @@ class MapLoader:
             if self.map_data:
                 self.map_height = len(self.map_data)
                 self.map_width = len(self.map_data[0]) if self.map_data[0] else 0
-                print(f"[INFO] Map loaded: {self.map_width}x{self.map_height} tiles")
                 return True
             else:
-                print("[WARNING] Empty map data, using default")
                 return False
                 
         except Exception as e:
-            print(f"[ERROR] Failed to load map: {e}")
-            print(f"[ERROR] Attempted path: {full_path}")
             return False
     
     def generate_default_map(self):

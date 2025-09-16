@@ -499,13 +499,11 @@ def main():
             is_frozen = False
             
         if not is_frozen and not os.path.exists(csv_path):
-            print(f"[INFO] Creating sample CSV map: {csv_path}")
             map_loader.create_sample_csv(csv_path)
             
         # マップを読み込み（PyInstallerの場合はリソースから）
         success = map_loader.load_csv_map(csv_path)
         if not success:
-            print("[WARNING] Failed to load CSV map, using default map")
             map_loader.generate_default_map()
     else:
         # デフォルトマップ（市松模様）を生成
@@ -1424,9 +1422,8 @@ def main():
                                         if len(particles) < 300:
                                             for _ in range(12):
                                                 particles.append(SpawnParticle(special_box.x, special_box.y, (255, 100, 100)))
-                                        print(f"[INFO] Special boss box spawned at ({special_box.x:.0f},{special_box.y:.0f})")
                                     except Exception as e:
-                                        print(f"[WARNING] Failed to spawn boss special box: {e}")
+                                        pass
 
                                 # 撃破カウンターを増加
                                 enemies_killed_this_game += 1
@@ -1476,9 +1473,9 @@ def main():
                 # 全てのボス設定を取得
                 all_boss_configs = Enemy.get_all_boss_configs()
                 
-                # Noベースでボス設定を処理（重複を避けるため）
+                # Noベースでボス設定を処理
                 for key, boss_config in all_boss_configs.items():
-                    # Noベースのエントリのみを処理（タプルキーは互換性用なのでスキップ）
+                    # Noベースのエントリのみを処理
                     if not isinstance(key, int):
                         continue
                     
@@ -1536,8 +1533,7 @@ def main():
                                 boss_x, boss_y = stage_map.find_safe_spawn_position(boss_x, boss_y, 50)
                             
                             # ボス生成（NoベースでCSVの設定に基づき）
-                            boss_stats_key = (boss_type, level, spawn_time)  # 互換性用
-                            boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type, boss_image_file=boss_config['image_file'], boss_stats_key=boss_stats_key, boss_no=boss_no)
+                            boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type, boss_image_file=boss_config['image_file'], boss_no=boss_no)
                             enemies.append(boss)
                             
                             # この特定のNoのボスを出現済みリストに追加
@@ -1547,10 +1543,6 @@ def main():
                             if len(particles) < 300:
                                 for _ in range(6):  # スパイクを抑える
                                     particles.append(SpawnParticle(boss_x, boss_y, (255, 215, 0)))  # 金色
-                            
-                            # 現在のボス数をログ出力
-                            boss_count = sum(1 for enemy in enemies if getattr(enemy, 'is_boss', False))
-                            print(f"[INFO] Boss No.{boss_no} (Type {boss_type}) spawned at ({boss_x:.0f}, {boss_y:.0f}). Player at ({player.x:.0f}, {player.y:.0f}). Total bosses: {boss_count}")
 
                 # 敵の生成を爆発的に
                 # spawn_frequency倍率を適用してスポーン頻度を調整
@@ -2140,8 +2132,6 @@ def main():
                             money_amount = getattr(item, 'amount', 10)
                             money_type = getattr(item, 'money_type', 'money1')
                             current_game_money += money_amount
-                            if DEBUG:
-                                print(f"[DEBUG] Money collected: {money_amount}G ({money_type})")
                             # お金取得のエフェクト（金色の爆発）
                             for _ in range(3):
                                 particles.append(DeathParticle(item.x, item.y, (255, 215, 0)))
@@ -2258,13 +2248,8 @@ def main():
             # 画面内パーティクルのみ描画
             for particle in visible_particles:
                 # 各パーティクルは world_surf 上に描画する（カメラオフセットを渡す）
-                try:
-                    particle.draw(world_surf, int_cam_x, int_cam_y)
-                    performance_stats['draw_calls'] += 1
-                except TypeError:
-                    # 古いインターフェースのままなら位置をオフセットして描画
-                    particle.draw(world_surf)
-                    performance_stats['draw_calls'] += 1
+                particle.draw(world_surf, int_cam_x, int_cam_y)
+                performance_stats['draw_calls'] += 1
             
             # カリング統計を更新
             performance_stats['culled_entities'] += (len(world_particles[:max_particles_draw]) - len(visible_particles))

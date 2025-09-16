@@ -77,7 +77,7 @@ class Whip(Weapon):
                     # 仮想マウス座標を使用
                     mx, my = get_virtual_mouse_pos()
                 else:
-                    # 従来の方法（後方互換性のため）
+                    # 通常のマウス座標を使用
                     mx, my = pygame.mouse.get_pos()
                 # マウスは画面座標なのでワールド座標に変換
                 world_mx = mx + camera_x

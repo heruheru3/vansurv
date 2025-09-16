@@ -27,13 +27,9 @@ class StageMap:
             from constants import CSV_MAP_FILE
             from map.map_loader import MapLoader
             self._csv_map_cache = MapLoader()
-            if self._csv_map_cache.load_csv_map(CSV_MAP_FILE):
-                print(f"[DEBUG] CSV map cached successfully")
-            else:
-                print(f"[DEBUG] Failed to load CSV map, using default")
+            if not self._csv_map_cache.load_csv_map(CSV_MAP_FILE):
                 self._csv_map_cache.generate_default_map()
         except Exception as e:
-            print(f"[DEBUG] Failed to load CSV map cache: {e}")
             from map.map_loader import MapLoader
             self._csv_map_cache = MapLoader()
             self._csv_map_cache.generate_default_map()
@@ -47,7 +43,7 @@ class StageMap:
             try:
                 return self._csv_map_cache.get_tile_at(world_x, world_y)
             except Exception as e:
-                print(f"[DEBUG] CSV tile lookup failed: {e}")
+                pass
         return 0  # デフォルトタイル
     
     def is_weapon_blocked_at_pos(self, world_x, world_y, weapon_name):
@@ -189,7 +185,7 @@ class StageMap:
                 self._csv_map_cache.draw_map(screen, camera_x, camera_y)
                 return
             except Exception as e:
-                print(f"[DEBUG] CSV map draw failed: {e}")
+                pass
         
         # フォールバック：黒い画面を表示
         screen.fill((0, 0, 0))

@@ -47,12 +47,9 @@ class Enemy:
                         'description': row['description']
                     }
             cls._stats_loaded = True
-            print(f"[INFO] Loaded {len(cls._enemy_stats)} enemy configurations from {csv_path}")
         except FileNotFoundError:
-            print(f"[ERROR] Enemy stats file not found: {csv_path}")
             cls._stats_loaded = False
         except Exception as e:
-            print(f"[ERROR] Failed to load enemy stats: {e}")
             cls._stats_loaded = False
     
     @classmethod
@@ -86,38 +83,13 @@ class Enemy:
                         'projectile_speed': float(row['projectile_speed']) if row['projectile_speed'] else 3.0,
                         'description': row['description']
                     }
-                    # Noベースとキーベースの両方で保存
-                    cls._boss_stats[no] = boss_config  # Noベース（プライマリ）
-                    key = (type_id, level, spawn_time)
-                    cls._boss_stats[key] = boss_config  # 従来キーベース（互換性用）
+                    # Noベースで保存
+                    cls._boss_stats[no] = boss_config
             cls._boss_stats_loaded = True
-            total_entries = len([k for k in cls._boss_stats.keys() if isinstance(k, int)])
-            print(f"[INFO] Loaded {total_entries} boss configurations (No-based) from {csv_path}")
-            
-            # デバッグ: 読み込まれたボス設定を表示
-            for no, config in cls._boss_stats.items():
-                if isinstance(no, int):  # Noベースのエントリのみ表示
-                    print(f"[DEBUG] Boss No.{no}: type={config['type']}, image_file={config['image_file']}, image_size={config['image_size']}, spawn_time={config['spawn_time']}s")
         except FileNotFoundError:
-            print(f"[ERROR] Boss stats file not found: {csv_path}")
             cls._boss_stats_loaded = False
         except Exception as e:
-            print(f"[ERROR] Failed to load boss stats: {e}")
             cls._boss_stats_loaded = False
-    
-    @classmethod
-    def get_boss_config(cls, boss_level):
-        """（非推奨）指定されたレベルのボス設定を取得（旧版・互換性用）"""
-        # cls.load_boss_stats()
-        # key = (101, boss_level)  # ボスタイプは101固定
-        # return cls._boss_stats.get(key, None)
-        return None  # 今後は使わない
-
-    @classmethod
-    def get_boss_config_by_type(cls, boss_type):
-        """（削除済み）Typeベースのボス設定取得は廃止。Noベース検索を使用してください。"""
-        print(f"[WARNING] get_boss_config_by_type() is deprecated. Use No-based lookup instead.")
-        return None
     
     @classmethod
     def get_all_boss_configs(cls):
@@ -135,14 +107,9 @@ class Enemy:
             # boss_no（一意のNo）が指定されている場合はそれを優先
             if boss_no is not None:
                 boss_config = cls._boss_stats.get(boss_no)
-                if boss_config:
-                    print(f"[DEBUG] Found boss config by No {boss_no}: image_size={boss_config['image_size']}")
-                else:
-                    print(f"[WARNING] Boss config not found for No {boss_no}")
             
             # フォールバック: エラー回避用のデフォルト設定
             if boss_config is None:
-                print(f"[ERROR] Boss image config not found for boss_no={boss_no}, enemy_no={enemy_no}. Using default values.")
                 # デフォルト設定を使用
                 boss_config = {
                     'image_file': 'boss-01',
@@ -181,7 +148,6 @@ class Enemy:
         image_path = get_resource_path(os.path.join("assets", "character", "enemy", image_file))
         try:
             if not os.path.exists(image_path):
-                print(f"[WARNING] Enemy image file not found: {image_path}")
                 cls._image_cache[cache_key] = None
                 return None
 
@@ -229,11 +195,9 @@ class Enemy:
                 # オーラ生成に失敗しても読み込み自体は成功させる
                 pass
 
-            # print(f"[DEBUG] Loaded image for key: {cache_key}, file: {image_file}")
             return cls._image_cache[cache_key]
 
         except (pygame.error, FileNotFoundError) as e:
-            print(f"[WARNING] Failed to load enemy image {cache_key}: {e}")
             cls._image_cache[cache_key] = None
             return None
         except Exception as e:

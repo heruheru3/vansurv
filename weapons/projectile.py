@@ -519,7 +519,7 @@ class Knife(Weapon):
                     # 仮想マウス座標を使用
                     mx, my = get_virtual_mouse_pos()
                 else:
-                    # 従来の方法（後方互換性のため）
+                    # 通常のマウス座標を使用
                     mx, my = pygame.mouse.get_pos()
                 world_mx = mx + camera_x
                 world_my = my + camera_y

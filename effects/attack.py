@@ -71,17 +71,13 @@ class Attack:
         
         try:
             if os.path.exists(image_path):
-                print(f"[DEBUG] Loading weapon image: {image_path}")
                 image = pygame.image.load(image_path).convert_alpha()
                 cls._weapon_image_cache[weapon_type] = image
-                print(f"[DEBUG] Successfully loaded weapon image: {weapon_type}")
                 return image
             else:
-                print(f"[DEBUG] Weapon image not found: {image_path}")
                 cls._weapon_image_cache[weapon_type] = None
                 return None
         except Exception as e:
-            print(f"[WARNING] Failed to load weapon image {weapon_type}: {e}")
             cls._weapon_image_cache[weapon_type] = None
             return None
 
