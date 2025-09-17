@@ -115,7 +115,7 @@ def get_minimap_surf(map_w, map_h, alpha=128, bg=(20,20,20)):
         _surf_cache[key] = s
     return s
 
-def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True, money=0, game_money=0, enemy_kill_stats=None, boss_kill_stats=None, force_ended=False):
+def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None, icons=None, show_status=True, money=0, game_money=0, enemy_kill_stats=None, boss_kill_stats=None, force_ended=False, save_system=None):
     # メイン画面のフォントをやや小さく（約70%）にする
     font = get_font(18)
     
@@ -161,6 +161,31 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
     money_y = 8 + pad + meter_h // 2  # HPバーと同じ高さ
     money_rect = money_text.get_rect(midleft=(money_x, money_y))
     screen.blit(money_text, money_rect.topleft)
+
+    # 難易度表示（画面右上、ミニマップの左側）
+    if save_system:
+        try:
+            from constants import DIFFICULTY_NAMES
+            current_difficulty = save_system.get_difficulty()
+            difficulty_name = DIFFICULTY_NAMES.get(current_difficulty, "不明")
+            difficulty_font = get_font(16)  # 小さめのフォント
+            difficulty_text = difficulty_font.render(f"難易度: {difficulty_name}", True, WHITE)
+            
+            # ミニマップの位置を参考にして、その左側に配置
+            # ミニマップは右上 margin=10 で配置される
+            minimap_w = 220  # draw_minimapと同じ値
+            difficulty_x = SCREEN_WIDTH - minimap_w - 10 - difficulty_text.get_width() - 20  # ミニマップの左20px
+            difficulty_y = 15  # 上端から15px
+            
+            # 背景パネル（小さめ、半透明）
+            diff_bg_w = difficulty_text.get_width() + 12
+            diff_bg_h = difficulty_text.get_height() + 8
+            diff_panel = get_panel_surf(diff_bg_w, diff_bg_h, radius=4, alpha=140)
+            screen.blit(diff_panel, (difficulty_x - 6, difficulty_y - 4))
+            
+            screen.blit(difficulty_text, (difficulty_x, difficulty_y))
+        except Exception:
+            pass  # エラーが発生した場合は表示しない
 
     # # 時間表示
     # time_text = font.render(f"Time: {int(game_time)}s", True, WHITE)
@@ -1048,19 +1073,26 @@ def draw_level_choice(screen, player, icons, virtual_mouse_pos=None):
 
 def get_end_button_rects(is_game_clear=False):
     """GAME OVER / CLEAR 時に表示するボタンの矩形を返す。描画は行わない。
-    戻り値: {'restart': Rect, 'continue': Rect or None}
+    戻り値: {'restart': Rect, 'continue': Rect or None, 'settings': Rect}
     """
     try:
         button_w = 220
         button_h = 48
         gap = 24
         
+        # 設定ボタン（小さめ、右上に配置）
+        settings_w = 100
+        settings_h = 40
+        settings_x = SCREEN_WIDTH - settings_w - 20
+        settings_y = 20
+        settings_rect = pygame.Rect(settings_x, settings_y, settings_w, settings_h)
+        
         if is_game_clear:
             # GameClear時はRestartボタンのみ（中央配置）
             cx = SCREEN_WIDTH // 2
             by = SCREEN_HEIGHT - button_h - 40  # 画面最下部から40px上
             restart_rect = pygame.Rect(cx - button_w // 2, by, button_w, button_h)
-            return {'restart': restart_rect, 'continue': None}
+            return {'restart': restart_rect, 'continue': None, 'settings': settings_rect}
         else:
             # GameOver時は両方のボタン
             total_w = button_w * 2 + gap
@@ -1069,9 +1101,9 @@ def get_end_button_rects(is_game_clear=False):
             left_x = cx - total_w // 2
             restart_rect = pygame.Rect(left_x, by, button_w, button_h)
             continue_rect = pygame.Rect(left_x + button_w + gap, by, button_w, button_h)
-            return {'restart': restart_rect, 'continue': continue_rect}
+            return {'restart': restart_rect, 'continue': continue_rect, 'settings': settings_rect}
     except Exception:
-        return {'restart': None, 'continue': None}
+        return {'restart': None, 'continue': None, 'settings': None}
 
 
 def draw_end_buttons(screen, is_game_over, is_game_clear, selected_option=0):
@@ -1081,26 +1113,48 @@ def draw_end_buttons(screen, is_game_over, is_game_clear, selected_option=0):
         screen: 描画対象のスクリーン
         is_game_over: ゲームオーバー状態
         is_game_clear: ゲームクリア状態
-        selected_option: 選択されたオプション (0: Restart (left), 1: Continue (right))
+        selected_option: 選択されたオプション (0: Restart (left), 1: Continue (right), 2: Settings)
     """
     rects = get_end_button_rects(is_game_clear)
     restart_rect = rects.get('restart')
     continue_rect = rects.get('continue')
+    settings_rect = rects.get('settings')
+    
     try:
         font = get_font(18)
+        
+        # 設定ボタンを常に描画
+        if settings_rect:
+            try:
+                if selected_option == 2:  # Settings選択中
+                    pygame.draw.rect(screen, (80, 80, 120), settings_rect, border_radius=6)  # 明るい青系
+                    pygame.draw.rect(screen, (255, 255, 255), settings_rect, width=2, border_radius=6)
+                else:
+                    pygame.draw.rect(screen, (50, 50, 70), settings_rect, border_radius=6)  # 通常の青系
+                
+                # テキスト描画
+                settings_font = get_font(16)
+                settings_txt = settings_font.render('設定', True, WHITE)
+                screen.blit(settings_txt, (settings_rect.centerx - settings_txt.get_width()//2, 
+                                         settings_rect.centery - settings_txt.get_height()//2))
+            except Exception:
+                pass
         
         if is_game_clear:
             # GameClear時はRestartボタンのみ
             try:
-                pygame.draw.rect(screen, (80, 80, 80), restart_rect, border_radius=8)  # 明るい灰色
-                # 選択中の枠線を描画（白い太枠）
-                pygame.draw.rect(screen, (255, 255, 255), restart_rect, width=3, border_radius=8)
-                # 影のような効果を追加
-                shadow_rect = pygame.Rect(restart_rect.x + 2, restart_rect.y + 2, restart_rect.width, restart_rect.height)
-                pygame.draw.rect(screen, (0, 0, 0, 50), shadow_rect, width=1, border_radius=8)
+                if selected_option == 0:  # Restart選択中
+                    pygame.draw.rect(screen, (80, 80, 80), restart_rect, border_radius=8)  # 明るい灰色
+                    # 選択中の枠線を描画（白い太枠）
+                    pygame.draw.rect(screen, (255, 255, 255), restart_rect, width=3, border_radius=8)
+                    # 影のような効果を追加
+                    shadow_rect = pygame.Rect(restart_rect.x + 2, restart_rect.y + 2, restart_rect.width, restart_rect.height)
+                    pygame.draw.rect(screen, (0, 0, 0, 50), shadow_rect, width=1, border_radius=8)
+                else:
+                    pygame.draw.rect(screen, (40, 40, 40), restart_rect, border_radius=8)  # 通常の灰色
                 
                 # テキスト描画
-                txt_font = get_font(20)  # 少し大きなフォント
+                txt_font = get_font(20) if selected_option == 0 else font
                 txt = txt_font.render('Restart', True, WHITE)
                 screen.blit(txt, (restart_rect.centerx - txt.get_width()//2, restart_rect.centery - txt.get_height()//2))
             except Exception:
@@ -1526,3 +1580,136 @@ def draw_boss_kill_stats(screen, boss_kill_stats, start_x, start_y, area_width, 
             
     except Exception:
         pass
+
+
+def draw_settings_screen(screen, save_system, selected_difficulty=None, virtual_mouse_pos=None):
+    """設定画面を描画する"""
+    try:
+        from constants import (DIFFICULTY_NAMES, DIFFICULTY_MULTIPLIERS, 
+                              DIFFICULTY_VERY_EASY, DIFFICULTY_VERY_HARD)
+        
+        # 現在の難易度を取得
+        current_difficulty = save_system.get_difficulty() if save_system else 3
+        if selected_difficulty is not None:
+            current_difficulty = selected_difficulty
+        
+        # 背景オーバーレイ
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        screen.blit(overlay, (0, 0))
+        
+        # メインパネル
+        panel_w = min(800, SCREEN_WIDTH - 100)
+        panel_h = min(650, SCREEN_HEIGHT - 100)  # 600から650に変更（50px増加）
+        panel_x = (SCREEN_WIDTH - panel_w) // 2
+        panel_y = (SCREEN_HEIGHT - panel_h) // 2
+        
+        panel_surf = get_panel_surf(panel_w, panel_h, 12, 200)
+        screen.blit(panel_surf, (panel_x, panel_y))
+        
+        # フォント
+        title_font = get_font(48)
+        subtitle_font = get_font(32)
+        text_font = get_font(24)
+        small_font = get_font(20)
+        
+        # タイトル
+        title_surf = title_font.render("設定", True, WHITE)
+        title_x = panel_x + (panel_w - title_surf.get_width()) // 2
+        title_y = panel_y + 30
+        screen.blit(title_surf, (title_x, title_y))
+        
+        # 難易度セクション
+        subtitle_surf = subtitle_font.render("難易度選択", True, WHITE)
+        subtitle_x = panel_x + 40
+        subtitle_y = title_y + 80
+        screen.blit(subtitle_surf, (subtitle_x, subtitle_y))
+        
+        # 難易度選択肢
+        difficulty_buttons = []
+        button_width = panel_w - 80
+        button_height = 70  # 60から70に変更（10px増加）
+        button_spacing = 80  # 70から80に変更（10px増加）
+        
+        start_y = subtitle_y + 60
+        
+        for i in range(DIFFICULTY_VERY_EASY, DIFFICULTY_VERY_HARD + 1):
+            button_x = panel_x + 40
+            button_y = start_y + (i - 1) * button_spacing
+            
+            # ボタンの当たり判定領域
+            button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+            difficulty_buttons.append((i, button_rect))
+            
+            # ボタンの背景色（選択中は明るく、ホバー時は中間色）
+            is_selected = (i == current_difficulty)
+            is_hovered = False
+            
+            if virtual_mouse_pos:
+                mx, my = virtual_mouse_pos
+                is_hovered = button_rect.collidepoint(mx, my)
+            
+            if is_selected:
+                bg_color = (70, 140, 70)  # 選択中は緑系
+                border_color = (100, 200, 100)
+            elif is_hovered:
+                bg_color = (60, 60, 80)   # ホバー時は青系
+                border_color = (100, 100, 150)
+            else:
+                bg_color = (40, 40, 50)   # 通常は暗い
+                border_color = (80, 80, 100)
+            
+            # ボタン描画
+            pygame.draw.rect(screen, bg_color, button_rect, border_radius=8)
+            pygame.draw.rect(screen, border_color, button_rect, 3, border_radius=8)
+            
+            # 難易度名
+            diff_name = DIFFICULTY_NAMES.get(i, f"難易度{i}")
+            name_surf = text_font.render(diff_name, True, WHITE)
+            name_x = button_x + 20
+            name_y = button_y + 8
+            screen.blit(name_surf, (name_x, name_y))
+            
+            # 係数情報
+            multipliers = DIFFICULTY_MULTIPLIERS.get(i, {"hp": 1.0, "damage": 1.0, "speed": 1.0})
+            info_text = f"HP:{multipliers['hp']:.1f}倍 攻撃:{multipliers['damage']:.1f}倍 速度:{multipliers['speed']:.1f}倍"
+            info_surf = small_font.render(info_text, True, (200, 200, 200))
+            info_x = button_x + 20
+            info_y = button_y + 35
+            screen.blit(info_surf, (info_x, info_y))
+        
+        # 閉じるボタン
+        close_button_w = 120
+        close_button_h = 40
+        close_button_x = panel_x + panel_w - close_button_w - 20
+        # 最後のボタン（5番目）の下に30pxの間隔を空けて配置
+        last_button_y = start_y + (5 - 1) * button_spacing + button_height
+        close_button_y = last_button_y + 30
+        close_button_rect = pygame.Rect(close_button_x, close_button_y, close_button_w, close_button_h)
+        
+        # 閉じるボタンのホバー判定
+        close_hovered = False
+        if virtual_mouse_pos:
+            mx, my = virtual_mouse_pos
+            close_hovered = close_button_rect.collidepoint(mx, my)
+        
+        close_bg = (80, 50, 50) if close_hovered else (50, 30, 30)
+        close_border = (150, 80, 80) if close_hovered else (100, 60, 60)
+        
+        pygame.draw.rect(screen, close_bg, close_button_rect, border_radius=6)
+        pygame.draw.rect(screen, close_border, close_button_rect, 2, border_radius=6)
+        
+        close_surf = text_font.render("閉じる", True, WHITE)
+        close_text_x = close_button_x + (close_button_w - close_surf.get_width()) // 2
+        close_text_y = close_button_y + (close_button_h - close_surf.get_height()) // 2
+        screen.blit(close_surf, (close_text_x, close_text_y))
+        
+        # 戻り値として、ボタンの当たり判定情報を返す
+        return {
+            'difficulty_buttons': difficulty_buttons,
+            'close_button': close_button_rect
+        }
+        
+    except Exception as e:
+        print(f"[ERROR] Settings screen drawing failed: {e}")
+        return {'difficulty_buttons': [], 'close_button': None}

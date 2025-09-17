@@ -261,7 +261,7 @@ class Enemy:
         
         return adjusted_surface
     
-    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None, boss_image_file=None, boss_stats_key=None, boss_no=None, enemy_no=None, strength_multiplier=1.0, size_multiplier=1.0):
+    def __init__(self, screen, game_time, spawn_x=None, spawn_y=None, spawn_side=None, is_boss=False, boss_level=1, boss_type=None, boss_image_file=None, boss_stats_key=None, boss_no=None, enemy_no=None, strength_multiplier=1.0, size_multiplier=1.0, difficulty_multiplier=None):
         self.screen = screen
         self.is_boss = is_boss  # ボス判定フラグ
         self.boss_level = boss_level if is_boss else 1  # ボスレベル（ボス以外は1）
@@ -274,6 +274,9 @@ class Enemy:
         # スポーンルールからの倍率
         self.strength_multiplier = strength_multiplier  # HP・攻撃力倍率
         self.size_multiplier = size_multiplier  # サイズ倍率
+        
+        # 難易度係数
+        self.difficulty_multiplier = difficulty_multiplier  # 難易度による倍率
         
         # ヒット時のフラッシュ用タイマ（秒）
         self.hit_flash_timer = 0.0
@@ -603,12 +606,28 @@ class Enemy:
         self.last_movement_x = 0  # 最後の移動方向を記録
     
     def _apply_spawn_multipliers(self):
-        """スポーンルールからの倍率を適用"""
+        """スポーンルールからの倍率と難易度係数を適用"""
         # 強さ倍率の適用
         if hasattr(self, 'strength_multiplier') and self.strength_multiplier != 1.0:
             self.hp = int(self.hp * self.strength_multiplier)
             self.max_hp = int(self.max_hp * self.strength_multiplier)
             self.damage = int(self.damage * self.strength_multiplier)
+        
+        # 難易度係数の適用
+        if hasattr(self, 'difficulty_multiplier') and self.difficulty_multiplier is not None:
+            # HP係数を適用
+            hp_mult = self.difficulty_multiplier.get('hp', 1.0)
+            self.hp = int(self.hp * hp_mult)
+            self.max_hp = int(self.max_hp * hp_mult)
+            
+            # 攻撃力係数を適用
+            damage_mult = self.difficulty_multiplier.get('damage', 1.0)
+            self.damage = int(self.damage * damage_mult)
+            
+            # スピード係数を適用
+            speed_mult = self.difficulty_multiplier.get('speed', 1.0)
+            self.base_speed = self.base_speed * speed_mult
+            self.speed = self.speed * speed_mult
         
         # サイズ倍率の適用
         if hasattr(self, 'size_multiplier') and self.size_multiplier != 1.0:

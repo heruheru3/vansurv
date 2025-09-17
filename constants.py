@@ -285,3 +285,55 @@ WEAPONS_AFFECTED_BY_BLOCKERS = {
 # ノックバック設定
 KNOCKBACK_DURATION = 0.1             # ノックバック持続時間（秒）
 KNOCKBACK_COOLDOWN_DURATION = 0.8    # ノックバック後のクールダウン時間（秒）
+
+# =============================================================================
+# 難易度設定
+# =============================================================================
+
+# 難易度レベルの定義
+DIFFICULTY_VERY_EASY = 1
+DIFFICULTY_EASY = 2
+DIFFICULTY_NORMAL = 3  # デフォルト
+DIFFICULTY_HARD = 4
+DIFFICULTY_VERY_HARD = 5
+
+# 難易度名
+DIFFICULTY_NAMES = {
+    DIFFICULTY_VERY_EASY: "ベリーイージー",
+    DIFFICULTY_EASY: "イージー",
+    DIFFICULTY_NORMAL: "ノーマル",
+    DIFFICULTY_HARD: "ハード",
+    DIFFICULTY_VERY_HARD: "ベリーハード"
+}
+
+# 各難易度における敵ステータスの係数
+DIFFICULTY_MULTIPLIERS = {
+    DIFFICULTY_VERY_EASY: {
+        "hp": 0.5,      # HP 50%
+        "damage": 0.5,  # 攻撃力 50%
+        "speed": 0.8    # スピード 80%
+    },
+    DIFFICULTY_EASY: {
+        "hp": 0.7,      # HP 70%
+        "damage": 0.7,  # 攻撃力 70%
+        "speed": 0.9    # スピード 90%
+    },
+    DIFFICULTY_NORMAL: {
+        "hp": 1.0,      # HP 100%（基本値）
+        "damage": 1.0,  # 攻撃力 100%（基本値）
+        "speed": 1.0    # スピード 100%（基本値）
+    },
+    DIFFICULTY_HARD: {
+        "hp": 1.3,      # HP 130%
+        "damage": 1.3,  # 攻撃力 130%
+        "speed": 1.1    # スピード 110%
+    },
+    DIFFICULTY_VERY_HARD: {
+        "hp": 1.5,      # HP 150%
+        "damage": 1.5,  # 攻撃力 150%
+        "speed": 1.2    # スピード 120%
+    }
+}
+
+# デフォルト難易度
+DEFAULT_DIFFICULTY = DIFFICULTY_NORMAL

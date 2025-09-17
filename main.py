@@ -285,6 +285,10 @@ def main():
     # ゲーム状態の初期化
     player, enemies, experience_gems, items, game_over, game_clear, spawn_timer, spawn_interval, game_time, last_difficulty_increase, particles, damage_stats, boss_spawn_timer, spawned_boss_types = init_game_state(screen, save_system)
 
+    # 設定画面関連の状態
+    show_settings = False
+    settings_selection = None  # 選択中の難易度
+    
     # エネミースポーンマネージャーの初期化
     try:
         spawn_manager = EnemySpawnManager()
@@ -705,15 +709,20 @@ def main():
                             print(f"[INFO] Log file: {performance_logger.log_file}")
                         continue
 
-                    # ESCキーでゲーム途中でも強制終了
-                    if event.key == pygame.K_ESCAPE and not game_over and not game_clear:
-                        print("[INFO] Game forcibly ended by ESC key")
-                        # 強制終了フラグを立てる（game_overと同じ扱い）
-                        game_over = True
-                        force_ended = True  # 強制終了フラグ
-                        # セーブデータに記録
-                        save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
-                        save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
+                    # ESCキーでゲーム途中でも強制終了（設定画面が開いている場合は設定画面を閉じる）
+                    if event.key == pygame.K_ESCAPE:
+                        if show_settings:
+                            # 設定画面を閉じる
+                            show_settings = False
+                            continue
+                        elif not game_over and not game_clear:
+                            print("[INFO] Game forcibly ended by ESC key")
+                            # 強制終了フラグを立てる（game_overと同じ扱い）
+                            game_over = True
+                            force_ended = True  # 強制終了フラグ
+                            # セーブデータに記録
+                            save_system.add_money(current_game_money + int(game_time * MONEY_PER_SURVIVAL_SECOND))
+                            save_system.record_game_end(game_time, player.level, enemies_killed_this_game, player.exp)
                         # 武器使用統計も記録
                         if damage_stats:
                             save_system.record_weapon_usage(damage_stats)
@@ -1120,8 +1129,41 @@ def main():
                                     particles.append(HealEffect(x, y, heal_amount))
                                 player.heal_effect_callback = heal_effect_callback
                                 continue
+                            # Settings
+                            if rects.get('settings') and rects['settings'].collidepoint(mx, my):
+                                show_settings = True
+                                settings_selection = save_system.get_difficulty()
+                                continue
                         except Exception:
                             pass
+                    
+                    # 設定画面のクリック処理
+                    if show_settings and event.button == 1:
+                        # マウス座標を仮想画面座標に変換
+                        mouse_x, mouse_y = event.pos
+                        virtual_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                        virtual_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                        virtual_x = max(0, min(SCREEN_WIDTH, virtual_x))
+                        virtual_y = max(0, min(SCREEN_HEIGHT, virtual_y))
+                        mx, my = int(virtual_x), int(virtual_y)
+                        
+                        from ui.ui import draw_settings_screen
+                        settings_result = draw_settings_screen(screen, save_system, settings_selection, (mx, my))
+                        
+                        # 難易度ボタンのクリック判定
+                        for difficulty, rect in settings_result.get('difficulty_buttons', []):
+                            if rect.collidepoint(mx, my):
+                                save_system.set_difficulty(difficulty)
+                                save_system.save()
+                                settings_selection = difficulty
+                                from constants import DIFFICULTY_NAMES
+                                print(f"[INFO] Difficulty changed to: {DIFFICULTY_NAMES.get(difficulty, 'Unknown')}")
+                                break
+                        
+                        # 閉じるボタンのクリック判定
+                        if settings_result.get('close_button') and settings_result['close_button'].collidepoint(mx, my):
+                            show_settings = False
+                            continue
 
             # キーボードでのレベルアップ選択処理は KEYDOWN イベントで単発処理に変更済み
 
@@ -1543,8 +1585,13 @@ def main():
                             if stage_map:
                                 boss_x, boss_y = stage_map.find_safe_spawn_position(boss_x, boss_y, 50)
                             
+                            # 難易度係数を取得
+                            from constants import DIFFICULTY_MULTIPLIERS
+                            current_difficulty = save_system.get_difficulty()
+                            difficulty_mult = DIFFICULTY_MULTIPLIERS.get(current_difficulty, {"hp": 1.0, "damage": 1.0, "speed": 1.0})
+                            
                             # ボス生成（NoベースでCSVの設定に基づき）
-                            boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type, boss_image_file=boss_config['image_file'], boss_no=boss_no)
+                            boss = Enemy(screen, game_time, spawn_x=boss_x, spawn_y=boss_y, is_boss=True, boss_type=boss_type, boss_image_file=boss_config['image_file'], boss_no=boss_no, difficulty_multiplier=difficulty_mult)
                             enemies.append(boss)
                             
                             # この特定のNoのボスを出現済みリストに追加
@@ -1618,8 +1665,14 @@ def main():
                         enemy_no, rule = spawn_manager.select_enemy_no(game_time)
                         strength_mult, size_mult = spawn_manager.get_enemy_modifiers(rule)
                         
+                        # 難易度係数を取得
+                        from constants import DIFFICULTY_MULTIPLIERS
+                        current_difficulty = save_system.get_difficulty()
+                        difficulty_mult = DIFFICULTY_MULTIPLIERS.get(current_difficulty, {"hp": 1.0, "damage": 1.0, "speed": 1.0})
+                        
                         enemy = Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, spawn_side=side, 
-                                     enemy_no=enemy_no, strength_multiplier=strength_mult, size_multiplier=size_mult)
+                                     enemy_no=enemy_no, strength_multiplier=strength_mult, size_multiplier=size_mult,
+                                     difficulty_multiplier=difficulty_mult)
                         enemies.append(enemy)
                         particles.append(SpawnParticle(enemy.x, enemy.y, enemy.color))
                     spawn_timer = 0
@@ -1840,9 +1893,16 @@ def main():
                                 # 時間に応じたランダムなenemy_noと倍率を選択
                                 enemy_no, rule = spawn_manager.select_enemy_no(game_time)
                                 strength_mult, size_mult = spawn_manager.get_enemy_modifiers(rule)
+                                
+                                # 難易度係数を取得
+                                from constants import DIFFICULTY_MULTIPLIERS
+                                current_difficulty = save_system.get_difficulty()
+                                difficulty_mult = DIFFICULTY_MULTIPLIERS.get(current_difficulty, {"hp": 1.0, "damage": 1.0, "speed": 1.0})
+                                
                                 # 生成は画面外から行うので spawn_x/spawn_y のみ渡す
                                 new_enemies_to_add.append(Enemy(screen, game_time, spawn_x=sx, spawn_y=sy, 
-                                                               enemy_no=enemy_no, strength_multiplier=strength_mult, size_multiplier=size_mult))
+                                                               enemy_no=enemy_no, strength_multiplier=strength_mult, size_multiplier=size_mult,
+                                                               difficulty_multiplier=difficulty_mult))
                                 # この敵は以降の削除チェックをスキップ
                                 continue
                     except Exception:
@@ -2393,11 +2453,23 @@ def main():
                 pass
 
             # UI描画を仮想画面に（毎フレーム描画でちらつき防止）
-            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money, enemy_kill_stats=enemy_kill_stats, boss_kill_stats=boss_kill_stats, force_ended=force_ended)
+            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money, enemy_kill_stats=enemy_kill_stats, boss_kill_stats=boss_kill_stats, force_ended=force_ended, save_system=save_system)
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
             if game_over or game_clear:
                 from ui.ui import draw_end_buttons
                 draw_end_buttons(virtual_screen, game_over, game_clear, end_screen_selection)
+            
+            # 設定画面を描画
+            if show_settings:
+                # マウス座標を仮想画面座標に変換
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                virtual_mouse_x = (mouse_x - offset_x) / scale_factor if scale_factor > 0 else mouse_x
+                virtual_mouse_y = (mouse_y - offset_y) / scale_factor if scale_factor > 0 else mouse_y
+                virtual_mouse_x = max(0, min(SCREEN_WIDTH, virtual_mouse_x))
+                virtual_mouse_y = max(0, min(SCREEN_HEIGHT, virtual_mouse_y))
+                
+                from ui.ui import draw_settings_screen
+                draw_settings_screen(virtual_screen, save_system, settings_selection, (virtual_mouse_x, virtual_mouse_y))
             
             # レベルアップ候補がある場合はポップアップを ui.draw_level_choice に任せる
             # サブアイテム選択 UI を優先して表示

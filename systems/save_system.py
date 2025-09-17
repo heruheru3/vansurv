@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime
 from utils.file_paths import get_save_file_path, ensure_directory_exists
+from constants import DEFAULT_DIFFICULTY
 
 class SaveSystem:
     """ゲームの永続データ（お金、統計など）を管理するクラス"""
@@ -27,6 +28,9 @@ class SaveSystem:
                 "total_enemies_killed": 0,  # 累計撃破数
                 "total_experience_gained": 0,  # 累計経験値
                 "max_level_reached": 1  # 到達最高レベル
+            },
+            "settings": {
+                "difficulty": DEFAULT_DIFFICULTY  # 現在の難易度設定
             },
             "weapon_stats": {
                 # 武器ごとの選択回数
@@ -195,6 +199,18 @@ class SaveSystem:
     def get_weapon_usage_stats(self):
         """武器使用統計を取得"""
         return self.data.get("weapon_usage_stats", {}).copy()
+    
+    # 設定関連メソッド
+    def get_difficulty(self):
+        """現在の難易度設定を取得"""
+        return self.data.get("settings", {}).get("difficulty", DEFAULT_DIFFICULTY)
+    
+    def set_difficulty(self, difficulty):
+        """難易度設定を変更"""
+        if "settings" not in self.data:
+            self.data["settings"] = {}
+        self.data["settings"]["difficulty"] = difficulty
+        print(f"[INFO] Difficulty set to: {difficulty}")
     
     # 実績関連メソッド
     def unlock_achievement(self, achievement_name):

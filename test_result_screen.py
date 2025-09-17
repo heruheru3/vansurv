@@ -212,7 +212,8 @@ def main():
                 game_money=1500,
                 enemy_kill_stats=enemy_kill_stats,
                 boss_kill_stats=boss_kill_stats,
-                force_ended=False
+                force_ended=False,
+                save_system=None  # テストツールでは難易度表示なし
             )
             
             # エンドボタンを描画
