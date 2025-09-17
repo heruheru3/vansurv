@@ -280,9 +280,39 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
             row_y = table_y + 50  # ヘッダーとの間隔を短縮（56から50に）
             row_height = 30  # 行間をさらに短縮（36から30に）
             
+            # 武器の表示名情報を読み込み
+            try:
+                import json
+                from systems.resources import get_resource_path
+                data_path = get_resource_path(os.path.join('data', 'descriptions.json'))
+                with open(data_path, 'r', encoding='utf-8') as f:
+                    desc_data = json.load(f)
+            except Exception:
+                desc_data = {'weapons': {}, 'subitems': {}}
+            
             for wname, dmg in items:
                 dps = dmg / total_time
-                screen.blit(row_font.render(str(wname), True, BLACK), (table_x + 24, row_y))
+                
+                # 武器アイコンを表示（24x24サイズ）
+                icon_x = table_x + 24
+                icon_y = row_y - 2  # 行の中央に配置するため少し上に
+                icon_size = 24
+                
+                # アイコンを表示
+                if icons and wname in icons:
+                    icon_surf = pygame.transform.scale(icons[wname], (icon_size, icon_size))
+                    screen.blit(icon_surf, (icon_x, icon_y))
+                else:
+                    # アイコンがない場合は灰色の四角
+                    pygame.draw.rect(screen, (120, 120, 120), (icon_x, icon_y, icon_size, icon_size))
+                
+                # 武器名を表示（アイコンの右側）
+                weapon_data = desc_data.get('weapons', {}).get(wname, {})
+                display_name = weapon_data.get('name', wname.replace('_', ' ').title())
+                name_x = icon_x + icon_size + 8  # アイコンから8px右
+                screen.blit(row_font.render(display_name, True, BLACK), (name_x, row_y))
+                
+                # ダメージとDPSの表示位置は変更なし
                 screen.blit(row_font.render(str(int(dmg)), True, BLACK), (table_x + 320, row_y))
                 screen.blit(row_font.render(f"{dps:.1f}", True, BLACK), (table_x + 580, row_y))
                 row_y += row_height
@@ -290,7 +320,7 @@ def draw_ui(screen, player, game_time, game_over, game_clear, damage_stats=None,
                     break
 
             total_dmg = sum(stats_to_show.values()) if stats_to_show else 0
-            row_y = table_y + table_h - 25  # マージンをさらに短縮（30から25に）
+            row_y = table_y + table_h - 35  # マージンをさらに短縮（30から25に）
             screen.blit(row_font.render("Total", True, BLACK), (table_x + 24, row_y))
             screen.blit(row_font.render(str(int(total_dmg)), True, BLACK), (table_x + 320, row_y))
             screen.blit(row_font.render(f"{(total_dmg/total_time):.1f}", True, BLACK), (table_x + 580, row_y))

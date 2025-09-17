@@ -47,11 +47,12 @@ def create_test_damage_stats():
     """テスト用の武器ダメージ統計を作成"""
     return {
         "magic_wand": 15420,
-        "fire_ball": 8730,
-        "ice_lance": 12350,
-        "lightning": 5670,
-        "poison_dart": 3240,
-        "wind_blade": 7890,
+        "rotating_book": 9800,  # 魔法の本
+        "stone": 8730,          # ストーン
+        "knife": 12350,         # ナイフ
+        "thunder": 5670,        # サンダー
+        "axe": 3240,           # 斧
+        "whip": 7890,          # ムチ
     }
 
 def create_test_enemy_kill_stats():
@@ -109,9 +110,9 @@ def main():
     pygame.display.set_caption("Result Screen Test Tool")
     clock = pygame.time.Clock()
     
-    # アイコン読み込み
+    # アイコン読み込み（main.pyと同じサイズに合わせる）
     try:
-        icons = load_icons()
+        icons = load_icons(size=16)
     except Exception as e:
         print(f"Warning: Could not load icons: {e}")
         icons = {}
