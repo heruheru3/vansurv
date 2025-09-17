@@ -670,11 +670,28 @@ class Thunder(Weapon):
             except Exception:
                 visible = []
             pool = visible if visible else enemies
-            k = min(len(pool), max(1, effective_num))
-            try:
-                targets = random.sample(pool, k)
-            except Exception:
-                targets = pool[:k]
+            
+            # ボスが存在する場合は、最低1本はボスを狙う
+            boss_enemies = [e for e in pool if getattr(e, 'is_boss', False)]
+            regular_enemies = [e for e in pool if not getattr(e, 'is_boss', False)]
+            
+            targets = []
+            remaining_strikes = effective_num
+            
+            # ボスがいる場合、最低1本はボスを狙う
+            if boss_enemies and remaining_strikes > 0:
+                boss_target = random.choice(boss_enemies)
+                targets.append(boss_target)
+                remaining_strikes -= 1
+            
+            # 残りのサンダーはボス・通常エネミー混合でランダム選択
+            if remaining_strikes > 0 and pool:
+                k = min(len(pool), remaining_strikes)
+                try:
+                    additional_targets = random.sample(pool, k)
+                    targets.extend(additional_targets)
+                except Exception:
+                    targets.extend(pool[:k])
         else:
             targets = []
 
