@@ -1,5 +1,5 @@
 """
-CSVマップ読み込みシステム
+CSVマップ読み込みシスチE��
 80x45マスのマップデータを読み込み、描画する
 """
 
@@ -17,32 +17,32 @@ class MapLoader:
         self.map_width = 0
         self.map_height = 0
         
-        # タイル定義（数字 -> 色のマッピング）
+        # タイル定義�E�数孁E-> 色のマッピング�E�E
         self.tile_colors = {
-            0: MOREDARK_GRAY,    # 暗いグレー（デフォルト）
-            1: DARK_GRAY,        # 濃いグレー
+            0: MOREDARK_GRAY,    # 暗いグレー�E�デフォルト！E
+            1: DARK_GRAY,        # 濁E��グレー
             2: GRAY,             # 通常グレー  
-            3: LIGHT_GRAY,       # 薄いグレー
-            4: (64, 32, 16),     # 茶色（土）
-            5: (32, 64, 32),     # 濃い緑（森）
-            6: (64, 64, 32),     # 黄土色（道）
-            7: (32, 32, 64),     # 青系（水）
-            8: (64, 16, 16),     # 赤系（危険地帯）
+            3: LIGHT_GRAY,       # 薁E��グレー
+            4: (64, 32, 16),     # 茶色�E�土�E�E
+            5: (32, 64, 32),     # 濁E��緑（森�E�E
+            6: (64, 64, 32),     # 黁E��色�E�道�E�E
+            7: (32, 32, 64),     # 青系�E�水�E�E
+            8: (64, 16, 16),     # 赤系�E�危険地帯�E�E
             9: (48, 48, 48),     # 中間グレー
         }
         
-        # ブロッカータイル用の縁色定義（基本色より濃い同系色）
+        # ブロチE��ータイル用の縁色定義�E�基本色より濁E��同系色�E�E
         self.border_colors = {
-            5: (16, 32, 16),     # 森：より濃い緑
-            7: (16, 16, 32),     # 水：より濃い青
-            8: (32, 8, 8),       # 危険地帯：より濃い赤
-            9: (24, 24, 24),     # 石/岩：より濃いグレー
+            5: (16, 32, 16),     # 森�E�より濁E��緁E
+            7: (16, 16, 32),     # 水�E�より濁E��靁E
+            8: (32, 8, 8),       # 危険地帯�E�より濁E��赤
+            9: (24, 24, 24),     # 石/岩�E�より濁E��グレー
         }
     
     def load_csv_map(self, csv_file_path):
         """CSVファイルからマップデータを読み込む"""
         try:
-            # PyInstaller対応のリソースパスを取得
+            # PyInstaller対応�Eリソースパスを取征E
             full_path = get_resource_path(csv_file_path)
             
             if not os.path.exists(full_path):
@@ -52,13 +52,13 @@ class MapLoader:
                 reader = csv.reader(file)
                 self.map_data = []
                 for row in reader:
-                    # 各要素を整数に変換
+                    # 吁E��素を整数に変換
                     int_row = []
                     for cell in row:
                         try:
                             int_row.append(int(cell.strip()))
                         except ValueError:
-                            int_row.append(0)  # 変換できない場合は0
+                            int_row.append(0)  # 変換できなぁE��合�E0
                     self.map_data.append(int_row)
             
             if self.map_data:
@@ -72,7 +72,7 @@ class MapLoader:
             return False
     
     def generate_default_map(self):
-        """デフォルトマップ（市松模様）を生成"""
+        """チE��ォルト�EチE�E�E�市松模様）を生�E"""
         expected_width = WORLD_WIDTH // self.tile_size  # 80
         expected_height = WORLD_HEIGHT // self.tile_size  # 45
         
@@ -93,7 +93,7 @@ class MapLoader:
         return True
     
     def get_tile_at(self, world_x, world_y):
-        """ワールド座標からタイル番号を取得"""
+        """ワールド座標からタイル番号を取征E""
         tile_x = int(world_x // self.tile_size)
         tile_y = int(world_y // self.tile_size)
         
@@ -101,14 +101,14 @@ class MapLoader:
             0 <= tile_x < len(self.map_data[tile_y])):
             return self.map_data[tile_y][tile_x]
         else:
-            return 0  # 範囲外はデフォルトタイル
+            return 0  # 篁E��外�EチE��ォルトタイル
     
     def draw_map(self, screen, camera_x, camera_y):
         """マップを描画"""
         if not self.map_data:
             return
         
-        # 描画範囲を計算
+        # 描画篁E��を計箁E
         start_tile_x = max(0, int(camera_x // self.tile_size))
         end_tile_x = min(self.map_width, int((camera_x + SCREEN_WIDTH) // self.tile_size) + 1)
         start_tile_y = max(0, int(camera_y // self.tile_size))
@@ -127,7 +127,7 @@ class MapLoader:
                 tile_id = row[tile_x]
                 color = self.tile_colors.get(tile_id, self.tile_colors[0])
                 
-                # スクリーン座標を計算
+                # スクリーン座標を計箁E
                 screen_x = tile_x * self.tile_size - camera_x
                 screen_y = tile_y * self.tile_size - camera_y
                 
@@ -135,15 +135,15 @@ class MapLoader:
                 pygame.draw.rect(screen, color, 
                                (screen_x, screen_y, self.tile_size, self.tile_size))
         
-        # ブロッカータイルの縁を描画
+        # ブロチE��ータイルの縁を描画
         self._draw_blocker_borders(screen, camera_x, camera_y, start_tile_x, end_tile_x, start_tile_y, end_tile_y)
     
     def _draw_blocker_borders(self, screen, camera_x, camera_y, start_tile_x, end_tile_x, start_tile_y, end_tile_y):
-        """ブロッカータイル（障害物）の縁を描画"""
-        # ブロッカータイル: 5(森), 7(水), 8(危険地帯), 9(石/岩)
+        """ブロチE��ータイル�E�障害物�E��E縁を描画"""
+        # ブロチE��ータイル: 5(森), 7(水), 8(危険地帯), 9(石/岩)
         blocker_tiles = {5, 7, 8, 9}
         
-        # 画面内のブロッカータイルを収集
+        # 画面冁E�EブロチE��ータイルを収雁E
         screen_blockers = set()
         for tile_y in range(start_tile_y, end_tile_y):
             if tile_y >= len(self.map_data):
@@ -159,21 +159,21 @@ class MapLoader:
                     screen_blockers.add((tile_x, tile_y))
         
         if screen_blockers:
-            # 画面内のブロッカーエリアを検出して縁を描画
+            # 画面冁E�EブロチE��ーエリアを検�Eして縁を描画
             visited = set()
             for tile_pos in screen_blockers:
                 if tile_pos not in visited:
-                    # このブロッカーから連続するエリアを検出
+                    # こ�EブロチE��ーから連続するエリアを検�E
                     region = self._flood_fill_blocker_region(tile_pos[0], tile_pos[1], visited, blocker_tiles)
                     if region:
                         self._draw_blocker_region_border(screen, region, camera_x, camera_y)
     
     def _flood_fill_blocker_region(self, start_x, start_y, visited, blocker_tiles):
-        """指定座標から連続するブロッカーエリアを検出"""
+        """持E��座標から連続するブロチE��ーエリアを検�E"""
         if (start_x, start_y) in visited:
             return set()
         
-        # 開始位置がブロッカータイルかチェック
+        # 開始位置がブロチE��ータイルかチェチE��
         if (start_y >= len(self.map_data) or 
             start_x >= len(self.map_data[start_y]) or 
             self.map_data[start_y][start_x] not in blocker_tiles):
@@ -187,19 +187,19 @@ class MapLoader:
             if (x, y) in visited or (x, y) in region:
                 continue
             
-            # 境界チェック
+            # 墁E��チェチE��
             if (y < 0 or y >= len(self.map_data) or 
                 x < 0 or x >= len(self.map_data[y])):
                 continue
             
-            # ブロッカータイルかチェック
+            # ブロチE��ータイルかチェチE��
             if self.map_data[y][x] not in blocker_tiles:
                 continue
                 
             region.add((x, y))
             visited.add((x, y))
             
-            # 4方向の隣接タイルを探索
+            # 4方向�E隣接タイルを探索
             for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                 nx, ny = x + dx, y + dy
                 if (nx, ny) not in visited:
@@ -208,139 +208,139 @@ class MapLoader:
         return region
     
     def _draw_blocker_region_border(self, screen, region, camera_x, camera_y):
-        """ブロッカーエリアの内側縁を描画"""
+        """ブロチE��ーエリアの冁E�E縁を描画"""
         if not region:
             return
             
         blocker_tiles = {5, 7, 8, 9}
         
-        # このエリアの代表的なタイル種類を決定（最も多いタイル種類を使用）
+        # こ�Eエリアの代表皁E��タイル種類を決定（最も多いタイル種類を使用�E�E
         tile_type_count = {}
         for tile_x, tile_y in region:
             if (tile_y < len(self.map_data) and tile_x < len(self.map_data[tile_y])):
                 tile_id = self.map_data[tile_y][tile_x]
                 tile_type_count[tile_id] = tile_type_count.get(tile_id, 0) + 1
         
-        # 最も多いタイル種類の縁色を使用
+        # 最も多いタイル種類�E縁色を使用
         dominant_tile_id = max(tile_type_count.keys()) if tile_type_count else 9
         border_color = self.border_colors.get(dominant_tile_id, (24, 24, 24))
         
-        # 明るい色を作成（左と上の線用）
+        # 明るぁE��を作�E�E�左と上�E線用�E�E
         def make_lighter_color(color, factor=1.5):
             return tuple(min(255, int(c * factor)) for c in color)
         
-        # 暗い色を作成（凹効果用）
+        # 暗い色を作�E�E��E効果用�E�E
         def make_darker_color(color, factor=0.6):
             return tuple(int(c * factor) for c in color)
         
-        # タイルIDに応じて明暗を決定
-        # エリア5,9: 凸効果（上・左が明るい）
-        # エリア7,8: 凹効果（上・左が暗い）
+        # タイルIDに応じて明暗を決宁E
+        # エリア5,9: 凸効果（上�E左が�Eるい�E�E
+        # エリア7,8: 凹効果（上�E左が暗ぁE��E
         if dominant_tile_id in [7, 8]:
-            # 凹効果：上・左が暗い、下・右が明るい
+            # 凹効果：上�E左が暗ぁE��下�E右が�Eるい
             top_left_color = make_darker_color(border_color)
             bottom_right_color = make_lighter_color(border_color)
         else:
-            # 凸効果：上・左が明るい、下・右が暗い（デフォルト）
+            # 凸効果：上�E左が�Eるい、下�E右が暗ぁE��デフォルト！E
             top_left_color = make_lighter_color(border_color)
             bottom_right_color = border_color
         
-        border_thickness = BORDER_THICKNESS  # 縁の厚さ
+        border_thickness = BORDER_THICKNESS  # 縁�E厚さ
         
         for tile_x, tile_y in region:
             # スクリーン座標でのタイル位置
             screen_x = tile_x * self.tile_size - camera_x
             screen_y = tile_y * self.tile_size - camera_y
             
-            # 画面外の場合はスキップ
+            # 画面外�E場合�EスキチE�E
             if (screen_x < -self.tile_size or screen_x > SCREEN_WIDTH or 
                 screen_y < -self.tile_size or screen_y > SCREEN_HEIGHT):
                 continue
             
-            # このタイルの4辺について、隣接タイルがこのエリア内にない辺に内側縁を描画
+            # こ�Eタイルの4辺につぁE��、E��接タイルがこのエリア冁E��なぁE��に冁E�E縁を描画
             directions = [
-                (0, -1, 'top'),     # 上
-                (0, 1, 'bottom'),   # 下
+                (0, -1, 'top'),     # 丁E
+                (0, 1, 'bottom'),   # 丁E
                 (-1, 0, 'left'),    # 左
                 (1, 0, 'right')     # 右
             ]
             
-            # 境界辺を記録
+            # 墁E��辺を記録
             border_sides = []
             
             for dx, dy, side in directions:
                 neighbor_x = tile_x + dx
                 neighbor_y = tile_y + dy
                 
-                # 隣接タイルがこのエリア内にない場合、この辺は境界
+                # 隣接タイルがこのエリア冁E��なぁE��合、この辺は墁E��
                 if (neighbor_x, neighbor_y) not in region:
                     border_sides.append(side)
             
             for side in border_sides:
                 if side == 'top':
-                    # 上辺の内側縁
+                    # 上辺の冁E�E縁E
                     pygame.draw.rect(screen, top_left_color, 
                                    (screen_x, screen_y, 
                                     self.tile_size, border_thickness))
                 elif side == 'bottom':
-                    # 下辺の内側縁
+                    # 下辺の冁E�E縁E
                     pygame.draw.rect(screen, bottom_right_color, 
                                    (screen_x, screen_y + self.tile_size - border_thickness, 
                                     self.tile_size, border_thickness))
                 elif side == 'left':
-                    # 左辺の内側縁
+                    # 左辺の冁E�E縁E
                     pygame.draw.rect(screen, top_left_color, 
                                    (screen_x, screen_y, 
                                     border_thickness, self.tile_size))
                 elif side == 'right':
-                    # 右辺の内側縁
+                    # 右辺の冁E�E縁E
                     pygame.draw.rect(screen, bottom_right_color, 
                                    (screen_x + self.tile_size - border_thickness, screen_y, 
                                     border_thickness, self.tile_size))
             
-            # 角部分の処理：2つの境界辺が交わる角に矩形を描画
+            # 角部刁E�E処琁E��Eつの墁E��辺が交わる角に矩形を描画
             corner_combinations = [
-                (['top', 'left'], (screen_x, screen_y), top_left_color),  # 左上
-                (['bottom', 'right'], (screen_x + self.tile_size - border_thickness, screen_y + self.tile_size - border_thickness), bottom_right_color)  # 右下
+                (['top', 'left'], (screen_x, screen_y), top_left_color),  # 左丁E
+                (['bottom', 'right'], (screen_x + self.tile_size - border_thickness, screen_y + self.tile_size - border_thickness), bottom_right_color)  # 右丁E
             ]
             
             for corner_sides, corner_pos, corner_color in corner_combinations:
                 if all(side in border_sides for side in corner_sides):
-                    # 角の矩形を描画
+                    # 角�E矩形を描画
                     pygame.draw.rect(screen, corner_color, 
                                    (corner_pos[0], corner_pos[1], border_thickness, border_thickness))
             
-            # 右上と左下の角は斜めカット処理
+            # 右上と左下�E角�E斜めカチE��処琁E
             if all(side in border_sides for side in ['top', 'right']):
-                # 右上角：斜めカット
+                # 右上角：斜めカチE��
                 corner_x = screen_x + self.tile_size - border_thickness
                 corner_y = screen_y
-                # 斜め分割：三角形で描画
+                # 斜め刁E���E�三角形で描画
                 for i in range(border_thickness):
                     for j in range(border_thickness):
                         if i + j < border_thickness:
-                            # 左上三角形部分（上辺の色）
+                            # 左上三角形部刁E��上辺の色�E�E
                             pygame.draw.rect(screen, top_left_color, (corner_x + j, corner_y + i, 1, 1))
                         else:
-                            # 右下三角形部分（右辺の色）
+                            # 右下三角形部刁E��右辺の色�E�E
                             pygame.draw.rect(screen, bottom_right_color, (corner_x + j, corner_y + i, 1, 1))
             
             if all(side in border_sides for side in ['bottom', 'left']):
-                # 左下角：斜めカット
+                # 左下角：斜めカチE��
                 corner_x = screen_x
                 corner_y = screen_y + self.tile_size - border_thickness
-                # 斜め分割：三角形で描画
+                # 斜め刁E���E�三角形で描画
                 for i in range(border_thickness):
                     for j in range(border_thickness):
                         if i + j >= border_thickness:
-                            # 右下三角形部分（下辺の色）
+                            # 右下三角形部刁E��下辺の色�E�E
                             pygame.draw.rect(screen, bottom_right_color, (corner_x + j, corner_y + i, 1, 1))
                         else:
-                            # 左上三角形部分（左辺の色）
+                            # 左上三角形部刁E��左辺の色�E�E
                             pygame.draw.rect(screen, top_left_color, (corner_x + j, corner_y + i, 1, 1))
     
     def create_sample_csv(self, output_path):
-        """サンプルCSVファイルを作成"""
+        """サンプルCSVファイルを作�E"""
         expected_width = WORLD_WIDTH // self.tile_size  # 80
         expected_height = WORLD_HEIGHT // self.tile_size  # 45
         
@@ -351,17 +351,17 @@ class MapLoader:
                 for y in range(expected_height):
                     row = []
                     for x in range(expected_width):
-                        # サンプルパターン：境界線、中央部、角にアクセント
+                        # サンプルパターン�E�墁E��線、中央部、角にアクセンチE
                         if (x == 0 or x == expected_width-1 or 
                             y == 0 or y == expected_height-1):
-                            row.append(8)  # 境界は赤系
+                            row.append(8)  # 墁E��は赤系
                         elif (x % 10 == 0 or y % 10 == 0):
-                            row.append(6)  # グリッド線は黄土色
+                            row.append(6)  # グリチE��線�E黁E��色
                         elif (abs(x - expected_width//2) < 3 and 
                               abs(y - expected_height//2) < 3):
                             row.append(5)  # 中央は緑系
                         elif (x + y) % 2 == 0:
-                            row.append(1)  # 市松模様
+                            row.append(1)  # 市松模槁E
                         else:
                             row.append(0)
                     writer.writerow(row)

@@ -500,8 +500,8 @@ class Knife(Weapon):
         movement_dy = getattr(player, 'movement_dy', 0.0)
         is_actually_moving = (movement_dx != 0 or movement_dy != 0)
         
-        # マウスがクリックされているかチェック
-        mouse_pressed = pygame.mouse.get_pressed()[0]
+        # マウス位置を常にチェック（クリック不要）
+        mouse_pressed = pygame.mouse.get_pressed()[0] or True
         
         if has_keyboard_input and is_actually_moving:
             # キーボード操作で実際に移動中：移動方向ベクトルを使用

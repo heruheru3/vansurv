@@ -209,7 +209,7 @@ class Player:
             self.movement_dx = 0.0
             self.movement_dy = 0.0
 
-        if pygame.mouse.get_pressed()[0]:
+        if pygame.mouse.get_pressed()[0] or True:  # 常にマウス位置に追従
             if get_virtual_mouse_pos:
                 # 仮想マウス座標を使用
                 mouse_x, mouse_y = get_virtual_mouse_pos()

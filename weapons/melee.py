@@ -71,8 +71,8 @@ class Whip(Weapon):
                         input_direction = 'left' if dx < 0 else 'right'
                     else:
                         input_direction = 'up' if dy < 0 else 'down'
-            # 左クリックのマウス移動も考慮
-            if input_direction is None and pygame.mouse.get_pressed()[0]:
+            # マウス移動も考慮（クリック不要）
+            if input_direction is None and (pygame.mouse.get_pressed()[0] or True):
                 if get_virtual_mouse_pos:
                     # 仮想マウス座標を使用
                     mx, my = get_virtual_mouse_pos()
