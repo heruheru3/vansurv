@@ -131,7 +131,7 @@ class DebugManager:
         print(f"[INFO] ENABLE_PERFORMANCE_LOG set to {ENABLE_PERFORMANCE_LOG}")
     
     def draw_fps(self, screen, fps_values, enemies, experience_gems, player):
-        """FPS情報を描画"""
+        """FPS情報を描画（左下表示）"""
         if not self.show_fps or not self.fps_font or len(fps_values) == 0:
             return
         
@@ -145,24 +145,20 @@ class DebugManager:
         pickup_range = player.get_gem_pickup_range() if hasattr(player, 'get_gem_pickup_range') else 0
         pickup_level = player.get_magnet_level() if hasattr(player, 'get_magnet_level') else 0
         
-        # 統計情報
-        info_lines = [
-            f"FPS: {avg_fps:.1f}",
-            f"Enemies: {len(enemies)}",
-            f"Gems: {len(experience_gems)}",
-            f"Projectiles: {total_projectiles}",
-            f"Pickup Range: +{pickup_range:.0f}px (Lv{pickup_level})"
-        ]
+        # 統計情報を1行にまとめる（左下表示）
+        info_text = f"FPS: {avg_fps:.1f} | Enemies: {len(enemies)} | Bullets: {total_projectiles} | Gems: {len(experience_gems)} | Range: {pickup_range:.1f}px (Lv{pickup_level})"
         
-        y = 10
-        for line in info_lines:
-            text_surf = self.fps_font.render(line, True, (255, 255, 255))
-            # 背景を追加して見やすく
-            bg_rect = text_surf.get_rect(topleft=(10, y))
-            bg_rect.inflate_ip(10, 4)
-            pygame.draw.rect(screen, (0, 0, 0, 128), bg_rect)
-            screen.blit(text_surf, (10, y))
-            y += 22
+        text_surf = self.fps_font.render(info_text, True, (255, 255, 255))
+        # 左下に配置
+        text_rect = text_surf.get_rect(bottomleft=(10, screen.get_height() - 10))
+        
+        # 半透明背景
+        bg_rect = text_rect.inflate(8, 4)
+        bg_surf = pygame.Surface((bg_rect.width, bg_rect.height))
+        bg_surf.set_alpha(128)
+        bg_surf.fill((0, 0, 0))
+        screen.blit(bg_surf, bg_rect.topleft)
+        screen.blit(text_surf, text_rect)
     
     def draw_debug_info(self, screen, player, camera_x, camera_y):
         """デバッグ情報を描画"""
