@@ -616,8 +616,13 @@ def main():
                         try:
                             is_fullscreen = not is_fullscreen
                             if is_fullscreen:
-                                # フルスクリーンモードに切り替え
-                                screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                                # フルスクリーンモードに切り替え（ハードウェアアクセラレーション有効）
+                                try:
+                                    # まずHWSURFACEを試みる（高速）
+                                    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+                                except:
+                                    # 失敗したら通常のフルスクリーン
+                                    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                                 current_size = screen.get_size()
                                 print(f"[INFO] Switched to fullscreen: {current_size}")
                             else:
@@ -2345,20 +2350,47 @@ def main():
                 virtual_mouse_y = max(0, min(SCREEN_HEIGHT, virtual_mouse_y))
                 draw_level_choice(virtual_screen, player, ICONS, virtual_mouse_pos=(int(virtual_mouse_x), int(virtual_mouse_y)))
 
-            # 仮想画面を実際の画面にスケールして転送
+            # 仮想画面を実際の画面にスケールして転送（最適化版）
             screen.fill((0, 0, 0))  # レターボックス部分を黒で塗りつぶし
             
             if scale_factor != 1.0:
-                # スケール済みサーフェスをキャッシュして再利用
                 scaled_size = (int(SCREEN_WIDTH * scale_factor), int(SCREEN_HEIGHT * scale_factor))
-                if scaled_surface is None or scaled_surface.get_size() != scaled_size:
-                    # キャッシュが無効またはサイズが変わった場合のみ新しいサーフェスを作成
-                    scaled_surface = pygame.Surface(scaled_size)
-                    print(f"[INFO] Created scaled surface cache: {scaled_size}")
                 
-                # キャッシュされたサーフェスにスケールして描画（最適化版）
-                pygame.transform.scale(virtual_screen, scaled_size, scaled_surface)
-                screen.blit(scaled_surface, (offset_x, offset_y))
+                # 整数倍スケールかチェック（高速化）
+                is_integer_scale = (scale_factor == int(scale_factor))
+                
+                if is_integer_scale and int(scale_factor) == 2:
+                    # 2倍スケールは最速のscale2x使用
+                    try:
+                        scaled_surf = pygame.transform.scale2x(virtual_screen)
+                        screen.blit(scaled_surf, (offset_x, offset_y))
+                    except:
+                        # scale2xが使えない場合は通常スケール
+                        scaled_surf = pygame.transform.scale(virtual_screen, scaled_size)
+                        screen.blit(scaled_surf, (offset_x, offset_y))
+                elif SCALE_DIRECT_TO_SCREEN and scale_factor > 1.5 and offset_x >= 0 and offset_y >= 0:
+                    # 大きなスケール時は直接screen上にスケール（中間サーフェス不要）
+                    # これにより全画面時のメモリコピーを削減
+                    try:
+                        target_rect = pygame.Rect(offset_x, offset_y, scaled_size[0], scaled_size[1])
+                        if target_rect.right <= screen.get_width() and target_rect.bottom <= screen.get_height():
+                            pygame.transform.scale(virtual_screen, scaled_size, screen.subsurface(target_rect))
+                        else:
+                            # subsurfaceが作れない場合は通常の方法
+                            scaled_surf = pygame.transform.scale(virtual_screen, scaled_size)
+                            screen.blit(scaled_surf, (offset_x, offset_y))
+                    except:
+                        # エラー時は通常の方法
+                        scaled_surf = pygame.transform.scale(virtual_screen, scaled_size)
+                        screen.blit(scaled_surf, (offset_x, offset_y))
+                else:
+                    # 小さなスケール時は通常の方法
+                    if scaled_surface is None or scaled_surface.get_size() != scaled_size:
+                        scaled_surface = pygame.Surface(scaled_size)
+                        print(f"[INFO] Created scaled surface cache: {scaled_size}")
+                    
+                    pygame.transform.scale(virtual_screen, scaled_size, scaled_surface)
+                    screen.blit(scaled_surface, (offset_x, offset_y))
             else:
                 # 等倍で描画（キャッシュ不要）
                 screen.blit(virtual_screen, (offset_x, offset_y))

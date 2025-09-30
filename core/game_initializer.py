@@ -47,13 +47,27 @@ class GameInitializer:
         return display_info
     
     def create_display(self):
-        """ディスプレイ設定"""
+        """ディスプレイ設定（最適化版）"""
         windowed_size = (SCREEN_WIDTH, SCREEN_HEIGHT)
-        self.screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
+        
+        # ハードウェアアクセラレーションを試みる
+        try:
+            if USE_HARDWARE_ACCELERATION:
+                self.screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE | pygame.HWSURFACE | pygame.DOUBLEBUF)
+                print("[INFO] Hardware acceleration enabled")
+            else:
+                self.screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
+        except:
+            # ハードウェアアクセラレーションが使えない場合は通常モード
+            self.screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
+            print("[WARNING] Hardware acceleration not available, using software rendering")
+        
         pygame.display.set_caption("Van Survivor Clone")
         
-        # 仮想画面
+        # 仮想画面（convert()で高速化）
         self.virtual_screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        if self.screen:
+            self.virtual_screen = self.virtual_screen.convert(self.screen)
         
         return {
             'screen': self.screen,

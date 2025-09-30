@@ -12,6 +12,10 @@ MIN_FPS_THRESHOLD = 45          # この値を下回ったら描画最適化を�
 DELTA_TIME_CAP = 50.0           # デルタタイムの上限（ミリ秒、約3フレーム相当）
 DELTA_TIME_SMOOTHING = 0.1      # デルタタイムスムージング係数（0.0-1.0、小さいほど滑らか）
 
+# スケーリング最適化設定
+USE_HARDWARE_ACCELERATION = True  # ハードウェアアクセラレーションを使用
+SCALE_DIRECT_TO_SCREEN = True     # 大きなスケール時にスクリーンに直接描画（全画面高速化）
+
 # ワールドサイズ（画面の4倍）
 WORLD_WIDTH = SCREEN_WIDTH * 4
 WORLD_HEIGHT = SCREEN_HEIGHT * 4
