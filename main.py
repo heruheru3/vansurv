@@ -99,6 +99,11 @@ from core.game_logic import (spawn_enemies, handle_enemy_death, handle_bomb_item
                        update_difficulty, handle_player_level_up, collect_experience_gems, collect_items)
 from core.collision import check_player_enemy_collision, check_attack_enemy_collision
 from map import MapLoader
+
+# リファクタリングされた新モジュール
+from core.event_handler import EventHandler
+from core.game_initializer import GameInitializer
+from core.debug_manager import DebugManager
 from systems.save_system import SaveSystem
 from systems.performance_logger import PerformanceLogger
 
@@ -181,103 +186,55 @@ def draw_performance_stats(surface, font):
 def main():
     global DEBUG_MODE
     
-    # マルチプロセシング対応の初期化
-    mp.set_start_method('spawn', force=True)  # Windowsでの安定性向上
+    # ゲーム初期化マネージャーを作成
+    initializer = GameInitializer()
     
-    # 初期化
-    pygame.init()
+    # 完全初期化を実行（Pygame、ディスプレイ、リソース、オーディオなど）
+    init_result = initializer.full_initialization()
     
-    # ステージを最初に初期化（プレイヤーの安全な開始位置決定のため、マップが有効な場合のみ）
-   
-    # ディスプレイ情報取得（フルスクリーン切替に使用）
-    try:
-        display_info = pygame.display.Info()
-    except Exception:
-        display_info = None
-
-    # ウィンドウサイズ（通常モード）
-    windowed_size = (SCREEN_WIDTH, SCREEN_HEIGHT)
-    current_size = windowed_size
-    # フルスクリーンフラグ（ウィンドウフルスクリーンタイプのトグルに使用）
-    is_fullscreen = False
-
-    # 初期はリサイズ可能なウィンドウモードで開始
-    screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
-    pygame.display.set_caption("Van Survivor Clone")
-    
-    # 仮想画面（ゲームロジックは常にこのサイズで動作）
-    virtual_screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    # 初期化結果を取得
+    screen = init_result['screen']
+    virtual_screen = init_result['virtual_screen']
+    windowed_size = init_result['windowed_size']
+    is_fullscreen = init_result['is_fullscreen']
+    display_info = init_result['display_info']
+    ICONS = init_result['ICONS']
+    save_system = init_result['save_system']
+    performance_logger = init_result['performance_logger']
+    spawn_manager = init_result['spawn_manager']
+    stage_map = init_result['stage_map']
     
     # スケーリング係数（描画用）とキャッシュサーフェス
+    current_size = windowed_size
     scale_factor = 1.0
     offset_x = 0
     offset_y = 0
     scaled_surface = None  # スケール済みサーフェスのキャッシュ
-
-    # リソースをプリロード（アイコン・フォント・サウンド等）
-    preload_res = resources.preload_all(icon_size=16)
-    ICONS = preload_res.get('icons', {})
-
-    # Start background music (level1) if available
-    try:
-        # from audio import audio (先頭でインポート済み)
-        audio.play_bgm('level1')
-    except Exception:
-        pass
-
-    # デバッグ: 起動時にオーディオ初期化と簡易再生テストを行う（問題切り分け用）
-    try:
-        pass
-    except Exception:
-        pass
-
-    # --- ボス設定のプリロード: ボス画像を事前に読み込んでおく（スポーン時のIO/変換を避ける）
-    try:
-        from core.enemy import Enemy
-        # get_all_boss_configs 内で load_boss_stats が呼ばれる
-        boss_configs = Enemy.get_all_boss_configs()
-        # 画像を一通りキャッシュしておく（Noベースのエントリのみ）
-        for key, cfg in boss_configs.items():
-            if isinstance(key, int):  # Noベースのエントリのみ処理
-                try:
-                    boss_no = key
-                    boss_type = cfg['type']
-                    Enemy._load_enemy_image(boss_type, 1, cfg.get('image_file'), boss_no=boss_no)
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-    # セーブシステムを初期化
-    save_system = SaveSystem()
-    print(f"[INFO] Save system initialized. Current money: {save_system.get_money()}G")
-
-    # パフォーマンスログシステムを初期化
-    performance_logger = PerformanceLogger()
-    log_timer = 0.0  # ログ出力タイマー
+    
+    # パフォーマンスログタイマー
+    log_timer = 0.0
 
     clock = pygame.time.Clock()
     # FPSカウンター用
     fps_values = []
     fps_update_timer = 0.0
     
-    # 画面右下に小さなプレイヤーステータスを表示するかどうかのフラグ（F4でトグル）
-    show_status = True
-    # デバッグ表示フラグ（F5でトグル：攻撃範囲＋敵の当たり判定）
-    show_debug_visuals = False
+    # デバッグマネージャーの初期化
+    debug_manager = DebugManager()
+    
+    # デバッグ用フォント（下位互換性のため保持）
     try:
         debug_font = pygame.font.SysFont(None, 14)
-        fps_font = pygame.font.SysFont(None, 20)  # FPS表示用フォント
+        fps_font = pygame.font.SysFont(None, 20)
     except Exception:
         try:
-            # システムフォントが使えない場合はデフォルトフォントを使用
             debug_font = pygame.font.Font(None, 14)
             fps_font = pygame.font.Font(None, 20)
         except Exception:
             debug_font = None
             fps_font = None
 
-    # カメラ初期値とスムージング係数（0.0: 固定、1.0: 即時追従）
+    # カメラ初期化（GameInitializerで設定済み）
     camera_x = 0.0
     camera_y = 0.0
     CAMERA_LERP = 0.18
@@ -289,20 +246,8 @@ def main():
     show_settings = False
     settings_selection = None  # 選択中の難易度
     
-    # エネミースポーンマネージャーの初期化
-    try:
-        spawn_manager = EnemySpawnManager()
-    except Exception as e:
-        print(f"ERROR: Failed to initialize EnemySpawnManager: {e}")
-        pygame.quit()
-        sys.exit(1)
-    
     # エンド画面のキーボード選択状態
     end_screen_selection = 0  # 0: Restart (left), 1: Continue (right)
-
-    # ステージマップのインスタンスを作成
-    from ui.stage import StageMap
-    stage_map = StageMap()
 
     # マルチプロセシング対応の並列処理関数
     def aggressive_parallel_update_enemies(enemies, player_data, dt, camera_data, map_loader):
@@ -535,6 +480,9 @@ def main():
     player.heal_effect_callback = heal_effect_callback
 
     # メインゲームループ
+    # イベントハンドラーの初期化（ループ外で一度だけ）
+    event_handler = EventHandler()
+    
     running = True
     frame_count = 0  # フレームカウンターを初期化
     
@@ -611,102 +559,33 @@ def main():
                 if event.type == pygame.QUIT:
                     running = False
                 elif event.type == pygame.VIDEORESIZE:
-                    # ウィンドウリサイズ処理（アスペクト比16:9を維持）
-                    new_width, new_height = event.w, event.h
-                    
-                    # 最小サイズを元のサイズの半分に制限
-                    min_width = SCREEN_WIDTH // 2
-                    min_height = SCREEN_HEIGHT // 2
-                    new_width = max(new_width, min_width)
-                    new_height = max(new_height, min_height)
-                    
-                    # アスペクト比を維持するためのスケール計算
-                    target_aspect = SCREEN_WIDTH / SCREEN_HEIGHT  # 16:9 = 1.777...
-                    current_aspect = new_width / new_height
-                    
-                    if current_aspect > target_aspect:
-                        # ウィンドウが横に広すぎる場合、高さを基準にする
-                        scale_factor = new_height / SCREEN_HEIGHT
-                        scaled_width = int(SCREEN_WIDTH * scale_factor)
-                        scaled_height = new_height
-                        offset_x = (new_width - scaled_width) // 2
-                        offset_y = 0
-                    else:
-                        # ウィンドウが縦に長すぎる場合、幅を基準にする
-                        scale_factor = new_width / SCREEN_WIDTH
-                        scaled_width = new_width
-                        scaled_height = int(SCREEN_HEIGHT * scale_factor)
-                        offset_x = 0
-                        offset_y = (new_height - scaled_height) // 2
-                    
-                    # スケール済みサーフェスのキャッシュをクリア
-                    scaled_surface = None
-                    
-                    current_size = (new_width, new_height)
-                    screen = pygame.display.set_mode(current_size, pygame.RESIZABLE)
+                    # ウィンドウイベントをEventHandlerで処理
+                    resize_result = event_handler.handle_window_events(
+                        event, is_fullscreen, windowed_size, display_info
+                    )
+                    if resize_result:
+                        scale_factor = resize_result['scale_factor']
+                        offset_x = resize_result['offset_x']
+                        offset_y = resize_result['offset_y']
+                        scaled_surface = None
+                        current_size = resize_result['current_size']
+                        screen = pygame.display.set_mode(current_size, pygame.RESIZABLE)
                     
                 elif event.type == pygame.KEYDOWN:
-                    # デバッグログのオン/オフ切り替え（F3）
-                    if event.key == pygame.K_F3:
-                        DEBUG_MODE = not DEBUG_MODE
-                        # 他モジュールで直接 DEBUG を参照している箇所があるため、読み込まれているモジュール内の DEBUG 変数を一括更新する
-                        try:
-                            for m in list(sys.modules.values()):
-                                try:
-                                    setattr(m, 'DEBUG', DEBUG_MODE)
-                                except Exception:
-                                    pass
-                        except Exception:
-                            pass
-                        print(f"[INFO] DEBUG_MODE set to {DEBUG_MODE}")
-                        continue
-
-                    # プレイヤーステータス表示のオン/オフ切り替え（F4）
-                    if event.key == pygame.K_F4:
-                        show_status = not show_status
-                        print(f"[INFO] show_status set to {show_status}")
-                        continue
-
-                    # デバッグ表示のトグル（F5：攻撃範囲＋敵の当たり判定）
-                    if event.key == pygame.K_F5:
-                        show_debug_visuals = not show_debug_visuals
-                        print(f"[INFO] show_debug_visuals set to {show_debug_visuals}")
-                        continue
-
-                    # FPS表示のトグル（F6）
-                    if event.key == pygame.K_F6:
-                        global SHOW_FPS
-                        SHOW_FPS = not SHOW_FPS
-                        print(f"[INFO] SHOW_FPS set to {SHOW_FPS}")
-                        continue
-
-                    if event.key == pygame.K_F7:
-                        global SHOW_PICKUP_RANGE
-                        SHOW_PICKUP_RANGE = not SHOW_PICKUP_RANGE
-                        print(f"[INFO] SHOW_PICKUP_RANGE set to {SHOW_PICKUP_RANGE}")
-                        continue
-
-                    # 並列処理のオン/オフ切り替え（F8）
-                    if event.key == pygame.K_F8:
-                        global PARALLEL_PROCESSING_ENABLED
-                        PARALLEL_PROCESSING_ENABLED = not PARALLEL_PROCESSING_ENABLED
-                        performance_stats['parallel_enabled'] = PARALLEL_PROCESSING_ENABLED
-                        print(f"[INFO] PARALLEL_PROCESSING_ENABLED set to {PARALLEL_PROCESSING_ENABLED}")
-                        continue
-
-                    # パフォーマンス統計表示のオン/オフ切り替え（F9）
-                    if event.key == pygame.K_F9:
-                        global SHOW_PERFORMANCE_STATS
-                        SHOW_PERFORMANCE_STATS = not SHOW_PERFORMANCE_STATS
-                        print(f"[INFO] SHOW_PERFORMANCE_STATS set to {SHOW_PERFORMANCE_STATS}")
-                        continue
-
-                    # パフォーマンスログのオン/オフ切り替え（F10）
-                    if event.key == pygame.K_F10:
-                        enabled = performance_logger.toggle_logging()
-                        print(f"[INFO] Performance logging {'enabled' if enabled else 'disabled'}")
-                        if enabled:
-                            print(f"[INFO] Log file: {performance_logger.log_file}")
+                    # デバッグキー（F3-F10）の処理をDebugManagerに委譲
+                    if event.key in (pygame.K_F3, pygame.K_F4, pygame.K_F5, pygame.K_F6, 
+                                      pygame.K_F7, pygame.K_F8, pygame.K_F9, pygame.K_F10):
+                        # DebugManagerでデバッグキーを処理
+                        debug_manager.handle_debug_keys(event)
+                        
+                        # F10（パフォーマンスログ）の場合は追加処理
+                        if event.key == pygame.K_F10:
+                            enabled = performance_logger.toggle_logging()
+                            if enabled:
+                                print(f"[INFO] Log file: {performance_logger.log_file}")
+                        
+                        # DEBUG_MODEの同期（下位互換性のため）
+                        DEBUG_MODE = debug_manager.debug_mode
                         continue
 
                     # ESCキーでゲーム途中でも強制終了（設定画面が開いている場合は設定画面を閉じる）
@@ -2367,7 +2246,8 @@ def main():
             player.draw(world_surf, int_cam_x, int_cam_y)
 
             # ジェム回収範囲の可視化（デバッグ用）
-            if SHOW_PICKUP_RANGE:
+            # 回収範囲の表示（DebugManagerで管理）
+            if debug_manager.should_show_pickup_range():
                 try:
                     pickup_range = player.get_gem_pickup_range() if hasattr(player, 'get_gem_pickup_range') else 0
                     player_screen_x = int(player.x - int_cam_x)
@@ -2392,48 +2272,21 @@ def main():
                 except Exception:
                     pass
 
-            # デバッグ表示: 攻撃範囲と敵の当たり判定の可視化（world_surf に描画）
-            if show_debug_visuals:
-                try:
-                    # 攻撃エフェクトの範囲を例示（黄色い円）
-                    for atk in player.active_attacks:
+            # デバッグ表示: 攻撃範囲と敵の当たり判定の可視化（DebugManagerで処理）
+            if debug_manager.should_show_debug_visuals():
+                debug_manager.draw_debug_info(world_surf, player, int_cam_x, int_cam_y)
+                # 敵の当たり判定も表示
+                for e in enemies:
+                    try:
+                        ex = int(e.x - int_cam_x)
+                        ey = int(e.y - int_cam_y)
+                        rs = int(getattr(e, 'size', 12))
                         try:
-                            ax = int(atk.x - int_cam_x)
-                            ay = int(atk.y - int_cam_y)
-                            w = int(getattr(atk, 'size_x', getattr(atk, 'size', 16) * 2))
-                            h = int(getattr(atk, 'size_y', getattr(atk, 'size', 16) * 2))
-                            tx = ax - w // 2
-                            ty = ay - h // 2
-                            s = pygame.Surface((max(1, w), max(1, h)), pygame.SRCALPHA)
-                            s.fill((255, 255, 0, 40))
-                            try:
-                                pygame.draw.rect(s, (255, 200, 0, 180), (0, 0, w, h), 2)
-                            except Exception:
-                                pass
-                            world_surf.blit(s, (tx, ty))
-                            if debug_font:
-                                t = str(getattr(atk, 'type', '?'))
-                                try:
-                                    txt = debug_font.render(t, True, (220, 220, 60))
-                                    world_surf.blit(txt, (ax + 6, ay - 6))
-                                except Exception:
-                                    pass
+                            pygame.draw.circle(world_surf, (255, 80, 80, 160), (ex, ey), rs, 2)
                         except Exception:
-                            pass
-                    # 敵の当たり判定も表示
-                    for e in enemies:
-                        try:
-                            ex = int(e.x - int_cam_x)
-                            ey = int(e.y - int_cam_y)
-                            rs = int(getattr(e, 'size', 12))
-                            try:
-                                pygame.draw.circle(world_surf, (255, 80, 80, 160), (ex, ey), rs, 2)
-                            except Exception:
-                                pygame.draw.circle(world_surf, (255, 80, 80), (ex, ey), rs, 2)
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+                            pygame.draw.circle(world_surf, (255, 80, 80), (ex, ey), rs, 2)
+                    except Exception:
+                        pass
 
             # ワールドを仮想画面にブリット
             virtual_screen.blit(world_surf, (0, 0))
@@ -2453,7 +2306,7 @@ def main():
                 pass
 
             # UI描画を仮想画面に（毎フレーム描画でちらつき防止）
-            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=show_status, game_money=current_game_money, enemy_kill_stats=enemy_kill_stats, boss_kill_stats=boss_kill_stats, force_ended=force_ended, save_system=save_system)
+            draw_ui(virtual_screen, player, game_time, game_over, game_clear, damage_stats, ICONS, show_status=debug_manager.should_show_status(), game_money=current_game_money, enemy_kill_stats=enemy_kill_stats, boss_kill_stats=boss_kill_stats, force_ended=force_ended, save_system=save_system)
             # エンド画面のボタンを描画（描画だけでクリックはイベントハンドラで処理）
             if game_over or game_clear:
                 from ui.ui import draw_end_buttons
@@ -2510,96 +2363,11 @@ def main():
                 # 等倍で描画（キャッシュ不要）
                 screen.blit(virtual_screen, (offset_x, offset_y))
 
-            # FPS表示（実画面の左下に直接描画）
-            if SHOW_FPS and fps_font and len(fps_values) > 0:
-                # 過去のFPS値の平均を計算
-                avg_fps = sum(fps_values[-30:]) / len(fps_values[-30:])  # 直近30フレーム
-                
-                # 弾丸数をカウント
-                total_projectiles = sum(len(enemy.get_projectiles()) for enemy in enemies)
-                
-                # 回収範囲情報を取得
-                pickup_range = player.get_gem_pickup_range() if hasattr(player, 'get_gem_pickup_range') else 0
-                pickup_level = player.get_magnet_level() if hasattr(player, 'get_magnet_level') else 0
-                
-                # 統計情報をまとめて表示
-                fps_text = fps_font.render(f"FPS: {avg_fps:.1f} | Enemies: {len(enemies)} | Bullets: {total_projectiles} | Gems: {len(experience_gems)} | Particles: {len(particles)} | Range: {pickup_range:.1f}px (Lv{pickup_level})", True, (255, 255, 255))
-                fps_rect = fps_text.get_rect()
-                fps_rect.bottomleft = (10, screen.get_height() - 10)
-                
-                # 敵の統計情報を集計
-                enemy_stats = {}
-                projectile_stats = {}
-                for enemy in enemies:
-                    behavior_type = enemy.behavior_type
-                    enemy_level = enemy.enemy_type
-                    key = f"{behavior_type}-{enemy_level}"
-                    enemy_stats[key] = enemy_stats.get(key, 0) + 1
-                    
-                    # 弾丸の統計も集計
-                    projectiles = enemy.get_projectiles()
-                    if projectiles:
-                        projectile_stats[behavior_type] = projectile_stats.get(behavior_type, 0) + len(projectiles)
-                
-                # 統計情報のテキストを作成
-                stat_lines = []
-                behavior_names = {1: "Chase", 2: "Direct", 3: "Shoot", 4: "Turret"}
-                for behavior_type in [1, 2, 3, 4]:
-                    type_counts = []
-                    for level in [1, 2, 3, 4, 5]:
-                        key = f"{behavior_type}-{level}"
-                        count = enemy_stats.get(key, 0)
-                        if count > 0:
-                            type_counts.append(f"Lv{level}:{count}")
-                    
-                    if type_counts:
-                        type_name = behavior_names.get(behavior_type, f"Type{behavior_type}")
-                        bullets_info = ""
-                        if behavior_type in projectile_stats:
-                            bullets_info = f" (Bullets:{projectile_stats[behavior_type]})"
-                        stat_lines.append(f"{type_name} {' '.join(type_counts)}{bullets_info}")
-                
-                # アイテム統計も追加
-                if len(items) > 0:
-                    item_counts = {}
-                    for item in items:
-                        item_counts[item.type] = item_counts.get(item.type, 0) + 1
-                    item_info = " | ".join([f"{k}:{v}" for k, v in item_counts.items()])
-                    stat_lines.append(f"Items: {item_info}")
-                
-                # FPS表示
-                bg_rect = fps_rect.inflate(8, 4)
-                # 半透明背景用のサーフェス作成
-                bg_surf = pygame.Surface((bg_rect.width, bg_rect.height))
-                bg_surf.set_alpha(128)
-                bg_surf.fill((0, 0, 0))
-                screen.blit(bg_surf, bg_rect.topleft)
-                screen.blit(fps_text, fps_rect)
-                
-                # 敵統計表示
-                y_offset = fps_rect.top - 5
-                for line in stat_lines:
-                    if y_offset < 20:  # 画面上部に近づいたら表示を停止
-                        break
-                    stat_text = fps_font.render(line, True, (255, 255, 255))
-                    stat_rect = stat_text.get_rect()
-                    stat_rect.bottomleft = (10, y_offset)
-                    
-                    stat_bg_rect = stat_rect.inflate(8, 4)
-                    # 半透明背景用のサーフェス作成
-                    stat_bg_surf = pygame.Surface((stat_bg_rect.width, stat_bg_rect.height))
-                    stat_bg_surf.set_alpha(128)
-                    stat_bg_surf.fill((0, 0, 0))
-                    screen.blit(stat_bg_surf, stat_bg_rect.topleft)
-                    screen.blit(stat_text, stat_rect)
-                    
-                    y_offset = stat_rect.top - 5
-                
+            # FPS表示とデバッグ情報の描画（DebugManagerに委譲）
+            if debug_manager.show_fps and len(fps_values) > 0:
+                debug_manager.draw_fps(screen, fps_values, enemies, experience_gems, player)
                 # パフォーマンス統計の表示（F9でオン/オフ）
                 draw_performance_stats(screen, fps_font)
-                
-                # 全体を一度に更新
-                update_rect = pygame.Rect(0, 0, 300, screen.get_height() - y_offset + 20)
 
             # 描画処理の終了時間を記録（高精度）
             render_end_time = time.perf_counter()
