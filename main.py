@@ -6,6 +6,8 @@ import os
 import time
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+import ctypes
+import ctypes.wintypes
 from constants import *
 from core.audio import audio
 
@@ -210,6 +212,9 @@ def main():
     offset_x = 0
     offset_y = 0
     scaled_surface = None  # スケール済みサーフェスのキャッシュ
+    
+    # ウィンドウ位置の記憶（フルスクリーン切り替え用）
+    saved_window_pos = None
     
     # パフォーマンスログタイマー
     log_timer = 0.0
@@ -616,6 +621,23 @@ def main():
                         try:
                             is_fullscreen = not is_fullscreen
                             if is_fullscreen:
+                                # 現在のウィンドウ位置を保存
+                                try:
+                                    hwnd = pygame.display.get_wm_info()['window']
+                                    rect = ctypes.wintypes.RECT()
+                                    ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                                    saved_window_pos = (rect.left, rect.top)
+                                except Exception:
+                                    saved_window_pos = None
+                                
+                                # フルスクリーン前にウィンドウを(0,0)に移動（Pygame内部のウィンドウ位置記憶をリセット）
+                                try:
+                                    hwnd = pygame.display.get_wm_info()['window']
+                                    # SWP_NOZORDER(0x0004): Z順序を変更しない, SWP_NOACTIVATE(0x0010): アクティブ化しない
+                                    ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, windowed_size[0], windowed_size[1], 0x0004 | 0x0010)
+                                except Exception:
+                                    pass
+                                
                                 # フルスクリーンモードに切り替え（ハードウェアアクセラレーション有効）
                                 try:
                                     # まずHWSURFACEを試みる（高速）
@@ -625,6 +647,26 @@ def main():
                                     screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                                 current_size = screen.get_size()
                                 print(f"[INFO] Switched to fullscreen: {current_size}")
+                                
+                                # フルスクリーン時のスケーリング パラメータを再計算
+                                new_width, new_height = current_size
+                                aspect_ratio = SCREEN_WIDTH / SCREEN_HEIGHT
+                                screen_aspect_ratio = new_width / new_height
+                                
+                                if screen_aspect_ratio > aspect_ratio:
+                                    # 画面の方が横長：高さベースでスケール
+                                    scale_factor = new_height / SCREEN_HEIGHT
+                                    scaled_width = int(SCREEN_WIDTH * scale_factor)
+                                    scaled_height = new_height
+                                    offset_x = (new_width - scaled_width) // 2
+                                    offset_y = 0
+                                else:
+                                    # 画面の方が縦長：幅ベースでスケール
+                                    scale_factor = new_width / SCREEN_WIDTH
+                                    scaled_width = new_width
+                                    scaled_height = int(SCREEN_HEIGHT * scale_factor)
+                                    offset_x = 0
+                                    offset_y = (new_height - scaled_height) // 2
                             else:
                                 # ウィンドウモードに戻す（ハードウェアアクセラレーション有効）
                                 try:
@@ -637,26 +679,21 @@ def main():
                                     screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
                                 current_size = windowed_size
                                 print(f"[INFO] Switched to windowed: {current_size}")
-                            
-                            # スケーリング パラメータを再計算
-                            new_width, new_height = current_size
-                            aspect_ratio = SCREEN_WIDTH / SCREEN_HEIGHT
-                            screen_aspect_ratio = new_width / new_height
-                            
-                            if screen_aspect_ratio > aspect_ratio:
-                                # 画面の方が横長：高さベースでスケール
-                                scale_factor = new_height / SCREEN_HEIGHT
-                                scaled_width = int(SCREEN_WIDTH * scale_factor)
-                                scaled_height = new_height
-                                offset_x = (new_width - scaled_width) // 2
-                                offset_y = 0
-                            else:
-                                # 画面の方が縦長：幅ベースでスケール
-                                scale_factor = new_width / SCREEN_WIDTH
-                                scaled_width = new_width
-                                scaled_height = int(SCREEN_HEIGHT * scale_factor)
+                                
+                                # 保存していたウィンドウ位置を復元
+                                if saved_window_pos is not None:
+                                    try:
+                                        hwnd = pygame.display.get_wm_info()['window']
+                                        x, y = saved_window_pos
+                                        # SWP_NOZORDER(0x0004) | SWP_NOSIZE(0x0001): サイズ変更なし
+                                        ctypes.windll.user32.SetWindowPos(hwnd, 0, x, y, 0, 0, 0x0004 | 0x0001 | 0x0010)
+                                    except Exception:
+                                        pass
+                                
+                                # ウィンドウモード時はスケーリングをリセット
+                                scale_factor = 1.0
                                 offset_x = 0
-                                offset_y = (new_height - scaled_height) // 2
+                                offset_y = 0
                             
                             # スケール済みサーフェスのキャッシュをクリア
                             scaled_surface = None
