@@ -626,8 +626,15 @@ def main():
                                 current_size = screen.get_size()
                                 print(f"[INFO] Switched to fullscreen: {current_size}")
                             else:
-                                # ウィンドウモードに戻す
-                                screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
+                                # ウィンドウモードに戻す（ハードウェアアクセラレーション有効）
+                                try:
+                                    if USE_HARDWARE_ACCELERATION:
+                                        screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE | pygame.HWSURFACE | pygame.DOUBLEBUF)
+                                    else:
+                                        screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
+                                except:
+                                    # 失敗したら通常のウィンドウモード
+                                    screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
                                 current_size = windowed_size
                                 print(f"[INFO] Switched to windowed: {current_size}")
                             

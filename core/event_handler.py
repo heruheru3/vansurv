@@ -21,8 +21,41 @@ class EventHandler:
     def handle_window_events(self, event, is_fullscreen, windowed_size, display_info):
         """ウィンドウ関連のイベント処理"""
         if event.type == pygame.VIDEORESIZE:
-            # リサイズイベントの処理
-            return {'action': 'resize', 'size': event.size}
+            # ウィンドウリサイズ処理（アスペクト比16:9を維持）
+            new_width, new_height = event.w, event.h
+            
+            # 最小サイズを元のサイズの半分に制限
+            from constants import SCREEN_WIDTH, SCREEN_HEIGHT
+            min_width = SCREEN_WIDTH // 2
+            min_height = SCREEN_HEIGHT // 2
+            new_width = max(new_width, min_width)
+            new_height = max(new_height, min_height)
+            
+            # アスペクト比を維持するためのスケール計算
+            target_aspect = SCREEN_WIDTH / SCREEN_HEIGHT  # 16:9 = 1.777...
+            current_aspect = new_width / new_height
+            
+            if current_aspect > target_aspect:
+                # ウィンドウが横に広すぎる場合、高さを基準にする
+                scale_factor = new_height / SCREEN_HEIGHT
+                scaled_width = int(SCREEN_WIDTH * scale_factor)
+                scaled_height = new_height
+                offset_x = (new_width - scaled_width) // 2
+                offset_y = 0
+            else:
+                # ウィンドウが縦に長すぎる場合、幅を基準にする
+                scale_factor = new_width / SCREEN_WIDTH
+                scaled_width = new_width
+                scaled_height = int(SCREEN_HEIGHT * scale_factor)
+                offset_x = 0
+                offset_y = (new_height - scaled_height) // 2
+            
+            return {
+                'scale_factor': scale_factor,
+                'offset_x': offset_x,
+                'offset_y': offset_y,
+                'current_size': (new_width, new_height)
+            }
         return None
     
     def handle_keyboard_navigation(self, event, player, particles):
