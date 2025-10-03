@@ -216,6 +216,9 @@ def main():
     # ウィンドウ位置の記憶（フルスクリーン切り替え用）
     saved_window_pos = None
     
+    # GPUアシスト状態（実行時切り替え可能）
+    gpu_assist_enabled = GPU_ASSIST_ENABLED
+    
     # パフォーマンスログタイマー
     log_timer = 0.0
 
@@ -592,6 +595,33 @@ def main():
                         # DEBUG_MODEの同期（下位互換性のため）
                         DEBUG_MODE = debug_manager.debug_mode
                         continue
+                    
+                    # F12キーでGPUアシスト切り替え
+                    if event.key == pygame.K_F12:
+                        gpu_assist_enabled = not gpu_assist_enabled
+                        print(f"[INFO] GPU Assist: {'ON' if gpu_assist_enabled else 'OFF'}")
+                        
+                        # ディスプレイを再初期化
+                        try:
+                            if is_fullscreen:
+                                if gpu_assist_enabled:
+                                    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+                                else:
+                                    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                            else:
+                                if gpu_assist_enabled:
+                                    screen = pygame.display.set_mode(current_size, pygame.RESIZABLE | pygame.HWSURFACE | pygame.DOUBLEBUF)
+                                else:
+                                    screen = pygame.display.set_mode(current_size, pygame.RESIZABLE)
+                            # 仮想画面も再作成
+                            virtual_screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+                            if gpu_assist_enabled:
+                                virtual_screen = virtual_screen.convert()
+                            scaled_surface = None
+                            print(f"[INFO] Display reinitialized with GPU Assist: {'ON' if gpu_assist_enabled else 'OFF'}")
+                        except Exception as e:
+                            print(f"[ERROR] Failed to reinitialize display: {e}")
+                        continue
 
                     # ESCキーでゲーム途中でも強制終了（設定画面が開いている場合は設定画面を閉じる）
                     if event.key == pygame.K_ESCAPE:
@@ -638,10 +668,14 @@ def main():
                                 except Exception:
                                     pass
                                 
-                                # フルスクリーンモードに切り替え（ハードウェアアクセラレーション有効）
+                                # フルスクリーンモードに切り替え（GPUアシスト状態を反映）
                                 try:
-                                    # まずHWSURFACEを試みる（高速）
-                                    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+                                    if gpu_assist_enabled:
+                                        # GPUアシスト有効：HWSURFACEを試みる（高速）
+                                        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+                                    else:
+                                        # GPUアシスト無効：通常のフルスクリーン
+                                        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                                 except:
                                     # 失敗したら通常のフルスクリーン
                                     screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -668,9 +702,9 @@ def main():
                                     offset_x = 0
                                     offset_y = (new_height - scaled_height) // 2
                             else:
-                                # ウィンドウモードに戻す（ハードウェアアクセラレーション有効）
+                                # ウィンドウモードに戻す（GPUアシスト状態を反映）
                                 try:
-                                    if USE_HARDWARE_ACCELERATION:
+                                    if gpu_assist_enabled:
                                         screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE | pygame.HWSURFACE | pygame.DOUBLEBUF)
                                     else:
                                         screen = pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
@@ -2441,7 +2475,7 @@ def main():
 
             # FPS表示とデバッグ情報の描画（DebugManagerに委譲）
             if debug_manager.show_fps and len(fps_values) > 0:
-                debug_manager.draw_fps(screen, fps_values, enemies, experience_gems, player)
+                debug_manager.draw_fps(screen, fps_values, enemies, experience_gems, player, gpu_assist_enabled)
                 # パフォーマンス統計の表示（F9でオン/オフ）
                 draw_performance_stats(screen, fps_font)
 

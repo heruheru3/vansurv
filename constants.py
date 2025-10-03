@@ -13,8 +13,9 @@ DELTA_TIME_CAP = 50.0           # デルタタイムの上限（ミリ秒、約3
 DELTA_TIME_SMOOTHING = 0.1      # デルタタイムスムージング係数（0.0-1.0、小さいほど滑らか）
 
 # スケーリング最適化設定
-USE_HARDWARE_ACCELERATION = True  # ハードウェアアクセラレーションを使用
+USE_HARDWARE_ACCELERATION = True  # ハードウェアアクセラレーションを使用（F12で切り替え可能）
 SCALE_DIRECT_TO_SCREEN = True     # 大きなスケール時にスクリーンに直接描画（全画面高速化）
+GPU_ASSIST_ENABLED = True         # GPUアシストのデフォルト状態（実行時に切り替え可能）
 
 # ワールドサイズ（画面の4倍）
 WORLD_WIDTH = SCREEN_WIDTH * 4
